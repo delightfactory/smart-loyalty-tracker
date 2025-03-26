@@ -9,7 +9,6 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   Select,
   SelectContent,
@@ -36,21 +35,22 @@ import {
 import { 
   FileText, 
   Plus, 
-  Search, 
   Filter, 
   ShoppingCart, 
   MoreVertical,
   CreditCard,
   Pencil,
   Trash,
-  Calendar 
+  Calendar,
+  Eye
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import PageContainer from '@/components/layout/PageContainer';
 import { InvoiceStatus, PaymentMethod } from '@/lib/types';
-import { invoices, customers, updateInvoice } from '@/lib/data';
+import { invoices, customers, getCustomerById, updateInvoice } from '@/lib/data';
 import { cn } from '@/lib/utils';
+import SmartSearch from '@/components/search/SmartSearch';
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -62,7 +62,7 @@ const Invoices = () => {
   
   const filteredInvoices = invoices.filter(invoice => {
     // Apply search filter
-    const customer = customers.find(c => c.id === invoice.customerId);
+    const customer = getCustomerById(invoice.customerId);
     const matchesSearch = 
       invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false);
@@ -88,9 +88,8 @@ const Invoices = () => {
   
   const confirmDeleteInvoice = () => {
     if (invoiceToDelete) {
-      // Here you'd call your delete function
-      // For now we'll just filter it out
-      const filteredInvoices = invoices.filter(invoice => invoice.id !== invoiceToDelete);
+      // For now we'll just show a notification
+      // The actual deletion logic is in InvoiceDetails.tsx
       
       toast({
         title: "تم حذف الفاتورة",
@@ -99,6 +98,9 @@ const Invoices = () => {
       
       setInvoiceToDelete(null);
       setDeleteDialogOpen(false);
+      
+      // Refresh or navigate back to invoices
+      navigate('/invoices');
     }
   };
   
@@ -120,15 +122,13 @@ const Invoices = () => {
   return (
     <PageContainer title="إدارة الفواتير" subtitle="عرض وإنشاء وإدارة الفواتير">
       <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input 
-            placeholder="بحث عن فاتورة..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <SmartSearch
+          placeholder="بحث عن فاتورة أو عميل..."
+          className="w-full sm:w-64"
+          onSelectCustomer={(customer) => {
+            navigate(`/customer/${customer.id}`);
+          }}
+        />
         
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -179,9 +179,13 @@ const Invoices = () => {
           <TableBody>
             {filteredInvoices.length > 0 ? (
               filteredInvoices.map((invoice) => {
-                const customer = customers.find(c => c.id === invoice.customerId);
+                const customer = getCustomerById(invoice.customerId);
                 return (
-                  <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow 
+                    key={invoice.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/invoice/${invoice.id}`)}
+                  >
                     <TableCell className="font-medium">{invoice.id}</TableCell>
                     <TableCell>{customer?.name || 'غير معروف'}</TableCell>
                     <TableCell>{formatDate(invoice.date)}</TableCell>
@@ -198,7 +202,7 @@ const Invoices = () => {
                     </TableCell>
                     <TableCell>{invoice.pointsEarned}</TableCell>
                     <TableCell>{invoice.pointsRedeemed}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
@@ -207,6 +211,12 @@ const Invoices = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/invoice/${invoice.id}`)}
+                          >
+                            <Eye className="ml-2 h-4 w-4" />
+                            عرض التفاصيل
+                          </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => navigate(`/create-invoice/${invoice.customerId}`, { state: { editInvoice: invoice } })}
                           >

@@ -11,8 +11,10 @@ import ProductDetails from "./pages/ProductDetails";
 import Customers from "./pages/Customers";
 import CustomerDetails from "./pages/CustomerDetails";
 import Invoices from "./pages/Invoices";
+import InvoiceDetails from "./pages/InvoiceDetails";
 import CreateInvoice from "./pages/CreateInvoice";
 import CreatePayment from "./pages/CreatePayment";
+import CreateRedemption from "./pages/CreateRedemption";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
@@ -34,10 +36,13 @@ const App = () => (
               <Route path="/customers" element={<Customers />} />
               <Route path="/customer/:id" element={<CustomerDetails />} />
               <Route path="/invoices" element={<Invoices />} />
+              <Route path="/invoice/:id" element={<InvoiceDetails />} />
               <Route path="/create-invoice" element={<CreateInvoice />} />
               <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />
               <Route path="/create-payment" element={<CreatePayment />} />
               <Route path="/create-payment/:customerId" element={<CreatePayment />} />
+              <Route path="/create-redemption" element={<CreateRedemption />} />
+              <Route path="/create-redemption/:customerId" element={<CreateRedemption />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
