@@ -81,6 +81,19 @@ export interface Invoice {
   status: InvoiceStatus;
   paymentMethod: PaymentMethod;
   categoriesCount: number; // Number of unique categories in this invoice
+  payments?: Payment[]; // Related payments
+}
+
+// Payment Interface
+export interface Payment {
+  id: string;
+  customerId: string;
+  invoiceId?: string; // Optional: payments can be related to an invoice or just to the customer account
+  amount: number;
+  date: Date;
+  method: string;
+  notes?: string;
+  type: 'payment' | 'refund';
 }
 
 // Redemption Item Interface
@@ -89,6 +102,16 @@ export interface RedemptionItem {
   quantity: number;
   pointsRequired: number;
   totalPointsRequired: number;
+}
+
+// Redemption Interface
+export interface Redemption {
+  id: string;
+  customerId: string;
+  date: Date;
+  items: RedemptionItem[];
+  totalPointsRedeemed: number;
+  status: 'completed' | 'cancelled' | 'pending';
 }
 
 // Customer Analysis
