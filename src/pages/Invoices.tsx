@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   
   const filteredInvoices = invoices.filter(invoice => {
     // Apply search filter
@@ -43,8 +43,8 @@ const Invoices = () => {
       invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
-    // Apply status filter
-    const matchesStatus = statusFilter ? invoice.status === statusFilter : true;
+    // Apply status filter - Use 'all' instead of empty string
+    const matchesStatus = statusFilter !== 'all' ? invoice.status === statusFilter : true;
     
     return matchesSearch && matchesStatus;
   });
@@ -94,7 +94,7 @@ const Invoices = () => {
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">جميع الحالات</SelectItem>
+              <SelectItem value="all">جميع الحالات</SelectItem>
               {Object.values(InvoiceStatus).map((status) => (
                 <SelectItem key={status} value={status}>{status}</SelectItem>
               ))}

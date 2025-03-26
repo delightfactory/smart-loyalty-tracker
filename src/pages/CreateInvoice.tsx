@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -95,10 +94,8 @@ const CreateInvoice = () => {
   const [totalRedemptionPoints, setTotalRedemptionPoints] = useState<number>(0);
   const [categoriesCount, setCategoriesCount] = useState<number>(0);
   
-  // Get customer data
   const customer = selectedCustomerId ? getCustomerById(selectedCustomerId) : null;
   
-  // Calculate what categories are in the items
   useEffect(() => {
     if (items.length > 0) {
       const uniqueCategories = new Set<ProductCategory>();
@@ -112,11 +109,9 @@ const CreateInvoice = () => {
       
       setCategoriesCount(uniqueCategories.size);
       
-      // Calculate total amount
       const calculatedTotalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
       setTotalAmount(calculatedTotalAmount);
       
-      // Calculate points earned
       const calculatedPointsEarned = calculatePoints(items);
       setPointsEarned(calculatedPointsEarned);
     } else {
@@ -126,7 +121,6 @@ const CreateInvoice = () => {
     }
   }, [items]);
   
-  // Calculate total redemption points
   useEffect(() => {
     if (redemptionItems.length > 0) {
       const calculatedTotalPoints = redemptionItems.reduce((sum, item) => sum + (item.totalPointsRequired || 0), 0);
@@ -213,7 +207,6 @@ const CreateInvoice = () => {
     
     setItems([...items, item]);
     
-    // Reset form
     setNewItem({
       productId: '',
       quantity: 1,
@@ -233,7 +226,6 @@ const CreateInvoice = () => {
       return;
     }
     
-    // Check if customer can redeem
     if (customer && !canRedeemPoints(customer.id, totalRedemptionPoints + (newRedemptionItem.totalPointsRequired || 0))) {
       toast({
         title: "خطأ",
@@ -252,7 +244,6 @@ const CreateInvoice = () => {
     
     setRedemptionItems([...redemptionItems, item]);
     
-    // Reset form
     setNewRedemptionItem({
       productId: '',
       quantity: 1,
@@ -292,14 +283,11 @@ const CreateInvoice = () => {
       return;
     }
     
-    // Create invoice
     const invoice = generateInvoice(selectedCustomerId, items, paymentMethod, totalRedemptionPoints);
     
     if (invoice) {
-      // Add invoice
       addInvoice(invoice);
       
-      // Update customer points and credit balance
       if (customer) {
         const updatedCustomer = { ...customer };
         updatedCustomer.pointsEarned += invoice.pointsEarned;
@@ -322,7 +310,6 @@ const CreateInvoice = () => {
         description: "تم إنشاء الفاتورة بنجاح",
       });
       
-      // Navigate back
       navigate(customerId ? `/customer/${customerId}` : '/invoices');
     }
   };
@@ -382,7 +369,6 @@ const CreateInvoice = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Customer Selection */}
               <div className="space-y-2">
                 <Label htmlFor="customer">العميل</Label>
                 <Select
@@ -403,7 +389,6 @@ const CreateInvoice = () => {
                 </Select>
               </div>
               
-              {/* Payment Method */}
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">طريقة الدفع</Label>
                 <Select
@@ -420,7 +405,6 @@ const CreateInvoice = () => {
                 </Select>
               </div>
               
-              {/* Add Product */}
               <div className="border rounded-lg p-4">
                 <h3 className="text-sm font-medium mb-4">إضافة منتج</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -461,7 +445,6 @@ const CreateInvoice = () => {
                 </div>
               </div>
               
-              {/* Products Table */}
               {items.length > 0 ? (
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
@@ -565,7 +548,6 @@ const CreateInvoice = () => {
               </div>
             </div>
             
-            {/* Points Redemption Section */}
             {paymentMethod === PaymentMethod.CASH && customer && (
               <Accordion type="single" collapsible className="border rounded-lg">
                 <AccordionItem value="redemption" className="border-none">
@@ -582,7 +564,6 @@ const CreateInvoice = () => {
                         <span className="font-medium">{customer.currentPoints}</span>
                       </div>
                       
-                      {/* Add Redemption Item */}
                       <div className="border rounded-lg p-3">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div className="md:col-span-2">
@@ -622,7 +603,6 @@ const CreateInvoice = () => {
                         </div>
                       </div>
                       
-                      {/* Redemption Items */}
                       {redemptionItems.length > 0 ? (
                         <div className="border rounded-lg overflow-hidden">
                           <Table>
@@ -667,7 +647,6 @@ const CreateInvoice = () => {
                         </div>
                       )}
                       
-                      {/* Redemption Status */}
                       {redemptionItems.length > 0 && (
                         <div className={cn(
                           "p-3 rounded-lg text-sm flex items-center",
