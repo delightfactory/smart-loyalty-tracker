@@ -29,7 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Edit, Trash, TrendingUp } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
-import { getProductById, products, invoices } from '@/lib/data';
+import { getProductById, products, invoices, customers } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 const ProductDetails = () => {
