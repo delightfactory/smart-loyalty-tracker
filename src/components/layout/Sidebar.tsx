@@ -1,125 +1,100 @@
 
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  ChevronRight, 
-  LayoutDashboard, 
+  Home, 
   Package, 
   Users, 
   FileText, 
-  Settings, 
-  ChevronLeft,
-  BarChart
+  PieChart, 
+  BarChart2, 
+  CreditCard,
+  Settings,
+  Star
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMobile } from '@/hooks/use-mobile';
 
-type NavItem = {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface NavItemProps {
+  icon: React.ReactNode;
   label: string;
   href: string;
-  icon: React.ElementType;
-};
+}
 
-const navItems: NavItem[] = [
-  {
-    label: 'لوحة التحكم',
-    href: '/',
-    icon: LayoutDashboard,
-  },
-  {
-    label: 'المنتجات',
-    href: '/products',
-    icon: Package,
-  },
-  {
-    label: 'العملاء',
-    href: '/customers',
-    icon: Users,
-  },
-  {
-    label: 'الفواتير',
-    href: '/invoices',
-    icon: FileText,
-  },
-  {
-    label: 'التحليلات',
-    href: '/analytics',
-    icon: BarChart,
-  },
-  {
-    label: 'الإعدادات',
-    href: '/settings',
-    icon: Settings,
-  },
-];
-
-const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
+const NavItem = ({ icon, label, href }: NavItemProps) => {
+  const location = useLocation();
+  const isActive = location.pathname === href || location.pathname.startsWith(`${href}/`);
 
   return (
-    <div 
+    <NavLink to={href} className="block w-full">
+      <Button
+        variant="ghost"
+        className={cn(
+          "w-full justify-start mb-1",
+          isActive && "bg-accent text-accent-foreground"
+        )}
+      >
+        {icon}
+        <span className="mr-3">{label}</span>
+      </Button>
+    </NavLink>
+  );
+};
+
+const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+  const isMobile = useMobile();
+
+  const navItems = [
+    { icon: <Home className="ml-2 h-4 w-4" />, label: "الصفحة الرئيسية", href: "/" },
+    { icon: <BarChart2 className="ml-2 h-4 w-4" />, label: "لوحة التحكم", href: "/dashboard" },
+    { icon: <Package className="ml-2 h-4 w-4" />, label: "المنتجات", href: "/products" },
+    { icon: <Users className="ml-2 h-4 w-4" />, label: "العملاء", href: "/customers" },
+    { icon: <FileText className="ml-2 h-4 w-4" />, label: "الفواتير", href: "/invoices" },
+    { icon: <CreditCard className="ml-2 h-4 w-4" />, label: "المدفوعات", href: "/create-payment" },
+    { icon: <Star className="ml-2 h-4 w-4" />, label: "استبدال النقاط", href: "/create-redemption/C001" },
+    { icon: <PieChart className="ml-2 h-4 w-4" />, label: "التحليلات", href: "/analytics" },
+    { icon: <Settings className="ml-2 h-4 w-4" />, label: "الإعدادات", href: "/settings" },
+  ];
+
+  return (
+    <aside
       className={cn(
-        "h-screen flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
-        collapsed ? "w-[80px]" : "w-[250px]"
+        "fixed right-0 top-0 z-40 h-screen w-64 border-l bg-background p-4 transition-transform duration-200 ease-in-out",
+        isOpen ? "translate-x-0" : "translate-x-full",
+        isMobile ? "shadow-lg" : ""
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-              L
-            </div>
-            <h1 className="text-xl font-bold text-white">نظام الولاء</h1>
-          </div>
-        )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => setCollapsed(!collapsed)} 
-          className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent"
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </Button>
-      </div>
-      
-      <div className="flex-grow py-4 overflow-y-auto scrollbar-none">
-        <nav className="px-2 space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                isActive 
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground" 
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                collapsed && "justify-center"
-              )}
-            >
-              <item.icon size={20} />
-              {!collapsed && <span>{item.label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
-      
-      <div className="p-4 border-t border-sidebar-border">
-        <div className={cn(
-          "flex items-center gap-3",
-          collapsed && "justify-center"
-        )}>
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <Users size={16} className="text-sidebar-accent-foreground" />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">Admin</p>
-              <p className="text-xs text-sidebar-foreground/70 truncate">admin@example.com</p>
-            </div>
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between py-2">
+          <h2 className="text-lg font-semibold">القائمة الرئيسية</h2>
+          {isMobile && (
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              &times;
+            </Button>
           )}
         </div>
+        <Separator className="my-2" />
+        <ScrollArea className="flex-1 pt-4">
+          <nav className="flex flex-col">
+            {navItems.map((item) => (
+              <NavItem
+                key={item.href}
+                icon={item.icon}
+                label={item.label}
+                href={item.href}
+              />
+            ))}
+          </nav>
+        </ScrollArea>
       </div>
-    </div>
+    </aside>
   );
 };
 

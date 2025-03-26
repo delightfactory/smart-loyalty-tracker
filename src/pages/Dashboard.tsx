@@ -1,65 +1,105 @@
 
 import { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
-} from '@/components/ui/card';
-import { 
-  PieChart, 
-  Pie, 
-  BarChart, 
-  Bar, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer, 
-  Cell
-} from 'recharts';
-import { Button } from '@/components/ui/button';
-import { Package, Users, FileText, CreditCard, TrendingUp } from 'lucide-react';
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Calendar } from 'lucide-react';
+import SmartSearch from '@/components/search/SmartSearch';
 import PageContainer from '@/components/layout/PageContainer';
-import { ProductCategory, Invoice, Customer } from '@/lib/types';
-import { products, customers, invoices } from '@/lib/data';
-import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { InvoiceStatus } from '@/lib/types';
+import { products, customers, invoices, payments } from '@/lib/data';
 
-// Colors for charts
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+// Import dashboard components
+import DashboardCards from '@/components/dashboard/DashboardCards';
+import InvoiceStatusChart from '@/components/dashboard/InvoiceStatusChart';
+import RevenueChart from '@/components/dashboard/RevenueChart';
+import CustomersList from '@/components/dashboard/CustomersList';
+import RecentInvoices from '@/components/dashboard/RecentInvoices';
+import PointsRedemptionChart from '@/components/dashboard/PointsRedemptionChart';
+
+// Utility functions
+// 1. Filter data by date range
+const filterDataByTimeRange = (data: any[], timeRange: string, dateField: string = 'date') => {
+  const now = new Date();
+  const startDate = new Date();
+
+  switch (timeRange) {
+    case 'week':
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    case 'quarter':
+      startDate.setMonth(now.getMonth() - 3);
+      break;
+    case 'year':
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+    default:
+      // For 'all', return all data
+      return data;
+  }
+
+  return data.filter(item => {
+    const itemDate = new Date(item[dateField]);
+    return itemDate >= startDate && itemDate <= now;
+  });
+};
+
+// 2. Format currency
+const formatCurrency = (value: number) => {
+  return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+};
 
 const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [timeRange, setTimeRange] = useState('all');
   const [summary, setSummary] = useState({
     totalProducts: 0,
     totalCustomers: 0,
     totalInvoices: 0,
     totalRevenue: 0,
+    totalPaid: 0,
+    totalOverdue: 0,
     totalPointsIssued: 0,
     totalPointsRedeemed: 0
   });
 
-  // Calculate category distribution for pie chart
-  const categoryData = Object.values(ProductCategory).map(category => {
-    const productCount = products.filter(p => p.category === category).length;
-    return {
-      name: category,
-      value: productCount
-    };
-  });
+  // Filter invoices based on time range
+  const filteredInvoices = filterDataByTimeRange(invoices, timeRange);
+  const filteredPayments = filterDataByTimeRange(payments, timeRange);
 
   // Calculate monthly revenue data
-  const monthlyRevenueData = [
-    { name: 'يناير', revenue: 12500 },
-    { name: 'فبراير', revenue: 15000 },
-    { name: 'مارس', revenue: 18000 },
-    { name: 'أبريل', revenue: 16500 },
-    { name: 'مايو', revenue: 19500 },
-    { name: 'يونيو', revenue: 22000 }
-  ];
+  const getMonthlyRevenueData = () => {
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    
+    const monthlyData = Array(12).fill(0).map((_, index) => ({
+      name: months[index],
+      revenue: 0,
+      invoiceCount: 0
+    }));
+    
+    filteredInvoices.forEach(invoice => {
+      const month = new Date(invoice.date).getMonth();
+      monthlyData[month].revenue += invoice.totalAmount;
+      monthlyData[month].invoiceCount += 1;
+    });
+    
+    // Only include months with data
+    return monthlyData.filter(month => month.invoiceCount > 0);
+  };
+
+  const monthlyRevenueData = getMonthlyRevenueData();
 
   // Calculate top customers by points
   const topCustomers = [...customers]
@@ -67,7 +107,7 @@ const Dashboard = () => {
     .slice(0, 5);
 
   // Calculate recent invoices
-  const recentInvoices = [...invoices]
+  const recentInvoices = [...filteredInvoices]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
@@ -77,263 +117,230 @@ const Dashboard = () => {
     { name: 'نقاط مستبدلة', value: customers.reduce((sum, c) => sum + c.pointsRedeemed, 0) }
   ];
 
+  // Calculate payment trend data
+  const getPaymentTrendData = () => {
+    const paymentsByDay: Record<string, { date: string, total: number }> = {};
+    
+    filteredPayments.forEach(payment => {
+      if (payment.type === 'payment') {
+        const dateStr = new Date(payment.date).toISOString().split('T')[0];
+        if (!paymentsByDay[dateStr]) {
+          paymentsByDay[dateStr] = {
+            date: dateStr,
+            total: 0
+          };
+        }
+        paymentsByDay[dateStr].total += payment.amount;
+      }
+    });
+    
+    return Object.values(paymentsByDay)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(item => ({
+        name: new Date(item.date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+        revenue: item.total
+      }))
+      .slice(-15); // Last 15 days with data
+  };
+
+  const paymentTrendData = getPaymentTrendData();
+
+  // Calculate overdue amount data
+  const overdueData = filteredInvoices
+    .filter(inv => inv.status === InvoiceStatus.OVERDUE)
+    .map(inv => ({
+      id: inv.id,
+      customer: customers.find(c => c.id === inv.customerId)?.name || 'غير معروف',
+      customerId: inv.customerId,
+      amount: inv.totalAmount,
+      date: new Date(inv.date).toLocaleDateString('ar-EG'),
+      dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('ar-EG') : 'غير محدد',
+      daysOverdue: inv.dueDate ? Math.floor((new Date().getTime() - new Date(inv.dueDate).getTime()) / (1000 * 3600 * 24)) : 0
+    }))
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
   useEffect(() => {
-    // Calculate dashboard summary
+    // Calculate dashboard summary based on filtered data
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const totalPaid = filteredInvoices
+      .filter(inv => inv.status === InvoiceStatus.PAID)
+      .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const totalOverdue = filteredInvoices
+      .filter(inv => inv.status === InvoiceStatus.OVERDUE)
+      .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    
     setSummary({
       totalProducts: products.length,
       totalCustomers: customers.length,
-      totalInvoices: invoices.length,
-      totalRevenue: invoices.reduce((sum, inv) => sum + inv.totalAmount, 0),
-      totalPointsIssued: invoices.reduce((sum, inv) => sum + inv.pointsEarned, 0),
-      totalPointsRedeemed: invoices.reduce((sum, inv) => sum + inv.pointsRedeemed, 0)
+      totalInvoices: filteredInvoices.length,
+      totalRevenue,
+      totalPaid,
+      totalOverdue,
+      totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + inv.pointsEarned, 0),
+      totalPointsRedeemed: filteredInvoices.reduce((sum, inv) => sum + inv.pointsRedeemed, 0)
     });
-  }, []);
-
-  // Format currency
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
-  };
+  }, [filteredInvoices]);
 
   return (
     <PageContainer title="لوحة التحكم" subtitle="نظرة عامة على أداء النظام">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="flex justify-between items-center mb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-[400px]">
+          <TabsList>
+            <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
+            <TabsTrigger value="sales">المبيعات</TabsTrigger>
+            <TabsTrigger value="customers">العملاء</TabsTrigger>
+            <TabsTrigger value="products">المنتجات</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="flex items-center gap-4">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[180px]">
+              <Calendar className="ml-2 h-4 w-4" />
+              <SelectValue placeholder="الفترة الزمنية" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الفترات</SelectItem>
+              <SelectItem value="week">آخر أسبوع</SelectItem>
+              <SelectItem value="month">آخر شهر</SelectItem>
+              <SelectItem value="quarter">آخر 3 شهور</SelectItem>
+              <SelectItem value="year">آخر سنة</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <SmartSearch className="w-[300px]" placeholder="بحث عن عميل أو منتج..." />
+        </div>
+      </div>
+
+      <TabsContent value="overview" className="mt-0">
         {/* Summary Cards */}
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي المنتجات</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalProducts}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Package className="h-6 w-6 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
 
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي العملاء</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalCustomers}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Invoice Status */}
+          <InvoiceStatusChart invoices={filteredInvoices} />
 
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الفواتير</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalInvoices}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Monthly Revenue */}
+          <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
+        </div>
 
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الإيرادات</p>
-                <h3 className="text-2xl font-bold mt-2">{formatCurrency(summary.totalRevenue)}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-purple-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Top Customers */}
+          <CustomersList customers={topCustomers} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* Category Distribution */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>توزيع المنتجات حسب الأقسام</CardTitle>
-            <CardDescription>عدد المنتجات في كل قسم</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'عدد المنتجات']} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          {/* Recent Invoices */}
+          <RecentInvoices 
+            invoices={recentInvoices} 
+            customers={customers} 
+            formatCurrency={formatCurrency} 
+          />
 
-        {/* Monthly Revenue */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>الإيرادات الشهرية</CardTitle>
-            <CardDescription>إجمالي الإيرادات لكل شهر</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyRevenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => [formatCurrency(value as number), 'الإيرادات']} />
-                <Legend />
-                <Bar dataKey="revenue" name="الإيرادات" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Points Redemption */}
+          <PointsRedemptionChart data={pointsRedemptionData} />
+        </div>
+      </TabsContent>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Top Customers */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>أفضل العملاء</CardTitle>
-            <CardDescription>بناءً على النقاط المكتسبة</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topCustomers.map((customer, index) => (
-                <div key={customer.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "h-8 w-8 rounded-full flex items-center justify-center text-white",
-                      index === 0 ? "bg-yellow-500" : 
-                      index === 1 ? "bg-gray-400" : 
-                      index === 2 ? "bg-amber-700" : "bg-gray-200"
-                    )}>
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium">{customer.name}</p>
-                      <p className="text-sm text-muted-foreground">{customer.businessType}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{customer.pointsEarned} نقطة</p>
-                    <p className="text-sm text-muted-foreground">المستوى {customer.level}</p>
-                  </div>
+      <TabsContent value="sales" className="mt-0">
+        {/* Sales Cards */}
+        <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
+
+        <div className="grid grid-cols-1 gap-6">
+          {/* Revenue Trends */}
+          <RevenueChart 
+            data={monthlyRevenueData} 
+            formatCurrency={formatCurrency} 
+            type="area"
+            title="تطور الإيرادات"
+            description="التغير في حجم المبيعات على مدار الوقت"
+          />
+
+          {/* Overdue Invoices */}
+          <Card>
+            <CardHeader>
+              <CardTitle>الفواتير المتأخرة</CardTitle>
+              <CardDescription>قائمة الفواتير المتأخرة عن موعد السداد</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {overdueData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-right p-2">رقم الفاتورة</th>
+                        <th className="text-right p-2">العميل</th>
+                        <th className="text-right p-2">المبلغ</th>
+                        <th className="text-right p-2">تاريخ الفاتورة</th>
+                        <th className="text-right p-2">تاريخ الاستحقاق</th>
+                        <th className="text-right p-2">أيام التأخير</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueData.map((invoice, index) => (
+                        <tr key={invoice.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                          <td className="p-2">{invoice.id}</td>
+                          <td className="p-2">{invoice.customer}</td>
+                          <td className="p-2">{formatCurrency(invoice.amount)}</td>
+                          <td className="p-2">{invoice.date}</td>
+                          <td className="p-2">{invoice.dueDate}</td>
+                          <td className="p-2 text-red-500">{invoice.daysOverdue}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  لا توجد فواتير متأخرة حالياً
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Recent Invoices */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>أحدث الفواتير</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentInvoices.map((invoice) => {
-                const customer = customers.find(c => c.id === invoice.customerId);
-                return (
-                  <div key={invoice.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{invoice.id}</p>
-                      <p className="text-sm text-muted-foreground">{customer?.name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{formatCurrency(invoice.totalAmount)}</p>
-                      <p className={cn(
-                        "text-sm",
-                        invoice.status === 'مدفوع' ? "text-green-500" : 
-                        invoice.status === 'متأخر' ? "text-red-500" : "text-amber-500"
-                      )}>
-                        {invoice.status}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+          {/* Payment Trends */}
+          <RevenueChart 
+            data={paymentTrendData} 
+            formatCurrency={formatCurrency}
+            title="تفاصيل المدفوعات"
+            description="تطور المدفوعات على مدار الوقت"
+          />
+        </div>
+      </TabsContent>
 
-        {/* Points Redemption */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>معدل استبدال النقاط</CardTitle>
-            <CardDescription>النقاط المكتسبة مقابل المستبدلة</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pointsRedemptionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  <Cell fill="#3b82f6" />
-                  <Cell fill="#22c55e" />
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'النقاط']} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <TabsContent value="customers" className="mt-0">
+        {/* Customer analysis components will be here */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Will be populated with charts and tables */}
+          <Card>
+            <CardHeader>
+              <CardTitle>قريباً</CardTitle>
+              <CardDescription>سيتم إضافة تحليلات العملاء هنا</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="py-10 text-center text-muted-foreground">
+                يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن العملاء.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
 
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>معدل نمو المبيعات</CardTitle>
-            <CardDescription>تحليل نمو المبيعات على مدار الوقت</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={monthlyRevenueData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => [formatCurrency(value as number), 'الإيرادات']} />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  name="الإيرادات" 
-                  stroke="#3b82f6" 
-                  activeDot={{ r: 8 }} 
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <TabsContent value="products" className="mt-0">
+        {/* Products analysis components will be here */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Will be populated with charts and tables */}
+          <Card>
+            <CardHeader>
+              <CardTitle>قريباً</CardTitle>
+              <CardDescription>سيتم إضافة تحليلات المنتجات هنا</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="py-10 text-center text-muted-foreground">
+                يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن المنتجات.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
     </PageContainer>
   );
 };

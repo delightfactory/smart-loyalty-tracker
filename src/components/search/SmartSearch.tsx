@@ -30,6 +30,7 @@ interface SmartSearchProps {
   onSelectCustomer?: (customer: Customer) => void;
   placeholder?: string;
   className?: string;
+  initialSearchTerm?: string;
 }
 
 const SmartSearch = ({
@@ -37,12 +38,13 @@ const SmartSearch = ({
   onSelectProduct,
   onSelectCustomer,
   placeholder = 'بحث...',
-  className
+  className,
+  initialSearchTerm = ''
 }: SmartSearchProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearchTerm);
   const [barcodeMode, setBarcodeMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -88,16 +90,18 @@ const SmartSearch = ({
     (type === 'all' || type === 'product') &&
     (product.id.toLowerCase().includes(search.toLowerCase()) ||
      product.name.toLowerCase().includes(search.toLowerCase()) ||
-     product.brand.toLowerCase().includes(search.toLowerCase()))
-  ).slice(0, 5);
+     product.brand.toLowerCase().includes(search.toLowerCase()) ||
+     product.category.includes(search))
+  ).slice(0, 8);
   
   const filteredCustomers = customers.filter(customer => 
     (type === 'all' || type === 'customer') &&
     (customer.id.toLowerCase().includes(search.toLowerCase()) ||
      customer.name.toLowerCase().includes(search.toLowerCase()) ||
      customer.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-     customer.phone.includes(search))
-  ).slice(0, 5);
+     customer.phone.includes(search) ||
+     customer.businessType.includes(search))
+  ).slice(0, 8);
   
   const handleSelectProduct = (product: Product) => {
     if (onSelectProduct) {
@@ -200,7 +204,12 @@ const SmartSearch = ({
                     setOpen(true);
                   }
                 }}
-                onFocus={() => setOpen(true)}
+                onFocus={() => {
+                  if (search) setOpen(true);
+                }}
+                onClick={() => {
+                  if (search) setOpen(true);
+                }}
                 placeholder={placeholder}
                 className="pl-10 pr-10"
               />
@@ -214,7 +223,7 @@ const SmartSearch = ({
               </Button>
             </div>
           </PopoverTrigger>
-          <PopoverContent className="p-0" align="start" sideOffset={5}>
+          <PopoverContent className="p-0" align="start" sideOffset={5} width="target">
             <Command>
               <CommandInput placeholder={placeholder} value={search} onValueChange={setSearch} />
               <CommandList>
@@ -239,6 +248,7 @@ const SmartSearch = ({
                             )}>
                               {product.category}
                             </Badge>
+                            <span className="text-xs text-muted-foreground">{product.price.toLocaleString('ar-EG')} ج.م</span>
                           </div>
                         </div>
                       </CommandItem>
@@ -269,6 +279,7 @@ const SmartSearch = ({
                             )}>
                               {customer.businessType}
                             </Badge>
+                            <span className="text-xs text-muted-foreground">{customer.phone}</span>
                           </div>
                         </div>
                       </CommandItem>

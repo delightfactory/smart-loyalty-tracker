@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,12 +21,14 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, CreditCard, Check } from 'lucide-react';
+import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import PageContainer from '@/components/layout/PageContainer';
-import { customers, invoices, getCustomerById, updateInvoice } from '@/lib/data';
-import { InvoiceStatus } from '@/lib/types';
+import { customers, invoices, getCustomerById, updateInvoice, addPayment } from '@/lib/data';
+import { InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
 
 // Define schema for form validation
 const paymentSchema = z.object({
@@ -34,6 +36,7 @@ const paymentSchema = z.object({
   invoiceId: z.string({ required_error: "يجب اختيار الفاتورة" }),
   amount: z.coerce.number().positive({ message: "يجب إدخال مبلغ أكبر من صفر" }),
   paymentDate: z.string().min(1, { message: "يجب تحديد تاريخ الدفع" }),
+  method: z.string().min(1, { message: "يجب تحديد طريقة الدفع" }),
   notes: z.string().optional(),
 });
 
@@ -56,24 +59,40 @@ const CreatePayment = () => {
       invoiceId: '',
       amount: 0,
       paymentDate: new Date().toISOString().slice(0, 10),
+      method: 'نقداً',
       notes: '',
     },
   });
   
-  // Handle customer selection and load unpaid invoices
+  // Load unpaid invoices when customer changes
+  useEffect(() => {
+    if (selectedCustomerId) {
+      // Get unpaid invoices for this customer
+      const customerUnpaidInvoices = invoices.filter(
+        invoice => invoice.customerId === selectedCustomerId && 
+        (invoice.status === InvoiceStatus.UNPAID || 
+         invoice.status === InvoiceStatus.PARTIALLY_PAID || 
+         invoice.status === InvoiceStatus.OVERDUE)
+      );
+      
+      setUnpaidInvoices(customerUnpaidInvoices);
+      
+      if (customerUnpaidInvoices.length > 0 && !form.getValues('invoiceId')) {
+        onInvoiceChange(customerUnpaidInvoices[0].id);
+      } else if (customerUnpaidInvoices.length === 0) {
+        setSelectedInvoice(null);
+        form.setValue('invoiceId', '');
+        form.setValue('amount', 0);
+      }
+    }
+  }, [selectedCustomerId]);
+  
+  // Handle customer selection
   const onCustomerChange = (value: string) => {
     setSelectedCustomerId(value);
     form.setValue('customerId', value);
     form.setValue('invoiceId', '');
     setSelectedInvoice(null);
-    
-    // Get unpaid invoices for this customer
-    const customerUnpaidInvoices = invoices.filter(
-      invoice => invoice.customerId === value && 
-      (invoice.status === InvoiceStatus.UNPAID || invoice.status === InvoiceStatus.PARTIALLY_PAID)
-    );
-    
-    setUnpaidInvoices(customerUnpaidInvoices);
   };
   
   // Handle invoice selection
@@ -83,7 +102,18 @@ const CreatePayment = () => {
     setSelectedInvoice(invoice);
     
     if (invoice) {
-      form.setValue('amount', invoice.totalAmount);
+      // Calculate remaining amount
+      const paidAmount = invoice.payments?.reduce((sum, payment) => {
+        if (payment.type === 'payment') {
+          return sum + payment.amount;
+        } else if (payment.type === 'refund') {
+          return sum - payment.amount;
+        }
+        return sum;
+      }, 0) || 0;
+      
+      const remainingAmount = invoice.totalAmount - paidAmount;
+      form.setValue('amount', remainingAmount > 0 ? remainingAmount : 0);
     }
   };
   
@@ -101,19 +131,23 @@ const CreatePayment = () => {
       return;
     }
     
-    // Determine new status based on payment amount
-    let newStatus = InvoiceStatus.PAID;
-    if (data.amount < invoice.totalAmount) {
-      newStatus = InvoiceStatus.PARTIALLY_PAID;
-    }
+    // Generate payment ID
+    const paymentId = `PAY${Date.now().toString().slice(-6)}`;
     
-    // Update invoice status
-    const updatedInvoice = {
-      ...invoice,
-      status: newStatus,
+    // Create payment object
+    const payment: Payment = {
+      id: paymentId,
+      customerId: data.customerId,
+      invoiceId: data.invoiceId,
+      amount: data.amount,
+      date: new Date(data.paymentDate),
+      method: data.method,
+      notes: data.notes || '',
+      type: 'payment'
     };
     
-    updateInvoice(updatedInvoice);
+    // Add payment
+    addPayment(payment);
     
     // Show success message
     toast({
@@ -121,8 +155,8 @@ const CreatePayment = () => {
       description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}`,
     });
     
-    // Clear form or navigate away
-    navigate('/invoices');
+    // Navigate back
+    navigate(customerId ? `/customer/${customerId}` : '/invoices');
   };
   
   return (
@@ -152,6 +186,7 @@ const CreatePayment = () => {
                         <Select
                           onValueChange={(value) => onCustomerChange(value)}
                           defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -180,7 +215,7 @@ const CreatePayment = () => {
                           <FormLabel>الفاتورة</FormLabel>
                           <Select
                             onValueChange={(value) => onInvoiceChange(value)}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -239,12 +274,36 @@ const CreatePayment = () => {
                       
                       <FormField
                         control={form.control}
+                        name="method"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>طريقة الدفع</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="اختر طريقة الدفع" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="نقداً">نقداً</SelectItem>
+                                <SelectItem value="تحويل بنكي">تحويل بنكي</SelectItem>
+                                <SelectItem value="شيك">شيك</SelectItem>
+                                <SelectItem value="بطاقة ائتمان">بطاقة ائتمان</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>ملاحظات</FormLabel>
                             <FormControl>
-                              <Input {...field} />
+                              <Textarea placeholder="أي ملاحظات إضافية..." {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -255,10 +314,20 @@ const CreatePayment = () => {
                 </CardContent>
               </Card>
               
+              {unpaidInvoices.length === 0 && selectedCustomerId && (
+                <Alert variant="warning" className="my-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>لا توجد فواتير غير مدفوعة</AlertTitle>
+                  <AlertDescription>
+                    هذا العميل ليس لديه أي فواتير مستحقة الدفع حالياً.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={!selectedInvoice}
+                disabled={!selectedInvoice || unpaidInvoices.length === 0}
               >
                 <CreditCard className="ml-2 h-4 w-4" />
                 تسجيل الدفعة
@@ -326,8 +395,35 @@ const CreatePayment = () => {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-muted-foreground">الحالة</p>
-                            <p className="text-lg font-bold">{selectedInvoice.status}</p>
+                            <p className={cn(
+                              "text-lg font-bold",
+                              selectedInvoice.status === InvoiceStatus.PAID ? "text-green-600" :
+                              selectedInvoice.status === InvoiceStatus.UNPAID ? "text-amber-600" :
+                              selectedInvoice.status === InvoiceStatus.OVERDUE ? "text-red-600" :
+                              "text-blue-600"
+                            )}>{selectedInvoice.status}</p>
                           </div>
+                          
+                          {selectedInvoice.payments && selectedInvoice.payments.length > 0 && (
+                            <div className="col-span-2">
+                              <p className="text-sm font-medium text-muted-foreground">الدفعات السابقة</p>
+                              <div className="mt-2 space-y-2">
+                                {selectedInvoice.payments.map((payment: Payment) => (
+                                  <div key={payment.id} className="flex justify-between p-2 bg-gray-50 rounded-md">
+                                    <div className="flex items-center">
+                                      <span className={payment.type === 'payment' ? "text-green-600" : "text-red-600"}>
+                                        {payment.type === 'payment' ? '+ ' : '- '}
+                                        {payment.amount.toLocaleString('ar-EG')} ج.م
+                                      </span>
+                                    </div>
+                                    <span className="text-sm text-muted-foreground">
+                                      {new Date(payment.date).toLocaleDateString('ar-EG')}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
