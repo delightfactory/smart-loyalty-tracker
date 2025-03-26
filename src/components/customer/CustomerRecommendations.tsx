@@ -158,7 +158,7 @@ const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendations
                   <span className="text-sm font-medium">{categoryDistribution[mostFrequentCategory]}%</span>
                 </div>
                 <div className="space-y-1">
-                  <Progress value={categoryDistribution[mostFrequentCategory]} className="h-2" indicatorClassName="bg-green-500" />
+                  <Progress value={categoryDistribution[mostFrequentCategory]} className="h-2" />
                   <p className="text-sm text-muted-foreground">{mostFrequentCategory}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -172,7 +172,7 @@ const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendations
                   <span className="text-sm font-medium">{categoryDistribution[leastFrequentCategory]}%</span>
                 </div>
                 <div className="space-y-1">
-                  <Progress value={categoryDistribution[leastFrequentCategory]} className="h-2" indicatorClassName="bg-amber-500" />
+                  <Progress value={categoryDistribution[leastFrequentCategory]} className="h-2" />
                   <p className="text-sm text-muted-foreground">{leastFrequentCategory}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">

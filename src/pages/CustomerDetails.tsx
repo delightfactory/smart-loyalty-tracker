@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -34,6 +33,7 @@ import CustomerAnalytics from '@/components/customer/CustomerAnalytics';
 import CustomerRedemptionButton from '@/components/customer/CustomerRedemptionButton';
 import CustomerEditDialog from '@/components/customer/CustomerEditDialog';
 import CustomerPaymentHistory from '@/components/customer/CustomerPaymentHistory';
+import CustomerRecommendations from '@/components/customer/CustomerRecommendations';
 
 const CustomerDetails = () => {
   const { id } = useParams<{ id: string }>();
