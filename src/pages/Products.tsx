@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
   // Form state
@@ -54,8 +54,8 @@ const Products = () => {
       product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.id.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Apply category filter
-    const matchesCategory = categoryFilter ? product.category === categoryFilter : true;
+    // Apply category filter - Use 'all' instead of empty string
+    const matchesCategory = categoryFilter !== 'all' ? product.category === categoryFilter : true;
     
     return matchesSearch && matchesCategory;
   });
@@ -110,7 +110,7 @@ const Products = () => {
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">جميع الأقسام</SelectItem>
+              <SelectItem value="all">جميع الأقسام</SelectItem>
               {Object.values(ProductCategory).map((category) => (
                 <SelectItem key={category} value={category}>{category}</SelectItem>
               ))}

@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 const Customers = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('');
+  const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
   // Form state
@@ -59,8 +59,8 @@ const Customers = () => {
       customer.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.phone.includes(searchTerm);
     
-    // Apply business type filter
-    const matchesBusinessType = businessTypeFilter ? customer.businessType === businessTypeFilter : true;
+    // Apply business type filter - Use 'all' instead of empty string
+    const matchesBusinessType = businessTypeFilter !== 'all' ? customer.businessType === businessTypeFilter : true;
     
     return matchesSearch && matchesBusinessType;
   });
@@ -127,7 +127,7 @@ const Customers = () => {
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">جميع الأنشطة</SelectItem>
+              <SelectItem value="all">جميع الأنشطة</SelectItem>
               {Object.values(BusinessType).map((type) => (
                 <SelectItem key={type} value={type}>{type}</SelectItem>
               ))}
