@@ -25,13 +25,15 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Package, Plus, Search, Filter } from 'lucide-react';
+import { Package, Plus, Search, Filter, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { ProductCategory, Product } from '@/lib/types';
 import { products, addProduct } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 const Products = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -78,6 +80,10 @@ const Products = () => {
       brand: ''
     });
     setIsAddDialogOpen(false);
+  };
+
+  const handleViewProduct = (productId: string) => {
+    navigate(`/product/${productId}`);
   };
   
   const categoryColorMap: Record<ProductCategory, string> = {
@@ -225,12 +231,13 @@ const Products = () => {
               <TableHead>السعر</TableHead>
               <TableHead>النقاط المكتسبة</TableHead>
               <TableHead>النقاط المطلوبة</TableHead>
+              <TableHead className="w-[80px]">تفاصيل</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product) => (
-                <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50">
+                <TableRow key={product.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{product.id}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>
@@ -246,11 +253,21 @@ const Products = () => {
                   <TableCell>{product.price} ج.م</TableCell>
                   <TableCell>{product.pointsEarned}</TableCell>
                   <TableCell>{product.pointsRequired}</TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleViewProduct(product.id)}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="sr-only">عرض</span>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Package className="h-10 w-10 mb-2" />
                     <p>لا توجد منتجات</p>

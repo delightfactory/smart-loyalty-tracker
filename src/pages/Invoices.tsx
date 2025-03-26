@@ -17,24 +17,48 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   FileText, 
   Plus, 
   Search, 
   Filter, 
   ShoppingCart, 
+  MoreVertical,
+  CreditCard,
+  Pencil,
+  Trash,
   Calendar 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 import PageContainer from '@/components/layout/PageContainer';
 import { InvoiceStatus, PaymentMethod } from '@/lib/types';
-import { invoices, customers } from '@/lib/data';
+import { invoices, customers, updateInvoice } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 const Invoices = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   
   const filteredInvoices = invoices.filter(invoice => {
     // Apply search filter
@@ -43,7 +67,7 @@ const Invoices = () => {
       invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
-    // Apply status filter - Use 'all' instead of empty string
+    // Apply status filter
     const matchesStatus = statusFilter !== 'all' ? invoice.status === statusFilter : true;
     
     return matchesSearch && matchesStatus;
@@ -55,6 +79,27 @@ const Invoices = () => {
   
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('ar-EG');
+  };
+  
+  const handleDeleteInvoice = (invoiceId: string) => {
+    setInvoiceToDelete(invoiceId);
+    setDeleteDialogOpen(true);
+  };
+  
+  const confirmDeleteInvoice = () => {
+    if (invoiceToDelete) {
+      // Here you'd call your delete function
+      // For now we'll just filter it out
+      const filteredInvoices = invoices.filter(invoice => invoice.id !== invoiceToDelete);
+      
+      toast({
+        title: "تم حذف الفاتورة",
+        description: `تم حذف الفاتورة ${invoiceToDelete} بنجاح`,
+      });
+      
+      setInvoiceToDelete(null);
+      setDeleteDialogOpen(false);
+    }
   };
   
   const getStatusClass = (status: InvoiceStatus) => {
@@ -101,10 +146,17 @@ const Invoices = () => {
             </SelectContent>
           </Select>
           
-          <Button onClick={() => navigate('/create-invoice')}>
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            فاتورة جديدة
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => navigate('/create-payment')}>
+              <CreditCard className="h-4 w-4 ml-2" />
+              تسجيل دفعة
+            </Button>
+            
+            <Button onClick={() => navigate('/create-invoice')}>
+              <ShoppingCart className="h-4 w-4 ml-2" />
+              فاتورة جديدة
+            </Button>
+          </div>
         </div>
       </div>
       
@@ -121,6 +173,7 @@ const Invoices = () => {
               <TableHead>الحالة</TableHead>
               <TableHead>النقاط المكتسبة</TableHead>
               <TableHead>النقاط المستبدلة</TableHead>
+              <TableHead className="w-[80px]">خيارات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -145,12 +198,44 @@ const Invoices = () => {
                     </TableCell>
                     <TableCell>{invoice.pointsEarned}</TableCell>
                     <TableCell>{invoice.pointsRedeemed}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">فتح القائمة</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => navigate(`/create-invoice/${invoice.customerId}`, { state: { editInvoice: invoice } })}
+                          >
+                            <Pencil className="ml-2 h-4 w-4" />
+                            تعديل الفاتورة
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className={invoice.status === InvoiceStatus.PAID ? "opacity-50 pointer-events-none" : ""}
+                            onClick={() => navigate(`/create-payment/${invoice.customerId}`, { state: { invoiceId: invoice.id } })}
+                          >
+                            <CreditCard className="ml-2 h-4 w-4" />
+                            تسجيل دفعة
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash className="ml-2 h-4 w-4" />
+                            حذف الفاتورة
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <FileText className="h-10 w-10 mb-2" />
                     <p>لا توجد فواتير</p>
@@ -162,6 +247,23 @@ const Invoices = () => {
           </TableBody>
         </Table>
       </div>
+      
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من حذف هذه الفاتورة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              هذا الإجراء لا يمكن التراجع عنه. سيتم حذف الفاتورة بشكل نهائي من النظام.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive text-destructive-foreground">
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 };
