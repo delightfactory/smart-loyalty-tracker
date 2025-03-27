@@ -199,7 +199,111 @@ export const customersService = {
   }
 };
 
-// خدمات الفواتير
+// خدمة المدفوعات
+export const paymentsService = {
+  // الحصول على جميع المدفوعات
+  async getAll(): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching payments:', error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
+  },
+  
+  // الحصول على مدفوعات عميل
+  async getByCustomerId(customerId: string): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error(`Error fetching payments for customer ${customerId}:`, error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
+  },
+  
+  // الحصول على مدفوعات فاتورة
+  async getByInvoiceId(invoiceId: string): Promise<Payment[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error(`Error fetching payments for invoice ${invoiceId}:`, error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
+  },
+  
+  // إنشاء دفعة جديدة
+  async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
+    // تحويل الكائن إلى الصيغة المناسبة لقاعدة البيانات
+    const dbPayment = appPaymentToDbPayment(payment);
+    
+    // إنشاء معرّف فريد للدفعة
+    const paymentId = `PAY${Date.now().toString().slice(-6)}`;
+    dbPayment.id = paymentId;
+    
+    // إدراج الدفعة في قاعدة البيانات
+    const { data, error } = await supabase
+      .from('payments')
+      .insert(dbPayment)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // تحويل النتيجة إلى الصيغة المناسبة للتطبيق
+    return dbPaymentToAppPayment(data);
+  },
+  
+  // تحديث دفعة
+  async update(payment: Payment): Promise<Payment> {
+    const dbPayment = appPaymentToDbPayment(payment);
+    
+    const { data, error } = await supabase
+      .from('payments')
+      .update(dbPayment)
+      .eq('id', payment.id)
+      .select('*')
+      .single();
+      
+    if (error) {
+      console.error(`Error updating payment with id ${payment.id}:`, error);
+      throw error;
+    }
+    
+    return dbPaymentToAppPayment(data);
+  },
+  
+  // حذف دفعة
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('payments')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      console.error(`Error deleting payment with id ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+// خدمة الفواتير
 export const invoicesService = {
   // الحصول على جميع الفواتير مع العناصر والمدفوعات
   async getAll(): Promise<Invoice[]> {
@@ -261,7 +365,7 @@ export const invoicesService = {
   },
   
   // إنشاء فاتورة جديدة مع العناصر
-  async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[]): Promise<Invoice> {
+  async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]): Promise<Invoice> {
     // بدء معاملة قاعدة البيانات
     
     // إنشاء معرّف فريد للفاتورة
@@ -304,22 +408,13 @@ export const invoicesService = {
         customer_id: invoice.customerId,
         invoice_id: invoiceId,
         amount: invoice.totalAmount,
-        date: invoice.date instanceof Date ? invoice.date.toISOString() : invoice.date,
-        method: 'نقداً',
+        date: invoice.date,
+        method: 'cash',
         type: PaymentType.PAYMENT,
-        notes: 'دفع مع الفاتورة'
+        notes: 'تم الدفع عند إنشاء الفاتورة'
       };
       
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert(payment)
-        .select('*')
-        .single();
-        
-      if (paymentError) {
-        console.error('Error adding payment record:', paymentError);
-        throw paymentError;
-      }
+      await supabase.from('payments').insert(payment);
     }
     
     // الحصول على الفاتورة الكاملة بعد الإنشاء
@@ -370,108 +465,6 @@ export const invoicesService = {
       
     if (error) {
       console.error(`Error deleting invoice with id ${id}:`, error);
-      throw error;
-    }
-  }
-};
-
-// خدمات المدفوعات
-export const paymentsService = {
-  // الحصول على جميع المدفوعات
-  async getAll(): Promise<Payment[]> {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .order('date', { ascending: false });
-      
-    if (error) {
-      console.error('Error fetching payments:', error);
-      throw error;
-    }
-    
-    return data.map(dbPaymentToAppPayment);
-  },
-  
-  // الحصول على مدفوعات عميل
-  async getByCustomerId(customerId: string): Promise<Payment[]> {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('date', { ascending: false });
-      
-    if (error) {
-      console.error(`Error fetching payments for customer ${customerId}:`, error);
-      throw error;
-    }
-    
-    return data.map(dbPaymentToAppPayment);
-  },
-  
-  // الحصول على مدفوعات فاتورة
-  async getByInvoiceId(invoiceId: string): Promise<Payment[]> {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('invoice_id', invoiceId)
-      .order('date', { ascending: false });
-      
-    if (error) {
-      console.error(`Error fetching payments for invoice ${invoiceId}:`, error);
-      throw error;
-    }
-    
-    return data.map(dbPaymentToAppPayment);
-  },
-  
-  // إنشاء دفعة جديدة
-  async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    // إنشاء معرّف فريد للدفعة
-    const paymentId = `PAY${Date.now().toString().slice(-6)}`;
-    const dbPayment = appPaymentToDbPayment({ ...payment, id: paymentId });
-    
-    const { data, error } = await supabase
-      .from('payments')
-      .insert(dbPayment)
-      .select('*')
-      .single();
-      
-    if (error) {
-      console.error('Error creating payment:', error);
-      throw error;
-    }
-    
-    return dbPaymentToAppPayment(data);
-  },
-  
-  // تحديث دفعة
-  async update(payment: Payment): Promise<Payment> {
-    const dbPayment = appPaymentToDbPayment(payment);
-    
-    const { data, error } = await supabase
-      .from('payments')
-      .update(dbPayment)
-      .eq('id', payment.id)
-      .select('*')
-      .single();
-      
-    if (error) {
-      console.error(`Error updating payment with id ${payment.id}:`, error);
-      throw error;
-    }
-    
-    return dbPaymentToAppPayment(data);
-  },
-  
-  // حذف دفعة
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('payments')
-      .delete()
-      .eq('id', id);
-      
-    if (error) {
-      console.error(`Error deleting payment with id ${id}:`, error);
       throw error;
     }
   }

@@ -14,13 +14,16 @@ export interface DashboardCardProps {
 // Props for RecentInvoices component
 export interface RecentInvoicesProps {
   invoices: any[];
+  customers: any[];
+  formatCurrency: (value: number) => string;
 }
 
 // Props for InvoiceStatusChart component
 export interface InvoiceStatusChartProps {
-  data: {
+  data?: {
     name: string;
     value: number;
+    color?: string;
   }[];
 }
 
@@ -52,7 +55,7 @@ export interface CustomersListProps {
   loading?: boolean;
 }
 
-// Props for DashboardSummaryProps component
+// Props for DashboardCards component
 export interface DashboardSummaryProps {
   summary: {
     totalProducts: number;

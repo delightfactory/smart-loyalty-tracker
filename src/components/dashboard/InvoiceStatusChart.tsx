@@ -29,6 +29,8 @@ const InvoiceStatusChart = (props?: InvoiceStatusChartProps) => {
 
   // حساب توزيع حالة الفواتير
   const getInvoiceStatusData = () => {
+    if (props?.data) return props.data;
+    
     if (!invoices) return [];
     
     const invoiceStatusData = [

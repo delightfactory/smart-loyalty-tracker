@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -215,14 +214,21 @@ const Dashboard = () => {
       <Tabs value={activeTab} className="w-full">
         <TabsContent value="overview">
           {/* Summary Cards */}
-          <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
+          <DashboardCards 
+            summary={summary} 
+            view="overview" 
+            formatCurrency={formatCurrency}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             {/* Invoice Status */}
             <InvoiceStatusChart />
 
             {/* Monthly Revenue */}
-            <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
+            <RevenueChart 
+              data={monthlyRevenueData} 
+              formatCurrency={formatCurrency}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
@@ -237,13 +243,17 @@ const Dashboard = () => {
             />
 
             {/* Points Redemption */}
-            <PointsRedemptionChart data={pointsRedemptionData} />
+            <PointsRedemptionChart />
           </div>
         </TabsContent>
 
         <TabsContent value="sales">
           {/* Sales Cards */}
-          <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
+          <DashboardCards 
+            summary={summary} 
+            view="sales" 
+            formatCurrency={formatCurrency}
+          />
 
           <div className="grid grid-cols-1 gap-6">
             {/* Revenue Trends */}

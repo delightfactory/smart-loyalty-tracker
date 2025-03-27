@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
-import { DashboardCardProps } from './DashboardCardProps';
+import { DashboardCardProps, DashboardSummaryProps } from './DashboardCardProps';
 
 interface CardData extends Omit<DashboardCardProps, 'value'> {
   value: number | string;
 }
 
-const DashboardCards = () => {
+const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps) => {
   // البيانات المطلوبة للبطاقات
   const { data: customers, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ['customers'],
@@ -47,6 +47,8 @@ const DashboardCards = () => {
   
   // حساب الإحصائيات
   const calculateTotalRevenue = () => {
+    if (summary) return summary.totalRevenue;
+    
     if (!payments) return 0;
     return payments
       .filter(payment => payment.type === 'payment')
@@ -54,70 +56,86 @@ const DashboardCards = () => {
   };
   
   const calculateTotalOutstanding = () => {
+    if (summary) return summary.totalOverdue || 0;
+    
     if (!invoices) return 0;
     return invoices
       .filter(invoice => invoice.status !== 'مدفوع')
       .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
   };
   
-  const cardData: CardData[] = [
+  const cardDataDefault: CardData[] = [
     {
       title: 'إجمالي العملاء',
-      value: customers?.length || 0,
+      value: summary ? summary.totalCustomers : customers?.length || 0,
       icon: <Users className="h-5 w-5 text-blue-600" />,
-      loading: isLoadingCustomers,
+      loading: !summary && isLoadingCustomers,
       trend: '+5.2%',
       description: 'منذ الشهر الماضي'
     },
     {
       title: 'إجمالي المنتجات',
-      value: products?.length || 0,
+      value: summary ? summary.totalProducts : products?.length || 0,
       icon: <Package className="h-5 w-5 text-green-600" />,
-      loading: isLoadingProducts,
+      loading: !summary && isLoadingProducts,
       trend: '+3.1%',
       description: 'منذ الشهر الماضي'
     },
     {
       title: 'إجمالي الفواتير',
-      value: invoices?.length || 0,
+      value: summary ? summary.totalInvoices : invoices?.length || 0,
       icon: <FileText className="h-5 w-5 text-amber-600" />,
-      loading: isLoadingInvoices,
+      loading: !summary && isLoadingInvoices,
       trend: '+12.5%',
       description: 'منذ الشهر الماضي'
     },
     {
       title: 'إجمالي الإيرادات',
-      value: new Intl.NumberFormat('ar-EG', { 
-        style: 'currency', 
-        currency: 'EGP',
-        maximumFractionDigits: 0 
-      }).format(calculateTotalRevenue()),
+      value: formatCurrency 
+        ? formatCurrency(calculateTotalRevenue())
+        : new Intl.NumberFormat('ar-EG', { 
+            style: 'currency', 
+            currency: 'EGP',
+            maximumFractionDigits: 0 
+          }).format(calculateTotalRevenue()),
       icon: <TrendingUp className="h-5 w-5 text-purple-600" />,
-      loading: isLoadingPayments,
+      loading: !summary && isLoadingPayments,
       trend: '+18.2%',
       description: 'منذ الشهر الماضي'
     },
     {
       title: 'المبالغ المستحقة',
-      value: new Intl.NumberFormat('ar-EG', { 
-        style: 'currency', 
-        currency: 'EGP',
-        maximumFractionDigits: 0 
-      }).format(calculateTotalOutstanding()),
+      value: formatCurrency 
+        ? formatCurrency(calculateTotalOutstanding())
+        : new Intl.NumberFormat('ar-EG', { 
+            style: 'currency', 
+            currency: 'EGP',
+            maximumFractionDigits: 0 
+          }).format(calculateTotalOutstanding()),
       icon: <CreditCard className="h-5 w-5 text-red-600" />,
-      loading: isLoadingInvoices,
+      loading: !summary && isLoadingInvoices,
       trend: '-2.5%',
       description: 'منذ الشهر الماضي'
     },
     {
       title: 'عمليات استبدال النقاط',
-      value: redemptions?.length || 0,
+      value: summary ? summary.totalPointsRedeemed : redemptions?.length || 0,
       icon: <Star className="h-5 w-5 text-yellow-600" />,
-      loading: isLoadingRedemptions,
+      loading: !summary && isLoadingRedemptions,
       trend: '+7.3%',
       description: 'منذ الشهر الماضي'
     }
   ];
+
+  // تفاصيل البطاقات للعرض "المبيعات"
+  const salesCards = [
+    cardDataDefault[2], // الفواتير
+    cardDataDefault[3], // الإيرادات
+    cardDataDefault[4], // المبالغ المستحقة
+  ];
+
+  // تحديد أي البطاقات لعرضها
+  const cardData = view === 'sales' ? salesCards : cardDataDefault;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
