@@ -1,19 +1,38 @@
 
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useTheme } from '@/components/ui/theme-provider';
 
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  onMenuClick?: () => void;
+  children?: React.ReactNode;
 }
 
-const Header = ({ title, subtitle }: HeaderProps) => {
+const Header = ({ title, subtitle, onMenuClick, children }: HeaderProps) => {
+  const isMobile = useIsMobile();
+  const { theme } = useTheme();
+  
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b bg-background/60 backdrop-blur-sm sticky top-0 z-10">
-      <div className="mb-4 md:mb-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
+    <div className={cn(
+      "flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b sticky top-0 z-10 transition-colors duration-300",
+      theme === 'dark' ? 'bg-background/80' : 'bg-background/60',
+      "backdrop-blur-sm"
+    )}>
+      <div className="flex items-center gap-3 mb-4 md:mb-0 w-full md:w-auto">
+        {isMobile && (
+          <Button variant="ghost" size="icon" onClick={onMenuClick} className="flex md:hidden">
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
+        </div>
       </div>
       
       <div className="flex items-center gap-4 w-full md:w-auto">
@@ -31,6 +50,8 @@ const Header = ({ title, subtitle }: HeaderProps) => {
             3
           </span>
         </Button>
+        
+        {children}
       </div>
     </div>
   );

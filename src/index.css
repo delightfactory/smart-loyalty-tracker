@@ -35,9 +35,48 @@
 
     --radius: 0.75rem;
 
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 97%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 215 28% 90%;
+    --sidebar-ring: 221 83% 53%;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 210 40% 62%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 221 83% 53%;
+
+    --sidebar-background: 222 47% 10%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
@@ -59,8 +98,13 @@
     @apply bg-white/80 backdrop-blur-lg border border-white/20 shadow-sm;
   }
 
-  .dark-glass {
-    @apply bg-black/10 backdrop-blur-lg border border-white/10 shadow-md;
+  .dark .glass {
+    @apply bg-black/30 backdrop-blur-lg border border-white/10 shadow-md;
+  }
+
+  /* Transitions */
+  .theme-transition {
+    @apply transition-colors duration-300;
   }
 
   /* Card Styles */
@@ -71,16 +115,6 @@
   /* Smooth Scrolling */
   html {
     scroll-behavior: smooth;
-  }
-
-  /* Transitions */
-  .page-transition {
-    @apply transition-all duration-300 ease-in-out;
-  }
-
-  /* Card Styles */
-  .stat-card {
-    @apply glass rounded-xl p-6 hover:shadow-lg transition-all duration-300;
   }
 
   /* Scrollbar styling */
@@ -99,5 +133,24 @@
   
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-primary/50;
+  }
+
+  /* Card gradient */
+  .card-gradient {
+    @apply bg-gradient-to-br from-card to-muted/80 backdrop-blur-sm;
+  }
+
+  .dark .card-gradient {
+    @apply bg-gradient-to-br from-card to-card/70 backdrop-blur-sm;
+  }
+
+  /* Clickable elements */
+  .clickable {
+    @apply cursor-pointer hover:opacity-80 transition-opacity;
+  }
+
+  /* Active Navigation Indicator */
+  .nav-indicator {
+    @apply absolute right-0 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-md bg-primary transition-all;
   }
 }

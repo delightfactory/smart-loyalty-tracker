@@ -8,6 +8,7 @@ import Products from '@/pages/Products';
 import ProductDetails from '@/pages/ProductDetails';
 import Customers from '@/pages/Customers';
 import CustomerDetails from '@/pages/CustomerDetails';
+import CustomerFollowup from '@/pages/CustomerFollowup';
 import Invoices from '@/pages/Invoices';
 import InvoiceDetails from '@/pages/InvoiceDetails';
 import CreateInvoice from '@/pages/CreateInvoice';
@@ -31,6 +32,7 @@ function App() {
             <Route path="/product/:id" element={<ProductDetails />} />
             <Route path="/customers" element={<Customers />} />
             <Route path="/customer/:id" element={<CustomerDetails />} />
+            <Route path="/customer-followup" element={<CustomerFollowup />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/invoice/:id" element={<InvoiceDetails />} />
             <Route path="/create-invoice" element={<CreateInvoice />} />
