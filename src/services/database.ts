@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
@@ -311,7 +310,9 @@ export const invoicesService = {
       
       const { error: paymentError } = await supabase
         .from('payments')
-        .insert(payment);
+        .insert(payment)
+        .select('*')
+        .single();
         
       if (paymentError) {
         console.error('Error adding payment record:', paymentError);

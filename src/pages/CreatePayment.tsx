@@ -27,7 +27,7 @@ import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import PageContainer from '@/components/layout/PageContainer';
 import { customers, invoices, getCustomerById, updateInvoice, addPayment } from '@/lib/data';
-import { InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
+import { InvoiceStatus, Payment, PaymentMethod, PaymentType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const paymentSchema = z.object({
@@ -132,7 +132,7 @@ const CreatePayment = () => {
       date: new Date(data.paymentDate),
       method: data.method,
       notes: data.notes || '',
-      type: 'payment'
+      type: PaymentType.PAYMENT
     };
     
     addPayment(payment);

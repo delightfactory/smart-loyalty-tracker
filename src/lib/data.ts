@@ -1,4 +1,3 @@
-
 import { 
   Product, 
   Customer, 
@@ -8,7 +7,9 @@ import {
   InvoiceStatus, 
   PaymentMethod,
   Payment,
-  Redemption
+  Redemption,
+  PaymentType,
+  RedemptionStatus
 } from './types';
 
 // Sample Products
@@ -194,7 +195,7 @@ export const payments: Payment[] = [
     date: new Date(2023, 5, 16),
     method: 'نقداً',
     notes: 'دفعة أولى',
-    type: 'payment'
+    type: PaymentType.PAYMENT
   },
   {
     id: 'PAY002',
@@ -204,7 +205,7 @@ export const payments: Payment[] = [
     date: new Date(2023, 5, 20),
     method: 'تحويل بنكي',
     notes: 'تسوية نهائية',
-    type: 'payment'
+    type: PaymentType.PAYMENT
   },
   {
     id: 'PAY003',
@@ -214,7 +215,7 @@ export const payments: Payment[] = [
     date: new Date(2023, 5, 25),
     method: 'نقداً',
     notes: 'دفعة جزئية',
-    type: 'payment'
+    type: PaymentType.PAYMENT
   },
   {
     id: 'PAY004',
@@ -224,7 +225,7 @@ export const payments: Payment[] = [
     date: new Date(2023, 5, 20),
     method: 'نقداً',
     notes: 'دفعة كاملة',
-    type: 'payment'
+    type: PaymentType.PAYMENT
   },
   {
     id: 'REF001',
@@ -234,7 +235,7 @@ export const payments: Payment[] = [
     date: new Date(2023, 5, 25),
     method: 'نقداً',
     notes: 'استرجاع منتج معيب',
-    type: 'refund'
+    type: PaymentType.REFUND
   },
 ];
 
@@ -253,7 +254,7 @@ export const redemptions: Redemption[] = [
       }
     ],
     totalPointsRedeemed: 240,
-    status: 'completed'
+    status: RedemptionStatus.COMPLETED
   },
   {
     id: 'RED002',
@@ -274,7 +275,7 @@ export const redemptions: Redemption[] = [
       }
     ],
     totalPointsRedeemed: 150,
-    status: 'completed'
+    status: RedemptionStatus.COMPLETED
   }
 ];
 
@@ -304,7 +305,7 @@ export const invoices: Invoice[] = [
         date: new Date(2023, 5, 16),
         method: 'نقداً',
         notes: 'دفعة أولى',
-        type: 'payment'
+        type: PaymentType.PAYMENT
       },
       {
         id: 'PAY002',
@@ -314,7 +315,7 @@ export const invoices: Invoice[] = [
         date: new Date(2023, 5, 20),
         method: 'تحويل بنكي',
         notes: 'تسوية نهائية',
-        type: 'payment'
+        type: PaymentType.PAYMENT
       },
       {
         id: 'REF001',
@@ -324,7 +325,7 @@ export const invoices: Invoice[] = [
         date: new Date(2023, 5, 25),
         method: 'نقداً',
         notes: 'استرجاع منتج معيب',
-        type: 'refund'
+        type: PaymentType.REFUND
       }
     ]
   },
@@ -352,7 +353,7 @@ export const invoices: Invoice[] = [
         date: new Date(2023, 5, 25),
         method: 'نقداً',
         notes: 'دفعة جزئية',
-        type: 'payment'
+        type: PaymentType.PAYMENT
       }
     ]
   },
@@ -378,7 +379,7 @@ export const invoices: Invoice[] = [
         date: new Date(2023, 5, 20),
         method: 'نقداً',
         notes: 'دفعة كاملة',
-        type: 'payment'
+        type: PaymentType.PAYMENT
       }
     ]
   },
