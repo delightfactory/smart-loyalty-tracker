@@ -1,4 +1,3 @@
-
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import {
   Settings,
   Star
 } from 'lucide-react';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -49,7 +48,7 @@ const NavItem = ({ icon, label, href }: NavItemProps) => {
 };
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
 
   const navItems = [
     { icon: <Home className="ml-2 h-4 w-4" />, label: "الصفحة الرئيسية", href: "/" },

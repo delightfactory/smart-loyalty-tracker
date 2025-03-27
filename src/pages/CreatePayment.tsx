@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -29,8 +28,8 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import PageContainer from '@/components/layout/PageContainer';
 import { customers, invoices, getCustomerById, updateInvoice, addPayment } from '@/lib/data';
 import { InvoiceStatus, Payment, PaymentMethod } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
-// Define schema for form validation
 const paymentSchema = z.object({
   customerId: z.string({ required_error: "يجب اختيار العميل" }),
   invoiceId: z.string({ required_error: "يجب اختيار الفاتورة" }),
@@ -51,7 +50,6 @@ const CreatePayment = () => {
   const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   
-  // Initialize the form
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -64,10 +62,8 @@ const CreatePayment = () => {
     },
   });
   
-  // Load unpaid invoices when customer changes
   useEffect(() => {
     if (selectedCustomerId) {
-      // Get unpaid invoices for this customer
       const customerUnpaidInvoices = invoices.filter(
         invoice => invoice.customerId === selectedCustomerId && 
         (invoice.status === InvoiceStatus.UNPAID || 
@@ -87,7 +83,6 @@ const CreatePayment = () => {
     }
   }, [selectedCustomerId]);
   
-  // Handle customer selection
   const onCustomerChange = (value: string) => {
     setSelectedCustomerId(value);
     form.setValue('customerId', value);
@@ -95,14 +90,12 @@ const CreatePayment = () => {
     setSelectedInvoice(null);
   };
   
-  // Handle invoice selection
   const onInvoiceChange = (value: string) => {
     form.setValue('invoiceId', value);
     const invoice = invoices.find(inv => inv.id === value);
     setSelectedInvoice(invoice);
     
     if (invoice) {
-      // Calculate remaining amount
       const paidAmount = invoice.payments?.reduce((sum, payment) => {
         if (payment.type === 'payment') {
           return sum + payment.amount;
@@ -117,9 +110,7 @@ const CreatePayment = () => {
     }
   };
   
-  // Submit handler
   const onSubmit = (data: PaymentFormValues) => {
-    // Find the invoice
     const invoice = invoices.find(inv => inv.id === data.invoiceId);
     
     if (!invoice) {
@@ -131,10 +122,8 @@ const CreatePayment = () => {
       return;
     }
     
-    // Generate payment ID
     const paymentId = `PAY${Date.now().toString().slice(-6)}`;
     
-    // Create payment object
     const payment: Payment = {
       id: paymentId,
       customerId: data.customerId,
@@ -146,16 +135,13 @@ const CreatePayment = () => {
       type: 'payment'
     };
     
-    // Add payment
     addPayment(payment);
     
-    // Show success message
     toast({
       title: "تم إضافة الدفعة بنجاح",
       description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}`,
     });
     
-    // Navigate back
     navigate(customerId ? `/customer/${customerId}` : '/invoices');
   };
   
@@ -315,7 +301,7 @@ const CreatePayment = () => {
               </Card>
               
               {unpaidInvoices.length === 0 && selectedCustomerId && (
-                <Alert variant="warning" className="my-4">
+                <Alert variant="destructive" className="my-4">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>لا توجد فواتير غير مدفوعة</AlertTitle>
                   <AlertDescription>

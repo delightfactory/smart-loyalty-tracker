@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -48,38 +47,32 @@ const SmartSearch = ({
   const [barcodeMode, setBarcodeMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // Focus input when barcode mode is enabled
   useEffect(() => {
     if (barcodeMode && inputRef.current) {
       inputRef.current.focus();
     }
   }, [barcodeMode]);
   
-  // Handle barcode scan
   useEffect(() => {
     if (barcodeMode && search && search.length > 3) {
-      // Check if the barcode matches a product ID
       const product = products.find(p => p.id === search);
       if (product) {
         handleSelectProduct(product);
         return;
       }
       
-      // Check if the barcode matches a customer ID
       const customer = customers.find(c => c.id === search);
       if (customer) {
         handleSelectCustomer(customer);
         return;
       }
       
-      // If no match found
       toast({
         title: "لم يتم العثور على نتائج",
         description: `لم يتم العثور على نتائج للباركود ${search}`,
         variant: "destructive"
       });
       
-      // Reset search after 1 second
       setTimeout(() => {
         setSearch('');
       }, 1000);
@@ -223,7 +216,7 @@ const SmartSearch = ({
               </Button>
             </div>
           </PopoverTrigger>
-          <PopoverContent className="p-0" align="start" sideOffset={5} width="target">
+          <PopoverContent className="p-0" align="start" sideOffset={5} style={{ width: '100%' }}>
             <Command>
               <CommandInput placeholder={placeholder} value={search} onValueChange={setSearch} />
               <CommandList>
