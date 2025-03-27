@@ -15,7 +15,6 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { customers } from '@/lib/data';
 
-// Extend the customer data with the properties we need for inactive customers
 const inactiveCustomers = customers.map(customer => ({
   ...customer,
   lastPurchase: new Date(Date.now() - Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000),
@@ -30,7 +29,6 @@ const CustomerFollowup = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [filteredCustomers, setFilteredCustomers] = useState(inactiveCustomers);
   
-  // Filter customers based on inactivity period
   useEffect(() => {
     const days = parseInt(period);
     const filtered = inactiveCustomers.filter(customer => 
@@ -39,7 +37,6 @@ const CustomerFollowup = () => {
     setFilteredCustomers(filtered.sort((a, b) => b.inactiveDays - a.inactiveDays));
   }, [period]);
 
-  // Group customers by inactivity range
   const criticalCustomers = filteredCustomers.filter(c => c.inactiveDays > 90);
   const warningCustomers = filteredCustomers.filter(c => c.inactiveDays >= 30 && c.inactiveDays <= 90);
   const recentCustomers = filteredCustomers.filter(c => c.inactiveDays < 30);
