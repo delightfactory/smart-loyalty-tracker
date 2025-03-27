@@ -3,9 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService } from '@/services/database';
 import { Redemption } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
+import { useRealtime } from './use-realtime';
 
 export function useRedemptions() {
   const queryClient = useQueryClient();
+  
+  // Set up realtime updates for redemptions
+  useRealtime('redemptions');
   
   const getAll = useQuery({
     queryKey: ['redemptions'],

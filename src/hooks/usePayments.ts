@@ -3,9 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsService } from '@/services/database';
 import { Payment } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
+import { useRealtime } from './use-realtime';
 
 export function usePayments() {
   const queryClient = useQueryClient();
+  
+  // Set up realtime updates for payments
+  useRealtime('payments');
   
   const getAll = useQuery({
     queryKey: ['payments'],

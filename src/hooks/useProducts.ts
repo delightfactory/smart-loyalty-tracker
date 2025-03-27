@@ -3,9 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
 import { Product } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
+import { useRealtime } from './use-realtime';
 
 export function useProducts() {
   const queryClient = useQueryClient();
+  
+  // Set up realtime updates for products
+  useRealtime('products');
   
   const getAll = useQuery({
     queryKey: ['products'],

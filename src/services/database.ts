@@ -11,6 +11,7 @@ import {
   InvoiceStatus,
   PaymentMethod
 } from "@/lib/types";
+import { dbToAppAdapters, appToDbAdapters } from "@/lib/adapters";
 
 // خدمات المنتجات
 export const productsService = {
@@ -21,7 +22,7 @@ export const productsService = {
       .order('id');
       
     if (error) throw error;
-    return data || [];
+    return (data || []).map(dbToAppAdapters.productFromDB);
   },
   
   async getById(id: string): Promise<Product | null> {
@@ -32,7 +33,7 @@ export const productsService = {
       .single();
       
     if (error && error.code !== 'PGRST116') throw error;
-    return data || null;
+    return data ? dbToAppAdapters.productFromDB(data) : null;
   },
   
   async create(product: Omit<Product, 'id'>): Promise<Product> {
@@ -40,26 +41,32 @@ export const productsService = {
     const allProducts = await this.getAll();
     const newId = `P${(allProducts.length + 1).toString().padStart(3, '0')}`;
     
+    const productData = {
+      ...appToDbAdapters.productToDB({...product, id: newId} as Product)
+    };
+    
     const { data, error } = await supabase
       .from('products')
-      .insert({ ...product, id: newId })
+      .insert(productData)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    return dbToAppAdapters.productFromDB(data);
   },
   
   async update(product: Product): Promise<Product> {
+    const productData = appToDbAdapters.productToDB(product);
+    
     const { data, error } = await supabase
       .from('products')
-      .update(product)
+      .update(productData)
       .eq('id', product.id)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    return dbToAppAdapters.productFromDB(data);
   },
   
   async delete(id: string): Promise<void> {
@@ -81,7 +88,7 @@ export const customersService = {
       .order('id');
       
     if (error) throw error;
-    return data || [];
+    return (data || []).map(dbToAppAdapters.customerFromDB);
   },
   
   async getById(id: string): Promise<Customer | null> {
@@ -92,7 +99,7 @@ export const customersService = {
       .single();
       
     if (error && error.code !== 'PGRST116') throw error;
-    return data || null;
+    return data ? dbToAppAdapters.customerFromDB(data) : null;
   },
   
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
@@ -100,26 +107,32 @@ export const customersService = {
     const allCustomers = await this.getAll();
     const newId = `C${(allCustomers.length + 1).toString().padStart(3, '0')}`;
     
+    const customerData = {
+      ...appToDbAdapters.customerToDB({...customer, id: newId} as Customer)
+    };
+    
     const { data, error } = await supabase
       .from('customers')
-      .insert({ ...customer, id: newId })
+      .insert(customerData)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    return dbToAppAdapters.customerFromDB(data);
   },
   
   async update(customer: Customer): Promise<Customer> {
+    const customerData = appToDbAdapters.customerToDB(customer);
+    
     const { data, error } = await supabase
       .from('customers')
-      .update(customer)
+      .update(customerData)
       .eq('id', customer.id)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    return dbToAppAdapters.customerFromDB(data);
   },
   
   async delete(id: string): Promise<void> {
@@ -143,11 +156,16 @@ export const invoicesService = {
     if (error) throw error;
     
     // تحويل البيانات من تنسيق قاعدة البيانات إلى تنسيق التطبيق
-    return data.map(invoice => ({
-      ...invoice,
-      items: invoice.items,
-      payments: [] // سنحصل على المدفوعات بشكل منفصل
-    })) || [];
+    const invoicesWithItems = await Promise.all((data || []).map(async (invoice) => {
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+      
+      return dbToAppAdapters.invoiceFromDB(invoice, invoice.items || [], payments || []);
+    }));
+    
+    return invoicesWithItems;
   },
   
   async getById(id: string): Promise<Invoice | null> {
@@ -176,11 +194,7 @@ export const invoicesService = {
       
     if (paymentsError) throw paymentsError;
     
-    return {
-      ...invoice,
-      items: items || [],
-      payments: payments || []
-    };
+    return dbToAppAdapters.invoiceFromDB(invoice, items || [], payments || []);
   },
   
   async getByCustomerId(customerId: string): Promise<Invoice[]> {
@@ -192,11 +206,16 @@ export const invoicesService = {
       
     if (error) throw error;
     
-    return data.map(invoice => ({
-      ...invoice,
-      items: invoice.items,
-      payments: [] // سنحصل على المدفوعات بشكل منفصل
-    })) || [];
+    const invoicesWithItems = await Promise.all((data || []).map(async (invoice) => {
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+      
+      return dbToAppAdapters.invoiceFromDB(invoice, invoice.items || [], payments || []);
+    }));
+    
+    return invoicesWithItems;
   },
   
   async create(invoice: Omit<Invoice, 'id'>): Promise<Invoice> {
@@ -210,34 +229,22 @@ export const invoicesService = {
     const newId = `INV${(allInvoices.length + 1).toString().padStart(3, '0')}`;
     
     // إنشاء الفاتورة
+    const invoiceData = {
+      ...appToDbAdapters.invoiceToDB({...invoice, id: newId} as Invoice)
+    };
+    
     const { data: createdInvoice, error: invoiceError } = await supabase
       .from('invoices')
-      .insert({
-        id: newId,
-        customer_id: invoice.customerId,
-        date: invoice.date,
-        due_date: invoice.dueDate,
-        total_amount: invoice.totalAmount,
-        points_earned: invoice.pointsEarned,
-        points_redeemed: invoice.pointsRedeemed,
-        status: invoice.status,
-        payment_method: invoice.paymentMethod,
-        categories_count: invoice.categoriesCount
-      })
+      .insert(invoiceData)
       .select()
       .single();
       
     if (invoiceError) throw invoiceError;
     
     // إنشاء بنود الفاتورة
-    const invoiceItems = invoice.items.map(item => ({
-      invoice_id: newId,
-      product_id: item.productId,
-      quantity: item.quantity,
-      price: item.price,
-      total_price: item.totalPrice,
-      points_earned: item.pointsEarned
-    }));
+    const invoiceItems = invoice.items.map(item => 
+      appToDbAdapters.invoiceItemToDB(item, newId)
+    );
     
     const { error: itemsError } = await supabase
       .from('invoice_items')
@@ -248,14 +255,12 @@ export const invoicesService = {
     // إذا كان هناك مدفوعات، قم بإنشائها
     if (invoice.payments && invoice.payments.length > 0) {
       const paymentsData = invoice.payments.map(payment => ({
-        id: payment.id || `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`,
-        customer_id: invoice.customerId,
-        invoice_id: newId,
-        amount: payment.amount,
-        date: payment.date,
-        method: payment.method,
-        notes: payment.notes,
-        type: payment.type
+        ...appToDbAdapters.paymentToDB({
+          ...payment,
+          id: payment.id || `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`,
+          customerId: invoice.customerId,
+          invoiceId: newId
+        })
       }));
       
       const { error: paymentsError } = await supabase
@@ -289,28 +294,17 @@ export const invoicesService = {
       if (updateError) throw updateError;
     }
     
-    return {
-      ...createdInvoice,
-      items: invoice.items,
-      payments: invoice.payments || []
-    };
+    // جلب الفاتورة كاملة مع العناصر
+    return this.getById(newId) as Promise<Invoice>;
   },
   
   async update(invoice: Invoice): Promise<Invoice> {
     // تحديث الفاتورة
+    const invoiceData = appToDbAdapters.invoiceToDB(invoice);
+    
     const { error: invoiceError } = await supabase
       .from('invoices')
-      .update({
-        customer_id: invoice.customerId,
-        date: invoice.date,
-        due_date: invoice.dueDate,
-        total_amount: invoice.totalAmount,
-        points_earned: invoice.pointsEarned,
-        points_redeemed: invoice.pointsRedeemed,
-        status: invoice.status,
-        payment_method: invoice.paymentMethod,
-        categories_count: invoice.categoriesCount
-      })
+      .update(invoiceData)
       .eq('id', invoice.id);
       
     if (invoiceError) throw invoiceError;
@@ -324,14 +318,9 @@ export const invoicesService = {
     if (deleteItemsError) throw deleteItemsError;
     
     // إنشاء بنود الفاتورة الجديدة
-    const invoiceItems = invoice.items.map(item => ({
-      invoice_id: invoice.id,
-      product_id: item.productId,
-      quantity: item.quantity,
-      price: item.price,
-      total_price: item.totalPrice,
-      points_earned: item.pointsEarned
-    }));
+    const invoiceItems = invoice.items.map(item => 
+      appToDbAdapters.invoiceItemToDB(item, invoice.id)
+    );
     
     const { error: itemsError } = await supabase
       .from('invoice_items')
@@ -362,7 +351,7 @@ export const paymentsService = {
       .order('date', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    return (data || []).map(dbToAppAdapters.paymentFromDB);
   },
   
   async getById(id: string): Promise<Payment | null> {
@@ -373,7 +362,7 @@ export const paymentsService = {
       .single();
       
     if (error && error.code !== 'PGRST116') throw error;
-    return data || null;
+    return data ? dbToAppAdapters.paymentFromDB(data) : null;
   },
   
   async getByCustomerId(customerId: string): Promise<Payment[]> {
@@ -384,7 +373,7 @@ export const paymentsService = {
       .order('date', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    return (data || []).map(dbToAppAdapters.paymentFromDB);
   },
   
   async getByInvoiceId(invoiceId: string): Promise<Payment[]> {
@@ -395,15 +384,19 @@ export const paymentsService = {
       .order('date', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    return (data || []).map(dbToAppAdapters.paymentFromDB);
   },
   
   async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
     const newId = `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`;
     
+    const paymentData = {
+      ...appToDbAdapters.paymentToDB({...payment, id: newId} as Payment)
+    };
+    
     const { data, error } = await supabase
       .from('payments')
-      .insert({ ...payment, id: newId })
+      .insert(paymentData)
       .select()
       .single();
       
@@ -417,13 +410,15 @@ export const paymentsService = {
     // تحديث رصيد العميل
     await this.updateCustomerCreditBalance(payment.customerId);
     
-    return data;
+    return dbToAppAdapters.paymentFromDB(data);
   },
   
   async update(payment: Payment): Promise<Payment> {
+    const paymentData = appToDbAdapters.paymentToDB(payment);
+    
     const { data, error } = await supabase
       .from('payments')
-      .update(payment)
+      .update(paymentData)
       .eq('id', payment.id)
       .select()
       .single();
@@ -438,7 +433,7 @@ export const paymentsService = {
     // تحديث رصيد العميل
     await this.updateCustomerCreditBalance(payment.customerId);
     
-    return data;
+    return dbToAppAdapters.paymentFromDB(data);
   },
   
   async delete(id: string): Promise<void> {
@@ -572,7 +567,7 @@ export const redemptionsService = {
     if (error) throw error;
     
     // جلب بنود الاستبدال لكل عملية استبدال
-    const result = await Promise.all(data.map(async (redemption) => {
+    const result = await Promise.all((data || []).map(async (redemption) => {
       const { data: items, error: itemsError } = await supabase
         .from('redemption_items')
         .select('*')
@@ -580,13 +575,10 @@ export const redemptionsService = {
         
       if (itemsError) throw itemsError;
       
-      return {
-        ...redemption,
-        items: items || []
-      };
+      return dbToAppAdapters.redemptionFromDB(redemption, items || []);
     }));
     
-    return result || [];
+    return result;
   },
   
   async getById(id: string): Promise<Redemption | null> {
@@ -607,10 +599,7 @@ export const redemptionsService = {
       
     if (itemsError) throw itemsError;
     
-    return {
-      ...redemption,
-      items: items || []
-    };
+    return dbToAppAdapters.redemptionFromDB(redemption, items || []);
   },
   
   async getByCustomerId(customerId: string): Promise<Redemption[]> {
@@ -623,7 +612,7 @@ export const redemptionsService = {
     if (error) throw error;
     
     // جلب بنود الاستبدال لكل عملية استبدال
-    const result = await Promise.all(data.map(async (redemption) => {
+    const result = await Promise.all((data || []).map(async (redemption) => {
       const { data: items, error: itemsError } = await supabase
         .from('redemption_items')
         .select('*')
@@ -631,13 +620,10 @@ export const redemptionsService = {
         
       if (itemsError) throw itemsError;
       
-      return {
-        ...redemption,
-        items: items || []
-      };
+      return dbToAppAdapters.redemptionFromDB(redemption, items || []);
     }));
     
-    return result || [];
+    return result;
   },
   
   async create(redemption: Omit<Redemption, 'id'>): Promise<Redemption> {
@@ -651,28 +637,22 @@ export const redemptionsService = {
     const newId = `RED${(allRedemptions.length + 1).toString().padStart(3, '0')}`;
     
     // إنشاء عملية الاستبدال
+    const redemptionData = {
+      ...appToDbAdapters.redemptionToDB({...redemption, id: newId} as Redemption)
+    };
+    
     const { data: createdRedemption, error: redemptionError } = await supabase
       .from('redemptions')
-      .insert({
-        id: newId,
-        customer_id: redemption.customerId,
-        date: redemption.date,
-        total_points_redeemed: redemption.totalPointsRedeemed,
-        status: redemption.status
-      })
+      .insert(redemptionData)
       .select()
       .single();
       
     if (redemptionError) throw redemptionError;
     
     // إنشاء بنود الاستبدال
-    const redemptionItems = redemption.items.map(item => ({
-      redemption_id: newId,
-      product_id: item.productId,
-      quantity: item.quantity,
-      points_required: item.pointsRequired,
-      total_points_required: item.totalPointsRequired
-    }));
+    const redemptionItems = redemption.items.map(item => 
+      appToDbAdapters.redemptionItemToDB(item, newId)
+    );
     
     const { error: itemsError } = await supabase
       .from('redemption_items')
@@ -703,10 +683,8 @@ export const redemptionsService = {
       if (updateError) throw updateError;
     }
     
-    return {
-      ...createdRedemption,
-      items: redemption.items
-    };
+    // جلب الاستبدال كاملاً
+    return this.getById(newId) as Promise<Redemption>;
   },
   
   async update(redemption: Redemption): Promise<Redemption> {
@@ -715,13 +693,11 @@ export const redemptionsService = {
     if (!oldRedemption) throw new Error('Redemption not found');
     
     // تحديث عملية الاستبدال
+    const redemptionData = appToDbAdapters.redemptionToDB(redemption);
+    
     const { error: redemptionError } = await supabase
       .from('redemptions')
-      .update({
-        date: redemption.date,
-        total_points_redeemed: redemption.totalPointsRedeemed,
-        status: redemption.status
-      })
+      .update(redemptionData)
       .eq('id', redemption.id);
       
     if (redemptionError) throw redemptionError;
@@ -735,13 +711,9 @@ export const redemptionsService = {
     if (deleteItemsError) throw deleteItemsError;
     
     // إنشاء بنود الاستبدال الجديدة
-    const redemptionItems = redemption.items.map(item => ({
-      redemption_id: redemption.id,
-      product_id: item.productId,
-      quantity: item.quantity,
-      points_required: item.pointsRequired,
-      total_points_required: item.totalPointsRequired
-    }));
+    const redemptionItems = redemption.items.map(item => 
+      appToDbAdapters.redemptionItemToDB(item, redemption.id)
+    );
     
     const { error: itemsError } = await supabase
       .from('redemption_items')
@@ -820,58 +792,6 @@ export const redemptionsService = {
       .eq('id', id);
       
     if (error) throw error;
-  }
-};
-
-// وظائف مساعدة للتحويل بين تنسيقات البيانات
-export const dataTransformers = {
-  // تحويل البيانات من تنسيق قاعدة البيانات إلى تنسيق التطبيق
-  transformInvoiceFromDB(dbInvoice: any, items: any[] = [], payments: any[] = []): Invoice {
-    return {
-      id: dbInvoice.id,
-      customerId: dbInvoice.customer_id,
-      date: new Date(dbInvoice.date),
-      dueDate: dbInvoice.due_date ? new Date(dbInvoice.due_date) : undefined,
-      items: items.map(item => ({
-        productId: item.product_id,
-        quantity: item.quantity,
-        price: item.price,
-        totalPrice: item.total_price,
-        pointsEarned: item.points_earned
-      })),
-      totalAmount: dbInvoice.total_amount,
-      pointsEarned: dbInvoice.points_earned,
-      pointsRedeemed: dbInvoice.points_redeemed,
-      status: dbInvoice.status,
-      paymentMethod: dbInvoice.payment_method,
-      categoriesCount: dbInvoice.categories_count,
-      payments: payments.map(payment => ({
-        id: payment.id,
-        customerId: payment.customer_id,
-        invoiceId: payment.invoice_id,
-        amount: payment.amount,
-        date: new Date(payment.date),
-        method: payment.method,
-        notes: payment.notes,
-        type: payment.type
-      }))
-    };
-  },
-  
-  // تحويل البيانات من تنسيق التطبيق إلى تنسيق قاعدة البيانات
-  transformInvoiceToDB(invoice: Invoice): any {
-    return {
-      id: invoice.id,
-      customer_id: invoice.customerId,
-      date: invoice.date.toISOString(),
-      due_date: invoice.dueDate ? invoice.dueDate.toISOString() : null,
-      total_amount: invoice.totalAmount,
-      points_earned: invoice.pointsEarned,
-      points_redeemed: invoice.pointsRedeemed,
-      status: invoice.status,
-      payment_method: invoice.paymentMethod,
-      categories_count: invoice.categoriesCount
-    };
   }
 };
 
