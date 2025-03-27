@@ -212,135 +212,137 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <TabsContent value="overview" className="mt-0">
-        {/* Summary Cards */}
-        <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
+      <Tabs value={activeTab} className="w-full">
+        <TabsContent value="overview">
+          {/* Summary Cards */}
+          <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Invoice Status */}
-          <InvoiceStatusChart invoices={filteredInvoices} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Invoice Status */}
+            <InvoiceStatusChart invoices={filteredInvoices} />
 
-          {/* Monthly Revenue */}
-          <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
-        </div>
+            {/* Monthly Revenue */}
+            <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          {/* Top Customers */}
-          <CustomersList customers={topCustomers} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+            {/* Top Customers */}
+            <CustomersList customers={topCustomers} />
 
-          {/* Recent Invoices */}
-          <RecentInvoices 
-            invoices={recentInvoices} 
-            customers={customers} 
-            formatCurrency={formatCurrency} 
-          />
+            {/* Recent Invoices */}
+            <RecentInvoices 
+              invoices={recentInvoices} 
+              customers={customers} 
+              formatCurrency={formatCurrency} 
+            />
 
-          {/* Points Redemption */}
-          <PointsRedemptionChart data={pointsRedemptionData} />
-        </div>
-      </TabsContent>
+            {/* Points Redemption */}
+            <PointsRedemptionChart data={pointsRedemptionData} />
+          </div>
+        </TabsContent>
 
-      <TabsContent value="sales" className="mt-0">
-        {/* Sales Cards */}
-        <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
+        <TabsContent value="sales">
+          {/* Sales Cards */}
+          <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
 
-        <div className="grid grid-cols-1 gap-6">
-          {/* Revenue Trends */}
-          <RevenueChart 
-            data={monthlyRevenueData} 
-            formatCurrency={formatCurrency} 
-            type="area"
-            title="تطور الإيرادات"
-            description="التغير في حجم المبيعات على مدار الوقت"
-          />
+          <div className="grid grid-cols-1 gap-6">
+            {/* Revenue Trends */}
+            <RevenueChart 
+              data={monthlyRevenueData} 
+              formatCurrency={formatCurrency} 
+              type="area"
+              title="تطور الإيرادات"
+              description="التغير في حجم المبيعات على مدار الوقت"
+            />
 
-          {/* Overdue Invoices */}
-          <Card>
-            <CardHeader>
-              <CardTitle>الفواتير المتأخرة</CardTitle>
-              <CardDescription>قائمة الفواتير المتأخرة عن موعد السداد</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {overdueData.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-right p-2">رقم الفاتورة</th>
-                        <th className="text-right p-2">العميل</th>
-                        <th className="text-right p-2">المبلغ</th>
-                        <th className="text-right p-2">تاريخ الفاتورة</th>
-                        <th className="text-right p-2">تاريخ الاستحقاق</th>
-                        <th className="text-right p-2">أيام التأخير</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overdueData.map((invoice, index) => (
-                        <tr key={invoice.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                          <td className="p-2">{invoice.id}</td>
-                          <td className="p-2">{invoice.customer}</td>
-                          <td className="p-2">{formatCurrency(invoice.amount)}</td>
-                          <td className="p-2">{invoice.date}</td>
-                          <td className="p-2">{invoice.dueDate}</td>
-                          <td className="p-2 text-red-500">{invoice.daysOverdue}</td>
+            {/* Overdue Invoices */}
+            <Card>
+              <CardHeader>
+                <CardTitle>الفواتير المتأخرة</CardTitle>
+                <CardDescription>قائمة الفواتير المتأخرة عن موعد السداد</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {overdueData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-right p-2">رقم الفاتورة</th>
+                          <th className="text-right p-2">العميل</th>
+                          <th className="text-right p-2">المبلغ</th>
+                          <th className="text-right p-2">تاريخ الفاتورة</th>
+                          <th className="text-right p-2">تاريخ الاستحقاق</th>
+                          <th className="text-right p-2">أيام التأخير</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  لا توجد فواتير متأخرة حالياً
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </thead>
+                      <tbody>
+                        {overdueData.map((invoice, index) => (
+                          <tr key={invoice.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                            <td className="p-2">{invoice.id}</td>
+                            <td className="p-2">{invoice.customer}</td>
+                            <td className="p-2">{formatCurrency(invoice.amount)}</td>
+                            <td className="p-2">{invoice.date}</td>
+                            <td className="p-2">{invoice.dueDate}</td>
+                            <td className="p-2 text-red-500">{invoice.daysOverdue}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    لا توجد فواتير متأخرة حالياً
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Payment Trends */}
-          <RevenueChart 
-            data={paymentTrendData} 
-            formatCurrency={formatCurrency}
-            title="تفاصيل المدفوعات"
-            description="تطور المدفوعات على مدار الوقت"
-          />
-        </div>
-      </TabsContent>
+            {/* Payment Trends */}
+            <RevenueChart 
+              data={paymentTrendData} 
+              formatCurrency={formatCurrency}
+              title="تفاصيل المدفوعات"
+              description="تطور المدفوعات على مدار الوقت"
+            />
+          </div>
+        </TabsContent>
 
-      <TabsContent value="customers" className="mt-0">
-        {/* Customer analysis components will be here */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Will be populated with charts and tables */}
-          <Card>
-            <CardHeader>
-              <CardTitle>قريباً</CardTitle>
-              <CardDescription>سيتم إضافة تحليلات العملاء هنا</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="py-10 text-center text-muted-foreground">
-                يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن العملاء.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
+        <TabsContent value="customers">
+          {/* Customer analysis components will be here */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Will be populated with charts and tables */}
+            <Card>
+              <CardHeader>
+                <CardTitle>قريباً</CardTitle>
+                <CardDescription>سيتم إضافة تحليلات العملاء هنا</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="py-10 text-center text-muted-foreground">
+                  يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن العملاء.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      <TabsContent value="products" className="mt-0">
-        {/* Products analysis components will be here */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Will be populated with charts and tables */}
-          <Card>
-            <CardHeader>
-              <CardTitle>قريباً</CardTitle>
-              <CardDescription>سيتم إضافة تحليلات المنتجات هنا</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="py-10 text-center text-muted-foreground">
-                يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن المنتجات.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
+        <TabsContent value="products">
+          {/* Products analysis components will be here */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Will be populated with charts and tables */}
+            <Card>
+              <CardHeader>
+                <CardTitle>قريباً</CardTitle>
+                <CardDescription>سيتم إضافة تحليلات المنتجات هنا</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="py-10 text-center text-muted-foreground">
+                  يتم حالياً تطوير هذا القسم ليعرض تحليلات مفصلة عن المنتجات.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </PageContainer>
   );
 };
