@@ -1,59 +1,42 @@
 
-import { Bell, Search, Menu } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useTheme } from '@/components/ui/theme-provider';
+import { MoonIcon, SunIcon, Menu as MenuIcon } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useSidebar } from '@/components/layout/SidebarContent';
+import { UserMenu } from '@/components/auth/UserMenu';
 
-interface HeaderProps {
-  title: string;
-  subtitle?: string;
-  onMenuClick?: () => void;
-  children?: React.ReactNode;
-}
+const Header = () => {
+  const { theme, setTheme } = useTheme();
+  const { toggleSidebar } = useSidebar();
 
-const Header = ({ title, subtitle, onMenuClick, children }: HeaderProps) => {
-  const isMobile = useIsMobile();
-  const { theme } = useTheme();
-  
   return (
-    <div className={cn(
-      "flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b sticky top-0 z-10 transition-colors duration-300",
-      theme === 'dark' ? 'bg-background/80' : 'bg-background/60',
-      "backdrop-blur-sm"
-    )}>
-      <div className="flex items-center gap-3 mb-4 md:mb-0 w-full md:w-auto">
-        {isMobile && (
-          <Button variant="ghost" size="icon" onClick={onMenuClick} className="flex md:hidden">
-            <Menu className="h-5 w-5" />
-          </Button>
-        )}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-          {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
-        </div>
-      </div>
-      
-      <div className="flex items-center gap-4 w-full md:w-auto">
-        <div className="relative flex-1 md:w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input 
-            placeholder="بحث..." 
-            className="pl-10 bg-background border-input" 
-          />
-        </div>
-        
-        <Button variant="outline" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-            3
-          </span>
+    <header className="border-b shadow-sm bg-background/70 backdrop-blur-md fixed top-0 right-0 left-0 z-10">
+      <div className="container flex items-center justify-between p-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="lg:hidden"
+        >
+          <MenuIcon />
         </Button>
-        
-        {children}
+
+        <h1 className="text-lg font-semibold lg:block hidden">نظام الولاء</h1>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="rounded-full"
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </Button>
+          
+          <UserMenu />
+        </div>
       </div>
-    </div>
+    </header>
   );
 };
 
