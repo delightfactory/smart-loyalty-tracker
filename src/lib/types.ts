@@ -47,6 +47,7 @@ export interface Customer {
 
 // Invoice Item Interface
 export interface InvoiceItem {
+  id?: string;
   productId: string;
   quantity: number;
   price: number;
@@ -66,6 +67,12 @@ export enum InvoiceStatus {
 export enum PaymentMethod {
   CASH = "نقداً",
   CREDIT = "آجل"
+}
+
+// Payment Type
+export enum PaymentType {
+  PAYMENT = "payment",
+  REFUND = "refund"
 }
 
 // Invoice Interface
@@ -93,11 +100,19 @@ export interface Payment {
   date: Date;
   method: string;
   notes?: string;
-  type: 'payment' | 'refund';
+  type: PaymentType;
+}
+
+// Redemption Status
+export enum RedemptionStatus {
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
+  PENDING = "pending"
 }
 
 // Redemption Item Interface
 export interface RedemptionItem {
+  id?: string;
   productId: string;
   quantity: number;
   pointsRequired: number;
@@ -111,7 +126,7 @@ export interface Redemption {
   date: Date;
   items: RedemptionItem[];
   totalPointsRedeemed: number;
-  status: 'completed' | 'cancelled' | 'pending';
+  status: RedemptionStatus;
 }
 
 // Customer Analysis

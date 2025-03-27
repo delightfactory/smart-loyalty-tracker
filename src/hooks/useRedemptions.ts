@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService } from '@/services/database';
-import { Redemption } from '@/lib/types';
+import { Redemption, RedemptionItem } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
@@ -29,7 +29,8 @@ export function useRedemptions() {
   });
   
   const addRedemption = useMutation({
-    mutationFn: (redemption: Omit<Redemption, 'id'>) => redemptionsService.create(redemption),
+    mutationFn: ({ redemption, items }: { redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id'>[] }) => 
+      redemptionsService.create(redemption, items),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', data.customerId] });

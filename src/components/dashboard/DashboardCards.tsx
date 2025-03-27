@@ -12,6 +12,11 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
+import { DashboardCardProps } from './DashboardCardProps';
+
+interface CardData extends Omit<DashboardCardProps, 'value'> {
+  value: number | string;
+}
 
 const DashboardCards = () => {
   // البيانات المطلوبة للبطاقات
@@ -55,7 +60,7 @@ const DashboardCards = () => {
       .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
   };
   
-  const cardData = [
+  const cardData: CardData[] = [
     {
       title: 'إجمالي العملاء',
       value: customers?.length || 0,
@@ -136,7 +141,7 @@ const DashboardCards = () => {
               <>
                 <div className="text-2xl font-bold">{card.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  <span className={card.trend.startsWith('+') ? "text-green-600" : "text-red-600"}>
+                  <span className={card.trend?.startsWith('+') ? "text-green-600" : "text-red-600"}>
                     {card.trend}
                   </span>
                   {' '}{card.description}

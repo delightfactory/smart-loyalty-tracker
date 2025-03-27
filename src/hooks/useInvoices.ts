@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService } from '@/services/database';
-import { Invoice } from '@/lib/types';
+import { Invoice, InvoiceItem } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
@@ -29,7 +29,8 @@ export function useInvoices() {
   });
   
   const addInvoice = useMutation({
-    mutationFn: (invoice: Omit<Invoice, 'id'>) => invoicesService.create(invoice),
+    mutationFn: ({ invoice, items }: { invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[] }) => 
+      invoicesService.create(invoice, items),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });

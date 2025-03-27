@@ -7,7 +7,8 @@ import {
   Payment, 
   InvoiceItem, 
   Redemption, 
-  RedemptionItem 
+  RedemptionItem,
+  PaymentType
 } from '@/lib/types';
 import { 
   dbProductToAppProduct, 
@@ -148,6 +149,10 @@ export const customersService = {
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
+    // تأكد من إنشاء معرّف فريد للعميل الجديد
+    const customerId = `CUST${Date.now().toString().slice(-6)}`;
+    dbCustomer.id = customerId;
+    
     const { data, error } = await supabase
       .from('customers')
       .insert(dbCustomer)
@@ -257,11 +262,16 @@ export const invoicesService = {
   },
   
   // إنشاء فاتورة جديدة مع العناصر
-  async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]): Promise<Invoice> {
+  async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[]): Promise<Invoice> {
     // بدء معاملة قاعدة البيانات
-    const { data: dbInvoice, error: invoiceError } = await supabase
+    
+    // إنشاء معرّف فريد للفاتورة
+    const invoiceId = `INV${Date.now().toString().slice(-6)}`;
+    const dbInvoice = appInvoiceToDbInvoice({ ...invoice, id: invoiceId });
+    
+    const { data: createdInvoice, error: invoiceError } = await supabase
       .from('invoices')
-      .insert(appInvoiceToDbInvoice(invoice))
+      .insert(dbInvoice)
       .select('*')
       .single();
       
@@ -273,8 +283,8 @@ export const invoicesService = {
     // إضافة عناصر الفاتورة
     if (items.length > 0) {
       const invoiceItems = items.map(item => ({
-        ...appInvoiceItemToDbInvoiceItem(item as InvoiceItem),
-        invoice_id: dbInvoice.id
+        ...appInvoiceItemToDbInvoiceItem(item),
+        invoice_id: invoiceId
       }));
       
       const { error: itemsError } = await supabase
@@ -291,11 +301,11 @@ export const invoicesService = {
     if (invoice.paymentMethod === 'نقداً' && invoice.status === 'مدفوع') {
       const payment = {
         customer_id: invoice.customerId,
-        invoice_id: dbInvoice.id,
+        invoice_id: invoiceId,
         amount: invoice.totalAmount,
         date: invoice.date instanceof Date ? invoice.date.toISOString() : invoice.date,
         method: 'نقداً',
-        type: 'payment' as const,
+        type: PaymentType.PAYMENT,
         notes: 'دفع مع الفاتورة'
       };
       
@@ -310,7 +320,7 @@ export const invoicesService = {
     }
     
     // الحصول على الفاتورة الكاملة بعد الإنشاء
-    return this.getById(dbInvoice.id);
+    return this.getById(invoiceId);
   },
   
   // تحديث فاتورة
@@ -413,7 +423,9 @@ export const paymentsService = {
   
   // إنشاء دفعة جديدة
   async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    const dbPayment = appPaymentToDbPayment(payment);
+    // إنشاء معرّف فريد للدفعة
+    const paymentId = `PAY${Date.now().toString().slice(-6)}`;
+    const dbPayment = appPaymentToDbPayment({ ...payment, id: paymentId });
     
     const { data, error } = await supabase
       .from('payments')
@@ -521,8 +533,10 @@ export const redemptionsService = {
   },
   
   // إنشاء عملية استبدال نقاط جديدة
-  async create(redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id' | 'redemptionId'>[]): Promise<Redemption> {
-    const dbRedemption = appRedemptionToDbRedemption(redemption);
+  async create(redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id'>[]): Promise<Redemption> {
+    // إنشاء معرّف فريد لعملية الاستبدال
+    const redemptionId = `RED${Date.now().toString().slice(-6)}`;
+    const dbRedemption = appRedemptionToDbRedemption({ ...redemption, id: redemptionId });
     
     const { data, error: redemptionError } = await supabase
       .from('redemptions')
@@ -538,8 +552,8 @@ export const redemptionsService = {
     // إضافة عناصر الاستبدال
     if (items.length > 0) {
       const redemptionItems = items.map(item => ({
-        ...appRedemptionItemToDbRedemptionItem(item as RedemptionItem),
-        redemption_id: data.id
+        ...appRedemptionItemToDbRedemptionItem(item),
+        redemption_id: redemptionId
       }));
       
       const { error: itemsError } = await supabase
@@ -553,7 +567,7 @@ export const redemptionsService = {
     }
     
     // الحصول على عملية الاستبدال الكاملة بعد الإنشاء
-    return this.getById(data.id);
+    return this.getById(redemptionId);
   },
   
   // تحديث عملية استبدال نقاط

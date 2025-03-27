@@ -17,8 +17,9 @@ import {
 import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
+import { PointsRedemptionChartProps } from './DashboardCardProps';
 
-const PointsRedemptionChart = () => {
+const PointsRedemptionChart = (props: PointsRedemptionChartProps) => {
   // استخراج بيانات العملاء من قاعدة البيانات
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
@@ -27,6 +28,8 @@ const PointsRedemptionChart = () => {
 
   // حساب بيانات النقاط
   const getPointsData = () => {
+    if (props.data) return props.data;
+    
     if (!customers) return [];
     
     const totalEarned = customers.reduce((sum, customer) => sum + customer.pointsEarned, 0);

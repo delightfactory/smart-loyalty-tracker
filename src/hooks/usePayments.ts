@@ -16,12 +16,6 @@ export function usePayments() {
     queryFn: () => paymentsService.getAll()
   });
   
-  const getById = (id: string) => useQuery({
-    queryKey: ['payments', id],
-    queryFn: () => paymentsService.getById(id),
-    enabled: !!id
-  });
-  
   const getByCustomerId = (customerId: string) => useQuery({
     queryKey: ['payments', 'customer', customerId],
     queryFn: () => paymentsService.getByCustomerId(customerId),
@@ -63,7 +57,6 @@ export function usePayments() {
     mutationFn: (payment: Payment) => paymentsService.update(payment),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['payments', data.id] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
       if (data.invoiceId) {
         queryClient.invalidateQueries({ queryKey: ['payments', 'invoice', data.invoiceId] });
@@ -108,7 +101,6 @@ export function usePayments() {
   
   return {
     getAll,
-    getById,
     getByCustomerId,
     getByInvoiceId,
     addPayment,

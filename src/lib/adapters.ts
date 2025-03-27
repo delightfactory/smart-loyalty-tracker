@@ -82,8 +82,8 @@ export function dbInvoiceToAppInvoice(dbInvoice: any): Invoice {
   const invoice: Invoice = {
     id: dbInvoice.id,
     customerId: dbInvoice.customer_id,
-    date: dbInvoice.date,
-    dueDate: dbInvoice.due_date || null,
+    date: new Date(dbInvoice.date),
+    dueDate: dbInvoice.due_date ? new Date(dbInvoice.due_date) : undefined,
     totalAmount: dbInvoice.total_amount,
     status: dbInvoice.status as InvoiceStatus,
     paymentMethod: dbInvoice.payment_method as PaymentMethod,
@@ -117,7 +117,6 @@ export function appInvoiceToDbInvoice(invoice: Invoice | Omit<Invoice, 'id'>): a
 export function dbInvoiceItemToAppInvoiceItem(dbItem: any): InvoiceItem {
   return {
     id: dbItem.id,
-    invoiceId: dbItem.invoice_id,
     productId: dbItem.product_id,
     quantity: dbItem.quantity,
     price: dbItem.price,
@@ -128,15 +127,19 @@ export function dbInvoiceItemToAppInvoiceItem(dbItem: any): InvoiceItem {
 
 // تحويل بيانات عنصر الفاتورة من نموذج التطبيق إلى قاعدة البيانات
 export function appInvoiceItemToDbInvoiceItem(item: InvoiceItem | Omit<InvoiceItem, 'id'>): any {
-  return {
-    ...(('id' in item) ? { id: item.id } : {}),
-    invoice_id: item.invoiceId,
+  const dbItem: any = {
     product_id: item.productId,
     quantity: item.quantity,
     price: item.price,
     total_price: item.totalPrice,
     points_earned: item.pointsEarned
   };
+  
+  if ('id' in item && item.id) {
+    dbItem.id = item.id;
+  }
+  
+  return dbItem;
 }
 
 // تحويل بيانات الدفعة من قاعدة البيانات إلى نموذج التطبيق
@@ -144,8 +147,8 @@ export function dbPaymentToAppPayment(dbPayment: any): Payment {
   return {
     id: dbPayment.id,
     customerId: dbPayment.customer_id,
-    invoiceId: dbPayment.invoice_id || null,
-    date: dbPayment.date,
+    invoiceId: dbPayment.invoice_id || undefined,
+    date: new Date(dbPayment.date),
     amount: dbPayment.amount,
     method: dbPayment.method,
     type: dbPayment.type as PaymentType,
@@ -172,7 +175,7 @@ export function dbRedemptionToAppRedemption(dbRedemption: any): Redemption {
   return {
     id: dbRedemption.id,
     customerId: dbRedemption.customer_id,
-    date: dbRedemption.date,
+    date: new Date(dbRedemption.date),
     status: dbRedemption.status as RedemptionStatus,
     totalPointsRedeemed: dbRedemption.total_points_redeemed,
     items: dbRedemption.items ? dbRedemption.items.map(dbRedemptionItemToAppRedemptionItem) : []
@@ -194,7 +197,6 @@ export function appRedemptionToDbRedemption(redemption: Redemption | Omit<Redemp
 export function dbRedemptionItemToAppRedemptionItem(dbItem: any): RedemptionItem {
   return {
     id: dbItem.id,
-    redemptionId: dbItem.redemption_id,
     productId: dbItem.product_id,
     quantity: dbItem.quantity,
     pointsRequired: dbItem.points_required,
@@ -204,12 +206,16 @@ export function dbRedemptionItemToAppRedemptionItem(dbItem: any): RedemptionItem
 
 // تحويل بيانات عنصر استبدال النقاط من نموذج التطبيق إلى قاعدة البيانات
 export function appRedemptionItemToDbRedemptionItem(item: RedemptionItem | Omit<RedemptionItem, 'id'>): any {
-  return {
-    ...(('id' in item) ? { id: item.id } : {}),
-    redemption_id: item.redemptionId,
+  const dbItem: any = {
     product_id: item.productId,
     quantity: item.quantity,
     points_required: item.pointsRequired,
     total_points_required: item.totalPointsRequired
   };
+  
+  if ('id' in item && item.id) {
+    dbItem.id = item.id;
+  }
+  
+  return dbItem;
 }
