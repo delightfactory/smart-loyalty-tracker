@@ -42,15 +42,19 @@ import {
   Pencil,
   Trash,
   Calendar,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import PageContainer from '@/components/layout/PageContainer';
 import { InvoiceStatus, PaymentMethod } from '@/lib/types';
-import { invoices, customers, getCustomerById, updateInvoice } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import SmartSearch from '@/components/search/SmartSearch';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useRealtime } from '@/hooks/use-realtime';
+import { useCallback } from 'react';
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -59,6 +63,25 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
+  
+  // استخدام React Query hooks
+  const { getAll: getAllInvoices, deleteInvoice } = useInvoices();
+  const { getAll: getAllCustomers } = useCustomers();
+  
+  const { data: invoices = [], isLoading: isLoadingInvoices, refetch: refetchInvoices } = getAllInvoices;
+  const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
+  
+  // إعداد الاستماع لتحديثات الفواتير والمدفوعات في الوقت الفعلي
+  const handleRefetch = useCallback(() => {
+    refetchInvoices();
+  }, [refetchInvoices]);
+  
+  useRealtime('invoices', handleRefetch);
+  useRealtime('payments', handleRefetch);
+  
+  const getCustomerById = (id: string) => {
+    return customers.find(customer => customer.id === id);
+  };
   
   const filteredInvoices = invoices.filter(invoice => {
     // Apply search filter
@@ -81,26 +104,20 @@ const Invoices = () => {
     return new Date(date).toLocaleDateString('ar-EG');
   };
   
-  const handleDeleteInvoice = (invoiceId: string) => {
+  const handleDeleteInvoice = (invoiceId: string, customerId: string) => {
     setInvoiceToDelete(invoiceId);
     setDeleteDialogOpen(true);
   };
   
   const confirmDeleteInvoice = () => {
     if (invoiceToDelete) {
-      // For now we'll just show a notification
-      // The actual deletion logic is in InvoiceDetails.tsx
+      // Find the invoice to get its customerId
+      const invoice = invoices.find(inv => inv.id === invoiceToDelete);
+      if (!invoice) return;
       
-      toast({
-        title: "تم حذف الفاتورة",
-        description: `تم حذف الفاتورة ${invoiceToDelete} بنجاح`,
-      });
-      
+      deleteInvoice.mutate({ id: invoiceToDelete, customerId: invoice.customerId });
       setInvoiceToDelete(null);
       setDeleteDialogOpen(false);
-      
-      // Refresh or navigate back to invoices
-      navigate('/invoices');
     }
   };
   
@@ -118,6 +135,8 @@ const Invoices = () => {
         return "bg-gray-100 text-gray-800";
     }
   };
+  
+  const isLoading = isLoadingInvoices || isLoadingCustomers;
   
   return (
     <PageContainer title="إدارة الفواتير" subtitle="عرض وإنشاء وإدارة الفواتير">
@@ -177,7 +196,16 @@ const Invoices = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredInvoices.length > 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={10} className="h-24 text-center">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-10 w-10 mb-2 animate-spin" />
+                    <p>جاري تحميل البيانات...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredInvoices.length > 0 ? (
               filteredInvoices.map((invoice) => {
                 const customer = getCustomerById(invoice.customerId);
                 return (
@@ -232,7 +260,7 @@ const Invoices = () => {
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="text-destructive focus:text-destructive"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
+                            onClick={() => handleDeleteInvoice(invoice.id, invoice.customerId)}
                           >
                             <Trash className="ml-2 h-4 w-4" />
                             حذف الفاتورة
@@ -268,8 +296,19 @@ const Invoices = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive text-destructive-foreground">
-              حذف
+            <AlertDialogAction 
+              onClick={confirmDeleteInvoice} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={deleteInvoice.isPending}
+            >
+              {deleteInvoice.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                'حذف'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

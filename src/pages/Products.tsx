@@ -25,18 +25,47 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Package, Plus, Search, Filter, ExternalLink } from 'lucide-react';
+import { Package, Plus, Search, Filter, ExternalLink, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { ProductCategory, Product } from '@/lib/types';
-import { products, addProduct } from '@/lib/data';
 import { cn } from '@/lib/utils';
+import { useProducts } from '@/hooks/useProducts';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 const Products = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  
+  // استخدام React Query hook
+  const { getAll, addProduct } = useProducts();
+  const { data: products = [], isLoading, refetch } = getAll;
+  
+  // إعداد الاستماع لتحديثات المنتجات في الوقت الفعلي
+  useEffect(() => {
+    const channel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products'
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
   
   // Form state
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -63,23 +92,29 @@ const Products = () => {
   });
   
   const handleAddProduct = () => {
-    const productId = `P${(products.length + 1).toString().padStart(3, '0')}`;
-    const product: Product = {
-      id: productId,
-      ...newProduct as Omit<Product, 'id'>
-    };
+    if (!newProduct.name || !newProduct.unit || !newProduct.brand) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    addProduct(product);
-    setNewProduct({
-      name: '',
-      unit: '',
-      category: ProductCategory.ENGINE_CARE,
-      price: 0,
-      pointsEarned: 0,
-      pointsRequired: 0,
-      brand: ''
+    addProduct.mutate(newProduct as Omit<Product, 'id'>, {
+      onSuccess: () => {
+        setNewProduct({
+          name: '',
+          unit: '',
+          category: ProductCategory.ENGINE_CARE,
+          price: 0,
+          pointsEarned: 0,
+          pointsRequired: 0,
+          brand: ''
+        });
+        setIsAddDialogOpen(false);
+      }
     });
-    setIsAddDialogOpen(false);
   };
 
   const handleViewProduct = (productId: string) => {
@@ -212,7 +247,19 @@ const Products = () => {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleAddProduct}>إضافة المنتج</Button>
+                <Button 
+                  onClick={handleAddProduct}
+                  disabled={addProduct.isPending}
+                >
+                  {addProduct.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      جاري الإضافة...
+                    </>
+                  ) : (
+                    'إضافة المنتج'
+                  )}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -235,7 +282,16 @@ const Products = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.length > 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-24 text-center">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-10 w-10 mb-2 animate-spin" />
+                    <p>جاري تحميل البيانات...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredProducts.length > 0 ? (
               filteredProducts.map((product) => (
                 <TableRow key={product.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{product.id}</TableCell>

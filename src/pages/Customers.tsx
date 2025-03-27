@@ -25,12 +25,15 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Users, Plus, Search, Filter, UserPlus, Star } from 'lucide-react';
+import { Users, Plus, Search, Filter, UserPlus, Star, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { BusinessType, Customer } from '@/lib/types';
-import { customers, addCustomer } from '@/lib/data';
 import { cn } from '@/lib/utils';
+import { useCustomers } from '@/hooks/useCustomers';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -38,18 +41,39 @@ const Customers = () => {
   const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
+  // استخدام React Query hook
+  const { getAll, addCustomer } = useCustomers();
+  const { data: customers = [], isLoading, refetch } = getAll;
+  
+  // إعداد الاستماع لتحديثات العملاء في الوقت الفعلي
+  useEffect(() => {
+    const channel = supabase
+      .channel('customers-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customers'
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
+  
   // Form state
   const [newCustomer, setNewCustomer] = useState<Partial<Customer>>({
     name: '',
     contactPerson: '',
     phone: '',
     businessType: BusinessType.SERVICE_CENTER,
-    pointsEarned: 0,
-    pointsRedeemed: 0,
-    currentPoints: 0,
-    creditBalance: 0,
-    classification: 0,
-    level: 0
+    creditBalance: 0
   });
 
   const filteredCustomers = customers.filter(customer => {
@@ -66,26 +90,38 @@ const Customers = () => {
   });
   
   const handleAddCustomer = () => {
-    const customerId = `C${(customers.length + 1).toString().padStart(3, '0')}`;
-    const customer: Customer = {
-      id: customerId,
+    if (!newCustomer.name || !newCustomer.contactPerson || !newCustomer.phone) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const customerData: Omit<Customer, 'id'> = {
       ...newCustomer,
       currentPoints: 0,
       pointsEarned: 0,
       pointsRedeemed: 0,
       classification: 0,
-      level: customers.length + 1
-    } as Customer;
+      level: customers.length + 1,
+      creditBalance: newCustomer.creditBalance || 0,
+      businessType: newCustomer.businessType || BusinessType.SERVICE_CENTER
+    } as Omit<Customer, 'id'>;
     
-    addCustomer(customer);
-    setNewCustomer({
-      name: '',
-      contactPerson: '',
-      phone: '',
-      businessType: BusinessType.SERVICE_CENTER,
-      creditBalance: 0
+    addCustomer.mutate(customerData, {
+      onSuccess: () => {
+        setNewCustomer({
+          name: '',
+          contactPerson: '',
+          phone: '',
+          businessType: BusinessType.SERVICE_CENTER,
+          creditBalance: 0
+        });
+        setIsAddDialogOpen(false);
+      }
     });
-    setIsAddDialogOpen(false);
   };
   
   const handleCustomerClick = (customerId: string) => {
@@ -203,7 +239,19 @@ const Customers = () => {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleAddCustomer}>إضافة العميل</Button>
+                <Button 
+                  onClick={handleAddCustomer}
+                  disabled={addCustomer.isPending}
+                >
+                  {addCustomer.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      جاري الإضافة...
+                    </>
+                  ) : (
+                    'إضافة العميل'
+                  )}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -226,7 +274,16 @@ const Customers = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredCustomers.length > 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-24 text-center">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-10 w-10 mb-2 animate-spin" />
+                    <p>جاري تحميل البيانات...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredCustomers.length > 0 ? (
               filteredCustomers.map((customer) => (
                 <TableRow 
                   key={customer.id} 
