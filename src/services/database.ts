@@ -148,7 +148,7 @@ export const customersService = {
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
-    // تأكد من إنشاء معرّف فريد ل��عميل الجديد
+    // تأكد من إنشاء معرّف فريد لعميل الجديد
     const customerId = `CUST${Date.now().toString().slice(-6)}`;
     dbCustomer.id = customerId;
     
@@ -256,6 +256,11 @@ export const paymentsService = {
     // إنشاء معرّف فريد للدفعة
     const paymentId = `PAY${Date.now().toString().slice(-6)}`;
     dbPayment.id = paymentId;
+    
+    // Make sure date is converted to ISO string for Supabase
+    if (dbPayment.date instanceof Date) {
+      dbPayment.date = dbPayment.date.toISOString();
+    }
     
     // إدراج الدفعة في قاعدة البيانات
     const { data, error } = await supabase

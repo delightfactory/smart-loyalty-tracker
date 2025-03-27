@@ -1,4 +1,3 @@
-
 import { 
   Customer, 
   Product, 
@@ -39,7 +38,7 @@ export function appProductToDbProduct(product: Product): any {
     unit: product.unit,
     brand: product.brand,
     points_earned: product.pointsEarned,
-    points_required: product.pointsRequired
+    pointsRequired: product.pointsRequired
   };
 }
 
