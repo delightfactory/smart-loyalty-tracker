@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/components/ui/use-toast";
 import { ArrowLeft } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
-import { RedemptionItem, InvoiceStatus } from '@/lib/types';
+import { RedemptionItem, InvoiceStatus, RedemptionStatus } from '@/lib/types';
 import { canRedeemPoints } from '@/lib/calculations';
 import RedemptionForm from '@/components/redemption/RedemptionForm';
 import RedemptionSummary from '@/components/redemption/RedemptionSummary';
@@ -91,7 +91,7 @@ const CreateRedemption = () => {
         customerId: selectedCustomerId,
         date: currentDate,
         totalPointsRedeemed: totalRedemptionPoints,
-        status: 'completed'
+        status: RedemptionStatus.COMPLETED
       },
       items: redemptionItems
     }, {

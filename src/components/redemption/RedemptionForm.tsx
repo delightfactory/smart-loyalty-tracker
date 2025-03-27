@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { canRedeemPoints } from '@/lib/calculations';
 import RedemptionItemsList from './RedemptionItemsList';
 import { useProducts } from '@/hooks/useProducts';
+import { useCustomers } from '@/hooks/useCustomers';
 
 interface RedemptionFormProps {
   customer: Customer | null;
@@ -39,6 +40,11 @@ const RedemptionForm = ({
   const { getAll } = useProducts();
   const productsQuery = getAll();
   const products = productsQuery.data || [];
+  
+  // Use React Query for customers
+  const { getAll: getAllCustomers } = useCustomers();
+  const customersQuery = getAllCustomers();
+  const customers = customersQuery.data || [];
   
   const [newRedemptionItem, setNewRedemptionItem] = useState<Partial<RedemptionItem>>({
     productId: '',
@@ -147,12 +153,10 @@ const RedemptionForm = ({
                 <SelectValue placeholder="اختر العميل" />
               </SelectTrigger>
               <SelectContent>
-                {productsQuery.isLoading ? (
+                {customersQuery.isLoading ? (
                   <SelectItem value="loading" disabled>جاري تحميل البيانات...</SelectItem>
                 ) : (
-                  products
-                    .filter(product => product.pointsRequired > 0)
-                    .map((customer) => (
+                  customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
                     </SelectItem>
