@@ -413,7 +413,7 @@ export const invoicesService = {
         customer_id: invoice.customerId,
         invoice_id: invoiceId,
         amount: invoice.totalAmount,
-        date: invoice.date,
+        date: invoice.date instanceof Date ? invoice.date.toISOString() : invoice.date,
         method: 'cash',
         type: PaymentType.PAYMENT,
         notes: 'تم الدفع عند إنشاء الفاتورة'

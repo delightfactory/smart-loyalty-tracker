@@ -29,7 +29,13 @@ export function usePayments() {
   });
   
   const addPayment = useMutation({
-    mutationFn: (payment: Omit<Payment, 'id'>) => paymentsService.create(payment),
+    mutationFn: (payment: Omit<Payment, 'id'>) => {
+      // Ensure we're working with a proper payment object with a Date instance
+      if (typeof payment.date === 'string') {
+        payment.date = new Date(payment.date);
+      }
+      return paymentsService.create(payment);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
