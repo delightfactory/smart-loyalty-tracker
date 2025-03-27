@@ -11,15 +11,18 @@ export function useRealtime(table: TableName, callback?: RealtimeCallback) {
 
   useEffect(() => {
     const handleChange = () => {
-      // Invalidate queries related to this table
+      console.log(`Realtime update detected on table: ${table}`);
+      
+      // إبطال الاستعلامات المتعلقة بهذا الجدول
       queryClient.invalidateQueries({ queryKey: [table] });
       
-      // Call custom callback if provided
+      // استدعاء الدالة المخصصة إذا تم توفيرها
       if (callback) {
         callback();
       }
     };
 
+    // إنشاء قناة للتحديثات في الوقت الفعلي
     const channel = supabase
       .channel(`${table}-changes`)
       .on(
@@ -29,11 +32,17 @@ export function useRealtime(table: TableName, callback?: RealtimeCallback) {
           schema: 'public',
           table
         },
-        handleChange
+        (payload) => {
+          console.log(`Realtime update on ${table}:`, payload);
+          handleChange();
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Realtime subscription status for ${table}:`, status);
+      });
       
     return () => {
+      console.log(`Cleaning up realtime subscription for ${table}`);
       supabase.removeChannel(channel);
     };
   }, [table, callback, queryClient]);

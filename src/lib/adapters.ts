@@ -1,211 +1,215 @@
 
 import { 
-  Product, 
   Customer, 
+  Product, 
   Invoice, 
   Payment, 
-  Redemption,
   InvoiceItem, 
+  Redemption,
   RedemptionItem,
   BusinessType,
   ProductCategory,
   InvoiceStatus,
-  PaymentMethod
+  PaymentMethod,
+  PaymentType,
+  RedemptionStatus
 } from './types';
 
-// Database to Application model adapters
-export const dbToAppAdapters = {
-  // Convert DB Product to App Product
-  productFromDB(dbProduct: any): Product {
-    return {
-      id: dbProduct.id,
-      name: dbProduct.name,
-      unit: dbProduct.unit,
-      category: dbProduct.category as ProductCategory,
-      price: dbProduct.price,
-      pointsEarned: dbProduct.points_earned,
-      pointsRequired: dbProduct.points_required,
-      brand: dbProduct.brand
-    };
-  },
+// تحويل بيانات المنتجات من قاعدة البيانات إلى نموذج التطبيق
+export function dbProductToAppProduct(dbProduct: any): Product {
+  return {
+    id: dbProduct.id,
+    name: dbProduct.name,
+    category: dbProduct.category as ProductCategory,
+    price: dbProduct.price,
+    unit: dbProduct.unit,
+    brand: dbProduct.brand,
+    pointsEarned: dbProduct.points_earned,
+    pointsRequired: dbProduct.points_required
+  };
+}
 
-  // Convert DB Customer to App Customer
-  customerFromDB(dbCustomer: any): Customer {
-    return {
-      id: dbCustomer.id,
-      name: dbCustomer.name,
-      contactPerson: dbCustomer.contact_person,
-      phone: dbCustomer.phone,
-      businessType: dbCustomer.business_type as BusinessType,
-      pointsEarned: dbCustomer.points_earned,
-      pointsRedeemed: dbCustomer.points_redeemed,
-      currentPoints: dbCustomer.current_points,
-      creditBalance: dbCustomer.credit_balance,
-      classification: dbCustomer.classification,
-      level: dbCustomer.level
-    };
-  },
+// تحويل بيانات المنتج من نموذج التطبيق إلى قاعدة البيانات
+export function appProductToDbProduct(product: Product): any {
+  return {
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    price: product.price,
+    unit: product.unit,
+    brand: product.brand,
+    points_earned: product.pointsEarned,
+    points_required: product.pointsRequired
+  };
+}
 
-  // Convert DB Invoice Item to App Invoice Item
-  invoiceItemFromDB(dbItem: any): InvoiceItem {
-    return {
-      productId: dbItem.product_id,
-      quantity: dbItem.quantity,
-      price: dbItem.price,
-      totalPrice: dbItem.total_price,
-      pointsEarned: dbItem.points_earned
-    };
-  },
+// تحويل بيانات العميل من قاعدة البيانات إلى نموذج التطبيق
+export function dbCustomerToAppCustomer(dbCustomer: any): Customer {
+  return {
+    id: dbCustomer.id,
+    name: dbCustomer.name,
+    contactPerson: dbCustomer.contact_person,
+    phone: dbCustomer.phone,
+    businessType: dbCustomer.business_type as BusinessType,
+    currentPoints: dbCustomer.current_points,
+    pointsEarned: dbCustomer.points_earned,
+    pointsRedeemed: dbCustomer.points_redeemed,
+    classification: dbCustomer.classification,
+    level: dbCustomer.level,
+    creditBalance: dbCustomer.credit_balance,
+  };
+}
 
-  // Convert DB Payment to App Payment
-  paymentFromDB(dbPayment: any): Payment {
-    return {
-      id: dbPayment.id,
-      customerId: dbPayment.customer_id,
-      invoiceId: dbPayment.invoice_id,
-      amount: dbPayment.amount,
-      date: new Date(dbPayment.date),
-      method: dbPayment.method,
-      notes: dbPayment.notes,
-      type: dbPayment.type
-    };
-  },
+// تحويل بيانات العميل من نموذج التطبيق إلى قاعدة البيانات
+export function appCustomerToDbCustomer(customer: Customer | Omit<Customer, 'id'>): any {
+  return {
+    ...(('id' in customer) ? { id: customer.id } : {}),
+    name: customer.name,
+    contact_person: customer.contactPerson,
+    phone: customer.phone,
+    business_type: customer.businessType,
+    current_points: customer.currentPoints,
+    points_earned: customer.pointsEarned,
+    points_redeemed: customer.pointsRedeemed,
+    classification: customer.classification,
+    level: customer.level,
+    credit_balance: customer.creditBalance,
+  };
+}
 
-  // Convert DB Invoice to App Invoice
-  invoiceFromDB(dbInvoice: any, items: any[] = [], payments: any[] = []): Invoice {
-    return {
-      id: dbInvoice.id,
-      customerId: dbInvoice.customer_id,
-      date: new Date(dbInvoice.date),
-      dueDate: dbInvoice.due_date ? new Date(dbInvoice.due_date) : undefined,
-      items: items.map(item => this.invoiceItemFromDB(item)),
-      totalAmount: dbInvoice.total_amount,
-      pointsEarned: dbInvoice.points_earned,
-      pointsRedeemed: dbInvoice.points_redeemed,
-      status: dbInvoice.status as InvoiceStatus,
-      paymentMethod: dbInvoice.payment_method as PaymentMethod,
-      categoriesCount: dbInvoice.categories_count,
-      payments: payments.map(payment => this.paymentFromDB(payment))
-    };
-  },
+// تحويل بيانات الفاتورة من قاعدة البيانات إلى نموذج التطبيق
+export function dbInvoiceToAppInvoice(dbInvoice: any): Invoice {
+  const invoice: Invoice = {
+    id: dbInvoice.id,
+    customerId: dbInvoice.customer_id,
+    date: dbInvoice.date,
+    dueDate: dbInvoice.due_date || null,
+    totalAmount: dbInvoice.total_amount,
+    status: dbInvoice.status as InvoiceStatus,
+    paymentMethod: dbInvoice.payment_method as PaymentMethod,
+    pointsEarned: dbInvoice.points_earned,
+    pointsRedeemed: dbInvoice.points_redeemed,
+    categoriesCount: dbInvoice.categories_count,
+    items: dbInvoice.items ? dbInvoice.items.map(dbInvoiceItemToAppInvoiceItem) : [],
+    payments: dbInvoice.payments ? dbInvoice.payments.map(dbPaymentToAppPayment) : []
+  };
+  
+  return invoice;
+}
 
-  // Convert DB Redemption Item to App Redemption Item
-  redemptionItemFromDB(dbItem: any): RedemptionItem {
-    return {
-      productId: dbItem.product_id,
-      quantity: dbItem.quantity,
-      pointsRequired: dbItem.points_required,
-      totalPointsRequired: dbItem.total_points_required
-    };
-  },
+// تحويل بيانات الفاتورة من نموذج التطبيق إلى قاعدة البيانات
+export function appInvoiceToDbInvoice(invoice: Invoice | Omit<Invoice, 'id'>): any {
+  return {
+    ...(('id' in invoice) ? { id: invoice.id } : {}),
+    customer_id: invoice.customerId,
+    date: invoice.date instanceof Date ? invoice.date.toISOString() : invoice.date,
+    due_date: invoice.dueDate instanceof Date ? invoice.dueDate.toISOString() : invoice.dueDate,
+    total_amount: invoice.totalAmount,
+    status: invoice.status,
+    payment_method: invoice.paymentMethod,
+    points_earned: invoice.pointsEarned,
+    points_redeemed: invoice.pointsRedeemed,
+    categories_count: invoice.categoriesCount
+  };
+}
 
-  // Convert DB Redemption to App Redemption
-  redemptionFromDB(dbRedemption: any, items: any[] = []): Redemption {
-    return {
-      id: dbRedemption.id,
-      customerId: dbRedemption.customer_id,
-      date: new Date(dbRedemption.date),
-      items: items.map(item => this.redemptionItemFromDB(item)),
-      totalPointsRedeemed: dbRedemption.total_points_redeemed,
-      status: dbRedemption.status
-    };
-  }
-};
+// تحويل بيانات عنصر الفاتورة من قاعدة البيانات إلى نموذج التطبيق
+export function dbInvoiceItemToAppInvoiceItem(dbItem: any): InvoiceItem {
+  return {
+    id: dbItem.id,
+    invoiceId: dbItem.invoice_id,
+    productId: dbItem.product_id,
+    quantity: dbItem.quantity,
+    price: dbItem.price,
+    totalPrice: dbItem.total_price,
+    pointsEarned: dbItem.points_earned
+  };
+}
 
-// Application to Database model adapters
-export const appToDbAdapters = {
-  // Convert App Product to DB Product
-  productToDB(product: Product): any {
-    return {
-      id: product.id,
-      name: product.name,
-      unit: product.unit,
-      category: product.category,
-      price: product.price,
-      points_earned: product.pointsEarned,
-      points_required: product.pointsRequired,
-      brand: product.brand
-    };
-  },
+// تحويل بيانات عنصر الفاتورة من نموذج التطبيق إلى قاعدة البيانات
+export function appInvoiceItemToDbInvoiceItem(item: InvoiceItem | Omit<InvoiceItem, 'id'>): any {
+  return {
+    ...(('id' in item) ? { id: item.id } : {}),
+    invoice_id: item.invoiceId,
+    product_id: item.productId,
+    quantity: item.quantity,
+    price: item.price,
+    total_price: item.totalPrice,
+    points_earned: item.pointsEarned
+  };
+}
 
-  // Convert App Customer to DB Customer
-  customerToDB(customer: Customer): any {
-    return {
-      id: customer.id,
-      name: customer.name,
-      contact_person: customer.contactPerson,
-      phone: customer.phone,
-      business_type: customer.businessType,
-      points_earned: customer.pointsEarned,
-      points_redeemed: customer.pointsRedeemed,
-      current_points: customer.currentPoints,
-      credit_balance: customer.creditBalance,
-      classification: customer.classification,
-      level: customer.level
-    };
-  },
+// تحويل بيانات الدفعة من قاعدة البيانات إلى نموذج التطبيق
+export function dbPaymentToAppPayment(dbPayment: any): Payment {
+  return {
+    id: dbPayment.id,
+    customerId: dbPayment.customer_id,
+    invoiceId: dbPayment.invoice_id || null,
+    date: dbPayment.date,
+    amount: dbPayment.amount,
+    method: dbPayment.method,
+    type: dbPayment.type as PaymentType,
+    notes: dbPayment.notes || ''
+  };
+}
 
-  // Convert App Invoice to DB Invoice
-  invoiceToDB(invoice: Invoice): any {
-    return {
-      id: invoice.id,
-      customer_id: invoice.customerId,
-      date: invoice.date.toISOString(),
-      due_date: invoice.dueDate ? invoice.dueDate.toISOString() : null,
-      total_amount: invoice.totalAmount,
-      points_earned: invoice.pointsEarned,
-      points_redeemed: invoice.pointsRedeemed,
-      status: invoice.status,
-      payment_method: invoice.paymentMethod,
-      categories_count: invoice.categoriesCount
-    };
-  },
+// تحويل بيانات الدفعة من نموذج التطبيق إلى قاعدة البيانات
+export function appPaymentToDbPayment(payment: Payment | Omit<Payment, 'id'>): any {
+  return {
+    ...(('id' in payment) ? { id: payment.id } : {}),
+    customer_id: payment.customerId,
+    invoice_id: payment.invoiceId || null,
+    date: payment.date instanceof Date ? payment.date.toISOString() : payment.date,
+    amount: payment.amount,
+    method: payment.method,
+    type: payment.type,
+    notes: payment.notes || null
+  };
+}
 
-  // Convert App Invoice Item to DB Invoice Item
-  invoiceItemToDB(item: InvoiceItem, invoiceId: string): any {
-    return {
-      invoice_id: invoiceId,
-      product_id: item.productId,
-      quantity: item.quantity,
-      price: item.price,
-      total_price: item.totalPrice,
-      points_earned: item.pointsEarned
-    };
-  },
+// تحويل بيانات استبدال النقاط من قاعدة البيانات إلى نموذج التطبيق
+export function dbRedemptionToAppRedemption(dbRedemption: any): Redemption {
+  return {
+    id: dbRedemption.id,
+    customerId: dbRedemption.customer_id,
+    date: dbRedemption.date,
+    status: dbRedemption.status as RedemptionStatus,
+    totalPointsRedeemed: dbRedemption.total_points_redeemed,
+    items: dbRedemption.items ? dbRedemption.items.map(dbRedemptionItemToAppRedemptionItem) : []
+  };
+}
 
-  // Convert App Payment to DB Payment
-  paymentToDB(payment: Payment): any {
-    return {
-      id: payment.id,
-      customer_id: payment.customerId,
-      invoice_id: payment.invoiceId,
-      amount: payment.amount,
-      date: payment.date.toISOString(),
-      method: payment.method,
-      notes: payment.notes || null,
-      type: payment.type
-    };
-  },
+// تحويل بيانات استبدال النقاط من نموذج التطبيق إلى قاعدة البيانات
+export function appRedemptionToDbRedemption(redemption: Redemption | Omit<Redemption, 'id'>): any {
+  return {
+    ...(('id' in redemption) ? { id: redemption.id } : {}),
+    customer_id: redemption.customerId,
+    date: redemption.date instanceof Date ? redemption.date.toISOString() : redemption.date,
+    status: redemption.status,
+    total_points_redeemed: redemption.totalPointsRedeemed
+  };
+}
 
-  // Convert App Redemption to DB Redemption
-  redemptionToDB(redemption: Redemption): any {
-    return {
-      id: redemption.id,
-      customer_id: redemption.customerId,
-      date: redemption.date.toISOString(),
-      total_points_redeemed: redemption.totalPointsRedeemed,
-      status: redemption.status
-    };
-  },
+// تحويل بيانات عنصر استبدال النقاط من قاعدة البيانات إلى نموذج التطبيق
+export function dbRedemptionItemToAppRedemptionItem(dbItem: any): RedemptionItem {
+  return {
+    id: dbItem.id,
+    redemptionId: dbItem.redemption_id,
+    productId: dbItem.product_id,
+    quantity: dbItem.quantity,
+    pointsRequired: dbItem.points_required,
+    totalPointsRequired: dbItem.total_points_required
+  };
+}
 
-  // Convert App Redemption Item to DB Redemption Item
-  redemptionItemToDB(item: RedemptionItem, redemptionId: string): any {
-    return {
-      redemption_id: redemptionId,
-      product_id: item.productId,
-      quantity: item.quantity,
-      points_required: item.pointsRequired,
-      total_points_required: item.totalPointsRequired
-    };
-  }
-};
+// تحويل بيانات عنصر استبدال النقاط من نموذج التطبيق إلى قاعدة البيانات
+export function appRedemptionItemToDbRedemptionItem(item: RedemptionItem | Omit<RedemptionItem, 'id'>): any {
+  return {
+    ...(('id' in item) ? { id: item.id } : {}),
+    redemption_id: item.redemptionId,
+    product_id: item.productId,
+    quantity: item.quantity,
+    points_required: item.pointsRequired,
+    total_points_required: item.totalPointsRequired
+  };
+}

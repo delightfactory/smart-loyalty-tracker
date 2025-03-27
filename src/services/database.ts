@@ -1,370 +1,385 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
   Customer, 
   Invoice, 
   Payment, 
-  Redemption,
-  InvoiceItem,
-  RedemptionItem,
-  InvoiceStatus,
-  PaymentMethod
-} from "@/lib/types";
-import { dbToAppAdapters, appToDbAdapters } from "@/lib/adapters";
+  InvoiceItem, 
+  Redemption, 
+  RedemptionItem 
+} from '@/lib/types';
+import { 
+  dbProductToAppProduct, 
+  appProductToDbProduct,
+  dbCustomerToAppCustomer,
+  appCustomerToDbCustomer,
+  dbInvoiceToAppInvoice,
+  appInvoiceToDbInvoice,
+  dbInvoiceItemToAppInvoiceItem,
+  appInvoiceItemToDbInvoiceItem,
+  dbPaymentToAppPayment,
+  appPaymentToDbPayment,
+  dbRedemptionToAppRedemption,
+  appRedemptionToDbRedemption,
+  dbRedemptionItemToAppRedemptionItem,
+  appRedemptionItemToDbRedemptionItem
+} from '@/lib/adapters';
 
 // خدمات المنتجات
 export const productsService = {
+  // الحصول على جميع المنتجات
   async getAll(): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('id');
+      .order('name');
       
-    if (error) throw error;
-    return (data || []).map(dbToAppAdapters.productFromDB);
+    if (error) {
+      console.error('Error fetching products:', error);
+      throw error;
+    }
+    
+    return data.map(dbProductToAppProduct);
   },
   
-  async getById(id: string): Promise<Product | null> {
+  // الحصول على منتج بواسطة المعرف
+  async getById(id: string): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single();
       
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ? dbToAppAdapters.productFromDB(data) : null;
+    if (error) {
+      console.error(`Error fetching product with id ${id}:`, error);
+      throw error;
+    }
+    
+    return dbProductToAppProduct(data);
   },
   
+  // إنشاء منتج جديد
   async create(product: Omit<Product, 'id'>): Promise<Product> {
-    // إنشاء معرف جديد للمنتج
-    const allProducts = await this.getAll();
-    const newId = `P${(allProducts.length + 1).toString().padStart(3, '0')}`;
-    
-    const productData = {
-      ...appToDbAdapters.productToDB({...product, id: newId} as Product)
-    };
+    const dbProduct = appProductToDbProduct(product as Product);
+    delete dbProduct.id; // حذف المعرف لأننا نريد أن يتم إنشاؤه تلقائيًا
     
     const { data, error } = await supabase
       .from('products')
-      .insert(productData)
-      .select()
+      .insert(dbProduct)
+      .select('*')
       .single();
       
-    if (error) throw error;
-    return dbToAppAdapters.productFromDB(data);
+    if (error) {
+      console.error('Error creating product:', error);
+      throw error;
+    }
+    
+    return dbProductToAppProduct(data);
   },
   
+  // تحديث منتج
   async update(product: Product): Promise<Product> {
-    const productData = appToDbAdapters.productToDB(product);
+    const dbProduct = appProductToDbProduct(product);
     
     const { data, error } = await supabase
       .from('products')
-      .update(productData)
+      .update(dbProduct)
       .eq('id', product.id)
-      .select()
+      .select('*')
       .single();
       
-    if (error) throw error;
-    return dbToAppAdapters.productFromDB(data);
+    if (error) {
+      console.error(`Error updating product with id ${product.id}:`, error);
+      throw error;
+    }
+    
+    return dbProductToAppProduct(data);
   },
   
+  // حذف منتج
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error deleting product with id ${id}:`, error);
+      throw error;
+    }
   }
 };
 
 // خدمات العملاء
 export const customersService = {
+  // الحصول على جميع العملاء
   async getAll(): Promise<Customer[]> {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
-      .order('id');
+      .order('name');
       
-    if (error) throw error;
-    return (data || []).map(dbToAppAdapters.customerFromDB);
+    if (error) {
+      console.error('Error fetching customers:', error);
+      throw error;
+    }
+    
+    return data.map(dbCustomerToAppCustomer);
   },
   
-  async getById(id: string): Promise<Customer | null> {
+  // الحصول على عميل بواسطة المعرف
+  async getById(id: string): Promise<Customer> {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
       .eq('id', id)
       .single();
       
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ? dbToAppAdapters.customerFromDB(data) : null;
+    if (error) {
+      console.error(`Error fetching customer with id ${id}:`, error);
+      throw error;
+    }
+    
+    return dbCustomerToAppCustomer(data);
   },
   
+  // إنشاء عميل جديد
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
-    // إنشاء معرف جديد للعميل
-    const allCustomers = await this.getAll();
-    const newId = `C${(allCustomers.length + 1).toString().padStart(3, '0')}`;
-    
-    const customerData = {
-      ...appToDbAdapters.customerToDB({...customer, id: newId} as Customer)
-    };
+    const dbCustomer = appCustomerToDbCustomer(customer);
     
     const { data, error } = await supabase
       .from('customers')
-      .insert(customerData)
-      .select()
+      .insert(dbCustomer)
+      .select('*')
       .single();
       
-    if (error) throw error;
-    return dbToAppAdapters.customerFromDB(data);
+    if (error) {
+      console.error('Error creating customer:', error);
+      throw error;
+    }
+    
+    return dbCustomerToAppCustomer(data);
   },
   
+  // تحديث عميل
   async update(customer: Customer): Promise<Customer> {
-    const customerData = appToDbAdapters.customerToDB(customer);
+    const dbCustomer = appCustomerToDbCustomer(customer);
     
     const { data, error } = await supabase
       .from('customers')
-      .update(customerData)
+      .update(dbCustomer)
       .eq('id', customer.id)
-      .select()
+      .select('*')
       .single();
       
-    if (error) throw error;
-    return dbToAppAdapters.customerFromDB(data);
+    if (error) {
+      console.error(`Error updating customer with id ${customer.id}:`, error);
+      throw error;
+    }
+    
+    return dbCustomerToAppCustomer(data);
   },
   
+  // حذف عميل
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('customers')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error deleting customer with id ${id}:`, error);
+      throw error;
+    }
   }
 };
 
 // خدمات الفواتير
 export const invoicesService = {
+  // الحصول على جميع الفواتير مع العناصر والمدفوعات
   async getAll(): Promise<Invoice[]> {
     const { data, error } = await supabase
       .from('invoices')
-      .select('*, items:invoice_items(*)')
+      .select(`
+        *,
+        items:invoice_items(*),
+        payments:payments(*)
+      `)
       .order('date', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching invoices:', error);
+      throw error;
+    }
     
-    // تحويل البيانات من تنسيق قاعدة البيانات إلى تنسيق التطبيق
-    const invoicesWithItems = await Promise.all((data || []).map(async (invoice) => {
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('invoice_id', invoice.id);
-      
-      return dbToAppAdapters.invoiceFromDB(invoice, invoice.items || [], payments || []);
-    }));
-    
-    return invoicesWithItems;
+    return data.map(dbInvoiceToAppInvoice);
   },
   
-  async getById(id: string): Promise<Invoice | null> {
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (invoiceError && invoiceError.code !== 'PGRST116') throw invoiceError;
-    if (!invoice) return null;
-    
-    // جلب بنود الفاتورة
-    const { data: items, error: itemsError } = await supabase
-      .from('invoice_items')
-      .select('*')
-      .eq('invoice_id', id);
-      
-    if (itemsError) throw itemsError;
-    
-    // جلب مدفوعات الفاتورة
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('invoice_id', id);
-      
-    if (paymentsError) throw paymentsError;
-    
-    return dbToAppAdapters.invoiceFromDB(invoice, items || [], payments || []);
-  },
-  
+  // الحصول على الفواتير حسب معرف العميل
   async getByCustomerId(customerId: string): Promise<Invoice[]> {
     const { data, error } = await supabase
       .from('invoices')
-      .select('*, items:invoice_items(*)')
+      .select(`
+        *,
+        items:invoice_items(*),
+        payments:payments(*)
+      `)
       .eq('customer_id', customerId)
       .order('date', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error fetching invoices for customer ${customerId}:`, error);
+      throw error;
+    }
     
-    const invoicesWithItems = await Promise.all((data || []).map(async (invoice) => {
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('invoice_id', invoice.id);
-      
-      return dbToAppAdapters.invoiceFromDB(invoice, invoice.items || [], payments || []);
-    }));
-    
-    return invoicesWithItems;
+    return data.map(dbInvoiceToAppInvoice);
   },
   
-  async create(invoice: Omit<Invoice, 'id'>): Promise<Invoice> {
-    // إنشاء معرف جديد للفاتورة
-    const { data: allInvoices, error: countError } = await supabase
+  // الحصول على فاتورة بواسطة المعرف
+  async getById(id: string): Promise<Invoice> {
+    const { data, error } = await supabase
       .from('invoices')
-      .select('id');
-      
-    if (countError) throw countError;
-    
-    const newId = `INV${(allInvoices.length + 1).toString().padStart(3, '0')}`;
-    
-    // إنشاء الفاتورة
-    const invoiceData = {
-      ...appToDbAdapters.invoiceToDB({...invoice, id: newId} as Invoice)
-    };
-    
-    const { data: createdInvoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert(invoiceData)
-      .select()
+      .select(`
+        *,
+        items:invoice_items(*),
+        payments:payments(*)
+      `)
+      .eq('id', id)
       .single();
       
-    if (invoiceError) throw invoiceError;
+    if (error) {
+      console.error(`Error fetching invoice with id ${id}:`, error);
+      throw error;
+    }
     
-    // إنشاء بنود الفاتورة
-    const invoiceItems = invoice.items.map(item => 
-      appToDbAdapters.invoiceItemToDB(item, newId)
-    );
-    
-    const { error: itemsError } = await supabase
-      .from('invoice_items')
-      .insert(invoiceItems);
+    return dbInvoiceToAppInvoice(data);
+  },
+  
+  // إنشاء فاتورة جديدة مع العناصر
+  async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]): Promise<Invoice> {
+    // بدء معاملة قاعدة البيانات
+    const { data: dbInvoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .insert(appInvoiceToDbInvoice(invoice))
+      .select('*')
+      .single();
       
-    if (itemsError) throw itemsError;
+    if (invoiceError) {
+      console.error('Error creating invoice:', invoiceError);
+      throw invoiceError;
+    }
     
-    // إذا كان هناك مدفوعات، قم بإنشائها
-    if (invoice.payments && invoice.payments.length > 0) {
-      const paymentsData = invoice.payments.map(payment => ({
-        ...appToDbAdapters.paymentToDB({
-          ...payment,
-          id: payment.id || `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`,
-          customerId: invoice.customerId,
-          invoiceId: newId
-        })
+    // إضافة عناصر الفاتورة
+    if (items.length > 0) {
+      const invoiceItems = items.map(item => ({
+        ...appInvoiceItemToDbInvoiceItem(item as InvoiceItem),
+        invoice_id: dbInvoice.id
       }));
       
-      const { error: paymentsError } = await supabase
-        .from('payments')
-        .insert(paymentsData);
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .insert(invoiceItems);
         
-      if (paymentsError) throw paymentsError;
+      if (itemsError) {
+        console.error('Error adding invoice items:', itemsError);
+        throw itemsError;
+      }
     }
     
-    // تحديث نقاط العميل
-    if (invoice.pointsEarned > 0 || invoice.pointsRedeemed > 0) {
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('points_earned, points_redeemed, current_points')
-        .eq('id', invoice.customerId)
-        .single();
-        
-      if (customerError) throw customerError;
-      
-      const updatedCustomer = {
-        points_earned: customer.points_earned + invoice.pointsEarned,
-        points_redeemed: customer.points_redeemed + invoice.pointsRedeemed,
-        current_points: customer.current_points + invoice.pointsEarned - invoice.pointsRedeemed
+    // إذا كانت الفاتورة مدفوعة نقدًا، أضف سجل دفع
+    if (invoice.paymentMethod === 'نقداً' && invoice.status === 'مدفوع') {
+      const payment = {
+        customer_id: invoice.customerId,
+        invoice_id: dbInvoice.id,
+        amount: invoice.totalAmount,
+        date: invoice.date instanceof Date ? invoice.date.toISOString() : invoice.date,
+        method: 'نقداً',
+        type: 'payment' as const,
+        notes: 'دفع مع الفاتورة'
       };
       
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update(updatedCustomer)
-        .eq('id', invoice.customerId);
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert(payment);
         
-      if (updateError) throw updateError;
+      if (paymentError) {
+        console.error('Error adding payment record:', paymentError);
+        throw paymentError;
+      }
     }
     
-    // جلب الفاتورة كاملة مع العناصر
-    return this.getById(newId) as Promise<Invoice>;
+    // الحصول على الفاتورة الكاملة بعد الإنشاء
+    return this.getById(dbInvoice.id);
   },
   
+  // تحديث فاتورة
   async update(invoice: Invoice): Promise<Invoice> {
-    // تحديث الفاتورة
-    const invoiceData = appToDbAdapters.invoiceToDB(invoice);
+    const dbInvoice = appInvoiceToDbInvoice(invoice);
     
-    const { error: invoiceError } = await supabase
+    const { data, error } = await supabase
       .from('invoices')
-      .update(invoiceData)
-      .eq('id', invoice.id);
+      .update(dbInvoice)
+      .eq('id', invoice.id)
+      .select('*')
+      .single();
       
-    if (invoiceError) throw invoiceError;
+    if (error) {
+      console.error(`Error updating invoice with id ${invoice.id}:`, error);
+      throw error;
+    }
     
-    // حذف بنود الفاتورة القديمة
-    const { error: deleteItemsError } = await supabase
-      .from('invoice_items')
-      .delete()
-      .eq('invoice_id', invoice.id);
-      
-    if (deleteItemsError) throw deleteItemsError;
-    
-    // إنشاء بنود الفاتورة الجديدة
-    const invoiceItems = invoice.items.map(item => 
-      appToDbAdapters.invoiceItemToDB(item, invoice.id)
-    );
-    
+    return dbInvoiceToAppInvoice({
+      ...data,
+      items: invoice.items,
+      payments: invoice.payments
+    });
+  },
+  
+  // حذف فاتورة
+  async delete(id: string): Promise<void> {
+    // حذف عناصر الفاتورة أولاً
     const { error: itemsError } = await supabase
       .from('invoice_items')
-      .insert(invoiceItems);
+      .delete()
+      .eq('invoice_id', id);
       
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error(`Error deleting invoice items for invoice ${id}:`, itemsError);
+      throw itemsError;
+    }
     
-    return invoice;
-  },
-  
-  async delete(id: string): Promise<void> {
-    // حذف الفاتورة سيؤدي تلقائيًا إلى حذف بنود الفاتورة بسبب قيود المفتاح الأجنبي
+    // ثم حذف الفاتورة
     const { error } = await supabase
       .from('invoices')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error deleting invoice with id ${id}:`, error);
+      throw error;
+    }
   }
 };
 
 // خدمات المدفوعات
 export const paymentsService = {
+  // الحصول على جميع المدفوعات
   async getAll(): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
       .select('*')
       .order('date', { ascending: false });
       
-    if (error) throw error;
-    return (data || []).map(dbToAppAdapters.paymentFromDB);
+    if (error) {
+      console.error('Error fetching payments:', error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
   },
   
-  async getById(id: string): Promise<Payment | null> {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ? dbToAppAdapters.paymentFromDB(data) : null;
-  },
-  
+  // الحصول على مدفوعات عميل
   async getByCustomerId(customerId: string): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
@@ -372,10 +387,15 @@ export const paymentsService = {
       .eq('customer_id', customerId)
       .order('date', { ascending: false });
       
-    if (error) throw error;
-    return (data || []).map(dbToAppAdapters.paymentFromDB);
+    if (error) {
+      console.error(`Error fetching payments for customer ${customerId}:`, error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
   },
   
+  // الحصول على مدفوعات فاتورة
   async getByInvoiceId(invoiceId: string): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
@@ -383,423 +403,203 @@ export const paymentsService = {
       .eq('invoice_id', invoiceId)
       .order('date', { ascending: false });
       
-    if (error) throw error;
-    return (data || []).map(dbToAppAdapters.paymentFromDB);
+    if (error) {
+      console.error(`Error fetching payments for invoice ${invoiceId}:`, error);
+      throw error;
+    }
+    
+    return data.map(dbPaymentToAppPayment);
   },
   
+  // إنشاء دفعة جديدة
   async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    const newId = `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    
-    const paymentData = {
-      ...appToDbAdapters.paymentToDB({...payment, id: newId} as Payment)
-    };
+    const dbPayment = appPaymentToDbPayment(payment);
     
     const { data, error } = await supabase
       .from('payments')
-      .insert(paymentData)
-      .select()
+      .insert(dbPayment)
+      .select('*')
       .single();
       
-    if (error) throw error;
-    
-    // تحديث حالة الفاتورة بعد إضافة الدفعة
-    if (payment.invoiceId) {
-      await this.updateInvoiceStatus(payment.invoiceId);
+    if (error) {
+      console.error('Error creating payment:', error);
+      throw error;
     }
     
-    // تحديث رصيد العميل
-    await this.updateCustomerCreditBalance(payment.customerId);
-    
-    return dbToAppAdapters.paymentFromDB(data);
+    return dbPaymentToAppPayment(data);
   },
   
+  // تحديث دفعة
   async update(payment: Payment): Promise<Payment> {
-    const paymentData = appToDbAdapters.paymentToDB(payment);
+    const dbPayment = appPaymentToDbPayment(payment);
     
     const { data, error } = await supabase
       .from('payments')
-      .update(paymentData)
+      .update(dbPayment)
       .eq('id', payment.id)
-      .select()
+      .select('*')
       .single();
       
-    if (error) throw error;
-    
-    // تحديث حالة الفاتورة بعد تعديل الدفعة
-    if (payment.invoiceId) {
-      await this.updateInvoiceStatus(payment.invoiceId);
+    if (error) {
+      console.error(`Error updating payment with id ${payment.id}:`, error);
+      throw error;
     }
     
-    // تحديث رصيد العميل
-    await this.updateCustomerCreditBalance(payment.customerId);
-    
-    return dbToAppAdapters.paymentFromDB(data);
+    return dbPaymentToAppPayment(data);
   },
   
+  // حذف دفعة
   async delete(id: string): Promise<void> {
-    // جلب معلومات الدفعة قبل حذفها
-    const payment = await this.getById(id);
-    if (!payment) return;
-    
     const { error } = await supabase
       .from('payments')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
-    
-    // تحديث حالة الفاتورة بعد حذف الدفعة
-    if (payment.invoiceId) {
-      await this.updateInvoiceStatus(payment.invoiceId);
+    if (error) {
+      console.error(`Error deleting payment with id ${id}:`, error);
+      throw error;
     }
-    
-    // تحديث رصيد العميل
-    await this.updateCustomerCreditBalance(payment.customerId);
-  },
-  
-  // دالة مساعدة لتحديث حالة الفاتورة
-  async updateInvoiceStatus(invoiceId: string): Promise<void> {
-    // جلب الفاتورة
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('id', invoiceId)
-      .single();
-      
-    if (invoiceError) throw invoiceError;
-    
-    // جلب المدفوعات المتعلقة بالفاتورة
-    const payments = await this.getByInvoiceId(invoiceId);
-    
-    // حساب إجمالي المدفوعات (المدفوعات ناقص المردودات)
-    const totalPayments = payments.reduce((sum, payment) => {
-      if (payment.type === 'payment') {
-        return sum + Number(payment.amount);
-      } else if (payment.type === 'refund') {
-        return sum - Number(payment.amount);
-      }
-      return sum;
-    }, 0);
-    
-    // تحديد الحالة الجديدة بناء على مبلغ الدفع
-    let newStatus: InvoiceStatus;
-    
-    if (totalPayments >= Number(invoice.total_amount)) {
-      newStatus = InvoiceStatus.PAID;
-    } else if (totalPayments > 0) {
-      newStatus = InvoiceStatus.PARTIALLY_PAID;
-    } else {
-      newStatus = invoice.payment_method === PaymentMethod.CREDIT ? InvoiceStatus.UNPAID : InvoiceStatus.PAID;
-    }
-    
-    // التحقق مما إذا كانت الفاتورة متأخرة
-    const today = new Date();
-    if (invoice.due_date && today > new Date(invoice.due_date) && totalPayments < Number(invoice.total_amount)) {
-      newStatus = InvoiceStatus.OVERDUE;
-    }
-    
-    // تحديث حالة الفاتورة
-    if (invoice.status !== newStatus) {
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({ status: newStatus })
-        .eq('id', invoiceId);
-        
-      if (updateError) throw updateError;
-    }
-  },
-  
-  // دالة مساعدة لتحديث رصيد العميل
-  async updateCustomerCreditBalance(customerId: string): Promise<void> {
-    // جلب العميل
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', customerId)
-      .single();
-      
-    if (customerError) throw customerError;
-    
-    // جلب الفواتير غير المدفوعة أو المدفوعة جزئيًا
-    const { data: unpaidInvoices, error: invoicesError } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('customer_id', customerId)
-      .in('status', [InvoiceStatus.UNPAID, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]);
-      
-    if (invoicesError) throw invoicesError;
-    
-    // حساب إجمالي المبلغ المستحق
-    let totalAmountDue = 0;
-    
-    for (const invoice of unpaidInvoices) {
-      const payments = await this.getByInvoiceId(invoice.id);
-      const totalPaidForInvoice = payments.reduce((sum, payment) => {
-        if (payment.type === 'payment') {
-          return sum + Number(payment.amount);
-        } else if (payment.type === 'refund') {
-          return sum - Number(payment.amount);
-        }
-        return sum;
-      }, 0);
-      
-      totalAmountDue += (Number(invoice.total_amount) - totalPaidForInvoice);
-    }
-    
-    // تحديث رصيد العميل
-    const { error: updateError } = await supabase
-      .from('customers')
-      .update({ credit_balance: totalAmountDue })
-      .eq('id', customerId);
-      
-    if (updateError) throw updateError;
   }
 };
 
-// خدمات استبدال النقاط
+// خدمات عمليات استبدال النقاط
 export const redemptionsService = {
+  // الحصول على جميع عمليات استبدال النقاط
   async getAll(): Promise<Redemption[]> {
     const { data, error } = await supabase
       .from('redemptions')
-      .select('*')
+      .select(`
+        *,
+        items:redemption_items(*)
+      `)
       .order('date', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching redemptions:', error);
+      throw error;
+    }
     
-    // جلب بنود الاستبدال لكل عملية استبدال
-    const result = await Promise.all((data || []).map(async (redemption) => {
-      const { data: items, error: itemsError } = await supabase
-        .from('redemption_items')
-        .select('*')
-        .eq('redemption_id', redemption.id);
-        
-      if (itemsError) throw itemsError;
-      
-      return dbToAppAdapters.redemptionFromDB(redemption, items || []);
-    }));
-    
-    return result;
+    return data.map(dbRedemptionToAppRedemption);
   },
   
-  async getById(id: string): Promise<Redemption | null> {
-    const { data: redemption, error: redemptionError } = await supabase
-      .from('redemptions')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (redemptionError && redemptionError.code !== 'PGRST116') throw redemptionError;
-    if (!redemption) return null;
-    
-    // جلب بنود الاستبدال
-    const { data: items, error: itemsError } = await supabase
-      .from('redemption_items')
-      .select('*')
-      .eq('redemption_id', id);
-      
-    if (itemsError) throw itemsError;
-    
-    return dbToAppAdapters.redemptionFromDB(redemption, items || []);
-  },
-  
+  // الحصول على عمليات استبدال النقاط لعميل
   async getByCustomerId(customerId: string): Promise<Redemption[]> {
     const { data, error } = await supabase
       .from('redemptions')
-      .select('*')
+      .select(`
+        *,
+        items:redemption_items(*)
+      `)
       .eq('customer_id', customerId)
       .order('date', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error fetching redemptions for customer ${customerId}:`, error);
+      throw error;
+    }
     
-    // جلب بنود الاستبدال لكل عملية استبدال
-    const result = await Promise.all((data || []).map(async (redemption) => {
-      const { data: items, error: itemsError } = await supabase
-        .from('redemption_items')
-        .select('*')
-        .eq('redemption_id', redemption.id);
-        
-      if (itemsError) throw itemsError;
-      
-      return dbToAppAdapters.redemptionFromDB(redemption, items || []);
-    }));
-    
-    return result;
+    return data.map(dbRedemptionToAppRedemption);
   },
   
-  async create(redemption: Omit<Redemption, 'id'>): Promise<Redemption> {
-    // إنشاء معرف جديد للاستبدال
-    const { data: allRedemptions, error: countError } = await supabase
+  // الحصول على عملية استبدال نقاط بواسطة المعرف
+  async getById(id: string): Promise<Redemption> {
+    const { data, error } = await supabase
       .from('redemptions')
-      .select('id');
-      
-    if (countError) throw countError;
-    
-    const newId = `RED${(allRedemptions.length + 1).toString().padStart(3, '0')}`;
-    
-    // إنشاء عملية الاستبدال
-    const redemptionData = {
-      ...appToDbAdapters.redemptionToDB({...redemption, id: newId} as Redemption)
-    };
-    
-    const { data: createdRedemption, error: redemptionError } = await supabase
-      .from('redemptions')
-      .insert(redemptionData)
-      .select()
+      .select(`
+        *,
+        items:redemption_items(*)
+      `)
+      .eq('id', id)
       .single();
       
-    if (redemptionError) throw redemptionError;
-    
-    // إنشاء بنود الاستبدال
-    const redemptionItems = redemption.items.map(item => 
-      appToDbAdapters.redemptionItemToDB(item, newId)
-    );
-    
-    const { error: itemsError } = await supabase
-      .from('redemption_items')
-      .insert(redemptionItems);
-      
-    if (itemsError) throw itemsError;
-    
-    // تحديث نقاط العميل إذا تم الاستبدال
-    if (redemption.status === 'completed') {
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('points_earned, points_redeemed, current_points')
-        .eq('id', redemption.customerId)
-        .single();
-        
-      if (customerError) throw customerError;
-      
-      const updatedCustomer = {
-        points_redeemed: customer.points_redeemed + redemption.totalPointsRedeemed,
-        current_points: customer.current_points - redemption.totalPointsRedeemed
-      };
-      
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update(updatedCustomer)
-        .eq('id', redemption.customerId);
-        
-      if (updateError) throw updateError;
+    if (error) {
+      console.error(`Error fetching redemption with id ${id}:`, error);
+      throw error;
     }
     
-    // جلب الاستبدال كاملاً
-    return this.getById(newId) as Promise<Redemption>;
+    return dbRedemptionToAppRedemption(data);
   },
   
-  async update(redemption: Redemption): Promise<Redemption> {
-    // جلب الاستبدال القديم لمعرفة حالته
-    const oldRedemption = await this.getById(redemption.id);
-    if (!oldRedemption) throw new Error('Redemption not found');
+  // إنشاء عملية استبدال نقاط جديدة
+  async create(redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id' | 'redemptionId'>[]): Promise<Redemption> {
+    const dbRedemption = appRedemptionToDbRedemption(redemption);
     
-    // تحديث عملية الاستبدال
-    const redemptionData = appToDbAdapters.redemptionToDB(redemption);
-    
-    const { error: redemptionError } = await supabase
+    const { data, error: redemptionError } = await supabase
       .from('redemptions')
-      .update(redemptionData)
-      .eq('id', redemption.id);
+      .insert(dbRedemption)
+      .select('*')
+      .single();
       
-    if (redemptionError) throw redemptionError;
+    if (redemptionError) {
+      console.error('Error creating redemption:', redemptionError);
+      throw redemptionError;
+    }
     
-    // حذف بنود الاستبدال القديمة
-    const { error: deleteItemsError } = await supabase
+    // إضافة عناصر الاستبدال
+    if (items.length > 0) {
+      const redemptionItems = items.map(item => ({
+        ...appRedemptionItemToDbRedemptionItem(item as RedemptionItem),
+        redemption_id: data.id
+      }));
+      
+      const { error: itemsError } = await supabase
+        .from('redemption_items')
+        .insert(redemptionItems);
+        
+      if (itemsError) {
+        console.error('Error adding redemption items:', itemsError);
+        throw itemsError;
+      }
+    }
+    
+    // الحصول على عملية الاستبدال الكاملة بعد الإنشاء
+    return this.getById(data.id);
+  },
+  
+  // تحديث عملية استبدال نقاط
+  async update(redemption: Redemption): Promise<Redemption> {
+    const dbRedemption = appRedemptionToDbRedemption(redemption);
+    
+    const { data, error } = await supabase
+      .from('redemptions')
+      .update(dbRedemption)
+      .eq('id', redemption.id)
+      .select('*')
+      .single();
+      
+    if (error) {
+      console.error(`Error updating redemption with id ${redemption.id}:`, error);
+      throw error;
+    }
+    
+    return dbRedemptionToAppRedemption({
+      ...data,
+      items: redemption.items
+    });
+  },
+  
+  // حذف عملية استبدال نقاط
+  async delete(id: string): Promise<void> {
+    // حذف عناصر الاستبدال أولاً
+    const { error: itemsError } = await supabase
       .from('redemption_items')
       .delete()
-      .eq('redemption_id', redemption.id);
+      .eq('redemption_id', id);
       
-    if (deleteItemsError) throw deleteItemsError;
-    
-    // إنشاء بنود الاستبدال الجديدة
-    const redemptionItems = redemption.items.map(item => 
-      appToDbAdapters.redemptionItemToDB(item, redemption.id)
-    );
-    
-    const { error: itemsError } = await supabase
-      .from('redemption_items')
-      .insert(redemptionItems);
-      
-    if (itemsError) throw itemsError;
-    
-    // تحديث نقاط العميل إذا تغيرت الحالة
-    if (oldRedemption.status !== redemption.status) {
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('points_earned, points_redeemed, current_points')
-        .eq('id', redemption.customerId)
-        .single();
-        
-      if (customerError) throw customerError;
-      
-      let updatedCustomer = { ...customer };
-      
-      if (oldRedemption.status === 'completed' && redemption.status !== 'completed') {
-        // إعادة النقاط المستردة
-        updatedCustomer.points_redeemed = customer.points_redeemed - oldRedemption.totalPointsRedeemed;
-        updatedCustomer.current_points = customer.current_points + oldRedemption.totalPointsRedeemed;
-      } else if (oldRedemption.status !== 'completed' && redemption.status === 'completed') {
-        // خصم النقاط للاستبدال الجديد
-        updatedCustomer.points_redeemed = customer.points_redeemed + redemption.totalPointsRedeemed;
-        updatedCustomer.current_points = customer.current_points - redemption.totalPointsRedeemed;
-      }
-      
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({
-          points_redeemed: updatedCustomer.points_redeemed,
-          current_points: updatedCustomer.current_points
-        })
-        .eq('id', redemption.customerId);
-        
-      if (updateError) throw updateError;
+    if (itemsError) {
+      console.error(`Error deleting redemption items for redemption ${id}:`, itemsError);
+      throw itemsError;
     }
     
-    return redemption;
-  },
-  
-  async delete(id: string): Promise<void> {
-    // جلب معلومات الاستبدال قبل حذفه
-    const redemption = await this.getById(id);
-    if (!redemption) return;
-    
-    // إعادة النقاط للعميل إذا كان الاستبدال مكتمل
-    if (redemption.status === 'completed') {
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('points_earned, points_redeemed, current_points')
-        .eq('id', redemption.customerId)
-        .single();
-        
-      if (customerError) throw customerError;
-      
-      const updatedCustomer = {
-        points_redeemed: customer.points_redeemed - redemption.totalPointsRedeemed,
-        current_points: customer.current_points + redemption.totalPointsRedeemed
-      };
-      
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update(updatedCustomer)
-        .eq('id', redemption.customerId);
-        
-      if (updateError) throw updateError;
-    }
-    
-    // حذف الاستبدال
+    // ثم حذف عملية الاستبدال
     const { error } = await supabase
       .from('redemptions')
       .delete()
       .eq('id', id);
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error deleting redemption with id ${id}:`, error);
+      throw error;
+    }
   }
-};
-
-// تصدير الخدمات
-export const databaseService = {
-  products: productsService,
-  customers: customersService,
-  invoices: invoicesService,
-  payments: paymentsService,
-  redemptions: redemptionsService
 };

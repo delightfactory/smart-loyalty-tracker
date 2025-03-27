@@ -8,7 +8,7 @@ import { useRealtime } from './use-realtime';
 export function useCustomers() {
   const queryClient = useQueryClient();
   
-  // Set up realtime updates for customers
+  // إعداد التحديثات في الوقت الفعلي للعملاء
   useRealtime('customers');
   
   const getAll = useQuery({
@@ -23,7 +23,20 @@ export function useCustomers() {
   });
   
   const addCustomer = useMutation({
-    mutationFn: (customer: Omit<Customer, 'id'>) => customersService.create(customer),
+    mutationFn: (customer: Omit<Customer, 'id'>) => {
+      // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
+      const normalizedCustomer: Omit<Customer, 'id'> = {
+        ...customer,
+        currentPoints: Number(customer.currentPoints),
+        pointsEarned: Number(customer.pointsEarned),
+        pointsRedeemed: Number(customer.pointsRedeemed),
+        classification: Number(customer.classification),
+        level: Number(customer.level),
+        creditBalance: Number(customer.creditBalance)
+      };
+      
+      return customersService.create(normalizedCustomer);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
@@ -32,6 +45,7 @@ export function useCustomers() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding customer:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء إضافة العميل: ${error.message}`,
@@ -41,7 +55,20 @@ export function useCustomers() {
   });
   
   const updateCustomer = useMutation({
-    mutationFn: (customer: Customer) => customersService.update(customer),
+    mutationFn: (customer: Customer) => {
+      // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
+      const normalizedCustomer: Customer = {
+        ...customer,
+        currentPoints: Number(customer.currentPoints),
+        pointsEarned: Number(customer.pointsEarned),
+        pointsRedeemed: Number(customer.pointsRedeemed),
+        classification: Number(customer.classification),
+        level: Number(customer.level),
+        creditBalance: Number(customer.creditBalance)
+      };
+      
+      return customersService.update(normalizedCustomer);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['customers', data.id] });
@@ -51,6 +78,7 @@ export function useCustomers() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating customer:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تحديث العميل: ${error.message}`,
@@ -69,6 +97,7 @@ export function useCustomers() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error deleting customer:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء حذف العميل: ${error.message}`,

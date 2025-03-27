@@ -1,131 +1,151 @@
 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  Card, 
-  CardContent
-} from '@/components/ui/card';
-import { Package, Users, FileText, CreditCard, AlertCircle, TrendingUp } from 'lucide-react';
+  Users, 
+  ShoppingBag, 
+  CreditCard, 
+  TrendingUp, 
+  Package, 
+  Star, 
+  FileText,
+  Loader2
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
 
-interface DashboardSummary {
-  totalProducts: number;
-  totalCustomers: number;
-  totalInvoices: number;
-  totalRevenue: number;
-  totalPaid: number;
-  totalOverdue: number;
-}
-
-interface DashboardCardsProps {
-  summary: DashboardSummary;
-  view: 'overview' | 'sales';
-  formatCurrency: (value: number) => string;
-}
-
-const DashboardCards = ({ summary, view, formatCurrency }: DashboardCardsProps) => {
-  if (view === 'overview') {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي المنتجات</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalProducts}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <Package className="h-6 w-6 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي العملاء</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalCustomers}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الفواتير</p>
-                <h3 className="text-2xl font-bold mt-2">{summary.totalInvoices}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="stat-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الإيرادات</p>
-                <h3 className="text-xl font-bold mt-2">{formatCurrency(summary.totalRevenue)}</h3>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-purple-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+const DashboardCards = () => {
+  // البيانات المطلوبة للبطاقات
+  const { data: customers, isLoading: isLoadingCustomers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => customersService.getAll()
+  });
   
+  const { data: products, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => productsService.getAll()
+  });
+  
+  const { data: invoices, isLoading: isLoadingInvoices } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => invoicesService.getAll()
+  });
+  
+  const { data: payments, isLoading: isLoadingPayments } = useQuery({
+    queryKey: ['payments'],
+    queryFn: () => paymentsService.getAll()
+  });
+  
+  const { data: redemptions, isLoading: isLoadingRedemptions } = useQuery({
+    queryKey: ['redemptions'],
+    queryFn: () => redemptionsService.getAll()
+  });
+  
+  // حساب الإحصائيات
+  const calculateTotalRevenue = () => {
+    if (!payments) return 0;
+    return payments
+      .filter(payment => payment.type === 'payment')
+      .reduce((sum, payment) => sum + payment.amount, 0);
+  };
+  
+  const calculateTotalOutstanding = () => {
+    if (!invoices) return 0;
+    return invoices
+      .filter(invoice => invoice.status !== 'مدفوع')
+      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+  };
+  
+  const cardData = [
+    {
+      title: 'إجمالي العملاء',
+      value: customers?.length || 0,
+      icon: <Users className="h-5 w-5 text-blue-600" />,
+      loading: isLoadingCustomers,
+      trend: '+5.2%',
+      description: 'منذ الشهر الماضي'
+    },
+    {
+      title: 'إجمالي المنتجات',
+      value: products?.length || 0,
+      icon: <Package className="h-5 w-5 text-green-600" />,
+      loading: isLoadingProducts,
+      trend: '+3.1%',
+      description: 'منذ الشهر الماضي'
+    },
+    {
+      title: 'إجمالي الفواتير',
+      value: invoices?.length || 0,
+      icon: <FileText className="h-5 w-5 text-amber-600" />,
+      loading: isLoadingInvoices,
+      trend: '+12.5%',
+      description: 'منذ الشهر الماضي'
+    },
+    {
+      title: 'إجمالي الإيرادات',
+      value: new Intl.NumberFormat('ar-EG', { 
+        style: 'currency', 
+        currency: 'EGP',
+        maximumFractionDigits: 0 
+      }).format(calculateTotalRevenue()),
+      icon: <TrendingUp className="h-5 w-5 text-purple-600" />,
+      loading: isLoadingPayments,
+      trend: '+18.2%',
+      description: 'منذ الشهر الماضي'
+    },
+    {
+      title: 'المبالغ المستحقة',
+      value: new Intl.NumberFormat('ar-EG', { 
+        style: 'currency', 
+        currency: 'EGP',
+        maximumFractionDigits: 0 
+      }).format(calculateTotalOutstanding()),
+      icon: <CreditCard className="h-5 w-5 text-red-600" />,
+      loading: isLoadingInvoices,
+      trend: '-2.5%',
+      description: 'منذ الشهر الماضي'
+    },
+    {
+      title: 'عمليات استبدال النقاط',
+      value: redemptions?.length || 0,
+      icon: <Star className="h-5 w-5 text-yellow-600" />,
+      loading: isLoadingRedemptions,
+      trend: '+7.3%',
+      description: 'منذ الشهر الماضي'
+    }
+  ];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">إجمالي المبيعات</p>
-              <h3 className="text-2xl font-bold mt-2">{formatCurrency(summary.totalRevenue)}</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {cardData.map((card, index) => (
+        <Card key={index} className="transition-all hover:shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {card.title}
+            </CardTitle>
+            <div className="bg-primary/10 p-2 rounded-full">
+              {card.icon}
             </div>
-            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-blue-500" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">إجمالي المدفوعات</p>
-              <h3 className="text-2xl font-bold mt-2">{formatCurrency(summary.totalPaid)}</h3>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-              <CreditCard className="h-6 w-6 text-green-500" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">إجمالي المتأخرات</p>
-              <h3 className="text-2xl font-bold mt-2 text-red-500">{formatCurrency(summary.totalOverdue)}</h3>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-red-500" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            {card.loading ? (
+              <div className="flex items-center">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <p className="text-muted-foreground">جاري التحميل...</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{card.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className={card.trend.startsWith('+') ? "text-green-600" : "text-red-600"}>
+                    {card.trend}
+                  </span>
+                  {' '}{card.description}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };
