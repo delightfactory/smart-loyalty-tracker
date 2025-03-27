@@ -91,7 +91,8 @@ const CreateRedemption = () => {
         customerId: selectedCustomerId,
         date: currentDate,
         totalPointsRedeemed: totalRedemptionPoints,
-        status: RedemptionStatus.COMPLETED
+        status: RedemptionStatus.COMPLETED,
+        items: redemptionItems // Adding the items property to fix the type error
       },
       items: redemptionItems
     }, {

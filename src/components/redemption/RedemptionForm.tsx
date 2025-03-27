@@ -38,12 +38,12 @@ const RedemptionForm = ({
   
   // Use React Query for products
   const { getAll } = useProducts();
-  const productsQuery = getAll();
+  const productsQuery = getAll;
   const products = productsQuery.data || [];
   
   // Use React Query for customers
   const { getAll: getAllCustomers } = useCustomers();
-  const customersQuery = getAllCustomers();
+  const customersQuery = getAllCustomers;
   const customers = customersQuery.data || [];
   
   const [newRedemptionItem, setNewRedemptionItem] = useState<Partial<RedemptionItem>>({
