@@ -219,7 +219,7 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             {/* Invoice Status */}
-            <InvoiceStatusChart invoices={filteredInvoices} />
+            <InvoiceStatusChart />
 
             {/* Monthly Revenue */}
             <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />

@@ -148,7 +148,7 @@ export const customersService = {
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
-    // تأكد من إنشاء معرّف فريد للعميل الجديد
+    // تأكد من إنشاء معرّف فريد ل��عميل الجديد
     const customerId = `CUST${Date.now().toString().slice(-6)}`;
     dbCustomer.id = customerId;
     
@@ -298,7 +298,9 @@ export const invoicesService = {
     
     // إذا كانت الفاتورة مدفوعة نقدًا، أضف سجل دفع
     if (invoice.paymentMethod === 'نقداً' && invoice.status === 'مدفوع') {
+      const paymentId = `PAY${Date.now().toString().slice(-6)}`;
       const payment = {
+        id: paymentId,
         customer_id: invoice.customerId,
         invoice_id: invoiceId,
         amount: invoice.totalAmount,

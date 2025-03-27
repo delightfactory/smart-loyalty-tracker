@@ -18,8 +18,9 @@ import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { invoicesService } from '@/services/database';
 import { InvoiceStatus } from '@/lib/types';
+import { InvoiceStatusChartProps } from './DashboardCardProps';
 
-const InvoiceStatusChart = () => {
+const InvoiceStatusChart = (props?: InvoiceStatusChartProps) => {
   // استخراج بيانات الفواتير من قاعدة البيانات
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['invoices'],
