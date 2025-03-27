@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { PageContainer } from '@/components/layout/PageContainer';
+import PageContainer from '@/components/layout/PageContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,11 +15,14 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { customers } from '@/lib/data';
 
-// Mock data to simulate inactive customers
+// Extend the customer data with the properties we need for inactive customers
 const inactiveCustomers = customers.map(customer => ({
   ...customer,
   lastPurchase: new Date(Date.now() - Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000),
   inactiveDays: Math.floor(Math.random() * 180) + 1,
+  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(customer.name)}`,
+  email: `${customer.contactPerson.replace(/\s+/g, '.').toLowerCase()}@${customer.name.replace(/\s+/g, '-').toLowerCase()}.com`,
+  loyaltyPoints: customer.currentPoints // Using currentPoints as loyaltyPoints
 }));
 
 const CustomerFollowup = () => {
