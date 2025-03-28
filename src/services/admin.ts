@@ -7,3 +7,17 @@ export const adminCredentials = {
   password: 'Admin@12345',
   fullName: 'مدير النظام'
 };
+
+// تحقق مما إذا كان المستخدم موجودًا بالفعل
+export const isAdminExists = async (supabase: any) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: adminCredentials.email,
+    password: adminCredentials.password,
+  });
+  
+  if (error) {
+    return false;
+  }
+  
+  return !!data.user;
+};

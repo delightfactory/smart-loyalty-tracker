@@ -13,36 +13,49 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
 import { DashboardCardProps, DashboardSummaryProps } from './DashboardCardProps';
+import { useEffect, useState } from 'react';
 
 interface CardData extends Omit<DashboardCardProps, 'value'> {
   value: number | string;
 }
 
 const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  
   // البيانات المطلوبة للبطاقات
   const { data: customers, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersService.getAll()
+    queryFn: () => customersService.getAll(),
+    enabled: isMounted
   });
   
   const { data: products, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
-    queryFn: () => productsService.getAll()
+    queryFn: () => productsService.getAll(),
+    enabled: isMounted
   });
   
   const { data: invoices, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => invoicesService.getAll()
+    queryFn: () => invoicesService.getAll(),
+    enabled: isMounted
   });
   
   const { data: payments, isLoading: isLoadingPayments } = useQuery({
     queryKey: ['payments'],
-    queryFn: () => paymentsService.getAll()
+    queryFn: () => paymentsService.getAll(),
+    enabled: isMounted
   });
   
   const { data: redemptions, isLoading: isLoadingRedemptions } = useQuery({
     queryKey: ['redemptions'],
-    queryFn: () => redemptionsService.getAll()
+    queryFn: () => redemptionsService.getAll(),
+    enabled: isMounted
   });
   
   // حساب الإحصائيات
@@ -64,6 +77,7 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
       .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
   };
   
+  // كروت الإحصائيات
   const cardDataDefault: CardData[] = [
     {
       title: 'إجمالي العملاء',
