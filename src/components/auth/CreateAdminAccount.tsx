@@ -1,11 +1,13 @@
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { createAdminUser, adminCredentials } from '@/services/admin';
+import { adminCredentials } from '@/services/admin';
 import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { UserRole } from '@/lib/auth-types';
 
 export const CreateAdminAccount = () => {
   const [isCreating, setIsCreating] = useState(false);
@@ -19,15 +21,39 @@ export const CreateAdminAccount = () => {
     
     try {
       const { email, password, fullName } = adminCredentials;
-      const result = await createAdminUser(email, password, fullName);
       
-      if (result.success) {
-        setIsCreated(true);
-      } else {
-        setError(result.error || 'حدث خطأ أثناء إنشاء الحساب');
+      // بدلاً من استخدام API المشرف، استخدم تسجيل مستخدم عادي
+      const { data: userData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          }
+        }
+      });
+      
+      if (signUpError) throw signUpError;
+      
+      if (!userData.user) throw new Error('فشل في إنشاء المستخدم');
+      
+      // إضافة صلاحية المدير والصلاحيات الأخرى
+      const roles = [UserRole.ADMIN, UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.SALES];
+      
+      for (const role of roles) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userData.user.id,
+            role: role,
+          });
+          
+        if (roleError) console.error(`Error adding role ${role}:`, roleError);
       }
+      
+      setIsCreated(true);
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ غير متوقع');
+      setError(err.message || 'حدث خطأ أثناء إنشاء الحساب');
     } finally {
       setIsCreating(false);
     }

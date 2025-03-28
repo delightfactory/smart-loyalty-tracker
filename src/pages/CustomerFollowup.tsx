@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { customers } from '@/lib/data';
+import CustomerPerformanceTab from '@/components/customer/CustomerPerformanceTab';
 
 const inactiveCustomers = customers.map(customer => ({
   ...customer,
@@ -28,6 +30,7 @@ const CustomerFollowup = () => {
   const [period, setPeriod] = useState<string>("30");
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [filteredCustomers, setFilteredCustomers] = useState(inactiveCustomers);
+  const [activeTab, setActiveTab] = useState<string>("all");
   
   useEffect(() => {
     const days = parseInt(period);
@@ -134,12 +137,13 @@ const CustomerFollowup = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="all" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="all">جميع العملاء</TabsTrigger>
             <TabsTrigger value="critical">عملاء غير نشطين جدًا</TabsTrigger>
             <TabsTrigger value="warning">عملاء في خطر الضياع</TabsTrigger>
             <TabsTrigger value="recent">عملاء حديثي الغياب</TabsTrigger>
+            <TabsTrigger value="performance">تحليل الأداء</TabsTrigger>
           </TabsList>
           
           <TabsContent value="all">
@@ -156,6 +160,10 @@ const CustomerFollowup = () => {
           
           <TabsContent value="recent">
             <InactiveCustomersTable customers={recentCustomers} />
+          </TabsContent>
+          
+          <TabsContent value="performance">
+            <CustomerPerformanceTab customers={inactiveCustomers} />
           </TabsContent>
         </Tabs>
       </div>
