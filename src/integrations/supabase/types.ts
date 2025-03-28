@@ -361,6 +361,27 @@ export type Database = {
           },
         ]
       }
+      settings: {
+        Row: {
+          created_at: string
+          id: number
+          settings_json: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: number
+          settings_json?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          settings_json?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

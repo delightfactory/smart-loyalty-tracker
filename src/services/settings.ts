@@ -80,24 +80,45 @@ const defaultSettings: AppSettings = {
   }
 };
 
+// واجهة للتعامل مع جدول الإعدادات
+interface SettingsRecord {
+  id: number;
+  settings_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const settingsService = {
   /**
    * جلب جميع الإعدادات
    */
   async getAllSettings(): Promise<AppSettings> {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return defaultSettings;
+      }
       
-    if (error) {
-      console.error('Error fetching settings:', error);
-      // إذا لم يتم العثور على إعدادات، إرجاع الإعدادات الافتراضية
+      // في حالة وجود بيانات، دمجها مع الإعدادات الافتراضية
+      if (data && data.settings_json) {
+        const settingsData = typeof data.settings_json === 'string' 
+          ? JSON.parse(data.settings_json) 
+          : data.settings_json;
+        
+        return { ...defaultSettings, ...settingsData };
+      }
+      
+      return defaultSettings;
+    } catch (err) {
+      console.error('Unexpected error fetching settings:', err);
       return defaultSettings;
     }
-    
-    // في حالة وجود بيانات، دمجها مع الإعدادات الافتراضية
-    return data ? { ...defaultSettings, ...JSON.parse(data.settings_json) } : defaultSettings;
   },
   
   /**
@@ -160,31 +181,34 @@ export const settingsService = {
   /**
    * تحديث جزء محدد من الإعدادات
    */
-  private async updateSettings<T extends keyof AppSettings>(
+  async updateSettings<T extends keyof AppSettings>(
     type: T,
     settings: AppSettings[T]
   ): Promise<void> {
-    // جلب الإعدادات الحالية
-    const currentSettings = await this.getAllSettings();
-    
-    // تحديث الجزء المحدد
-    currentSettings[type] = settings;
-    
-    // حفظ الإعدادات المحدثة
-    const { error } = await supabase
-      .from('settings')
-      .upsert(
-        { 
-          id: 1, // استخدام معرف ثابت للإعدادات العامة
-          settings_json: JSON.stringify(currentSettings),
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'id' }
-      );
+    try {
+      // جلب الإعدادات الحالية
+      const currentSettings = await this.getAllSettings();
       
-    if (error) {
-      console.error(`Error updating ${type} settings:`, error);
-      throw error;
+      // تحديث الجزء المحدد
+      currentSettings[type] = settings;
+      
+      // حفظ الإعدادات المحدثة
+      const { error } = await supabase
+        .from('settings')
+        .upsert({
+          id: 1, // استخدام معرف ثابت للإعدادات العامة
+          settings_json: currentSettings,
+          updated_at: new Date().toISOString()
+        })
+        .select();
+        
+      if (error) {
+        console.error(`Error updating ${type} settings:`, error);
+        throw error;
+      }
+    } catch (err) {
+      console.error(`Unexpected error updating ${type} settings:`, err);
+      throw err;
     }
   }
 };

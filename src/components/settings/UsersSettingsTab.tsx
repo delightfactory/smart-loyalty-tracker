@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,9 +35,9 @@ interface UserData {
   id: string;
   email: string;
   profile: {
-    full_name: string;
-    phone?: string;
-    position?: string;
+    fullName: string;
+    phone?: string | null;
+    position?: string | null;
   };
   roles: UserRole[];
   created_at: string;
@@ -54,42 +54,61 @@ export function UsersSettingsTab() {
     email: '',
     password: '',
     fullName: '',
-    role: 'user' as UserRole,
+    role: UserRole.USER,
   });
   const [editUser, setEditUser] = useState({
     fullName: '',
-    role: 'user' as UserRole,
+    role: UserRole.USER,
   });
 
   // جلب المستخدمين
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data: { users }, error } = await supabase.auth.admin.listUsers();
-      
-      if (error) throw error;
-      
-      // جلب معلومات المستخدم الإضافية
-      const profiles = await supabase.from('profiles').select('*');
-      const userRoles = await supabase.from('user_roles').select('*');
-      
-      return users.map(user => {
-        const profile = profiles.data?.find(p => p.id === user.id) || { full_name: user.email };
-        const roles = userRoles.data?.filter(r => r.user_id === user.id).map(r => r.role) || [];
+      try {
+        // جلب المستخدمين
+        const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
         
-        return {
-          id: user.id,
-          email: user.email,
-          profile: {
-            full_name: profile.full_name,
-            phone: profile.phone,
-            position: profile.position,
-          },
-          roles,
-          created_at: user.created_at,
-          last_sign_in_at: user.last_sign_in_at,
-        };
-      });
+        if (authError) throw authError;
+        
+        // جلب الملفات الشخصية
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*');
+          
+        if (profilesError) throw profilesError;
+        
+        // جلب الأدوار
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('*');
+          
+        if (rolesError) throw rolesError;
+        
+        // تجميع البيانات
+        return authUsers.users.map(user => {
+          const profile = profiles?.find(p => p.id === user.id);
+          const roles = userRoles
+            ?.filter(r => r.user_id === user.id)
+            .map(r => r.role as UserRole) || [UserRole.USER];
+          
+          return {
+            id: user.id,
+            email: user.email || '',
+            profile: {
+              fullName: profile?.full_name || user.email || '',
+              phone: profile?.phone || null,
+              position: profile?.position || null,
+            },
+            roles,
+            created_at: user.created_at || '',
+            last_sign_in_at: user.last_sign_in_at || null,
+          } as UserData;
+        });
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        return [];
+      }
     },
   });
 
@@ -116,14 +135,14 @@ export function UsersSettingsTab() {
         email: '',
         password: '',
         fullName: '',
-        role: 'user',
+        role: UserRole.USER,
       });
       toast({
         title: "تم إضافة المستخدم",
         description: "تم إضافة المستخدم بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في إضافة المستخدم",
         description: error.message,
@@ -146,7 +165,7 @@ export function UsersSettingsTab() {
       if (profileError) throw profileError;
       
       // تحديث الصلاحيات
-      if (currentUser.roles.join(',') !== editUser.role) {
+      if (!currentUser.roles.includes(editUser.role)) {
         // حذف الصلاحيات الحالية
         const { error: deleteRolesError } = await supabase
           .from('user_roles')
@@ -177,7 +196,7 @@ export function UsersSettingsTab() {
         description: "تم تحديث بيانات المستخدم بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في تحديث المستخدم",
         description: error.message,
@@ -202,7 +221,7 @@ export function UsersSettingsTab() {
         description: "تم حذف المستخدم بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في حذف المستخدم",
         description: error.message,
@@ -214,8 +233,8 @@ export function UsersSettingsTab() {
   const openEditUser = (user: UserData) => {
     setCurrentUser(user);
     setEditUser({
-      fullName: user.profile.full_name,
-      role: user.roles[0] || 'user',
+      fullName: user.profile.fullName,
+      role: user.roles[0] || UserRole.USER,
     });
     setIsEditUserOpen(true);
   };
@@ -228,6 +247,17 @@ export function UsersSettingsTab() {
   const handleEditUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateUser.mutate();
+  };
+
+  const getRoleDisplay = (role: UserRole): string => {
+    switch (role) {
+      case UserRole.ADMIN: return "مدير";
+      case UserRole.MANAGER: return "مشرف";
+      case UserRole.ACCOUNTANT: return "محاسب";
+      case UserRole.SALES: return "مبيعات";
+      case UserRole.USER: return "مستخدم عادي";
+      default: return "مستخدم عادي";
+    }
   };
 
   return (
@@ -294,11 +324,11 @@ export function UsersSettingsTab() {
                         <SelectValue placeholder="اختر الصلاحية" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">مدير</SelectItem>
-                        <SelectItem value="manager">مشرف</SelectItem>
-                        <SelectItem value="accountant">محاسب</SelectItem>
-                        <SelectItem value="sales">مبيعات</SelectItem>
-                        <SelectItem value="user">مستخدم عادي</SelectItem>
+                        <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                        <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                        <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                        <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                        <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -342,11 +372,11 @@ export function UsersSettingsTab() {
                           <SelectValue placeholder="اختر الصلاحية" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="admin">مدير</SelectItem>
-                          <SelectItem value="manager">مشرف</SelectItem>
-                          <SelectItem value="accountant">محاسب</SelectItem>
-                          <SelectItem value="sales">مبيعات</SelectItem>
-                          <SelectItem value="user">مستخدم عادي</SelectItem>
+                          <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                          <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                          <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                          <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                          <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -389,18 +419,10 @@ export function UsersSettingsTab() {
               ) : (
                 users.map((user, index) => (
                   <tr key={user.id} className={index % 2 === 1 ? "bg-gray-50" : ""}>
-                    <td className="p-2">{user.profile.full_name}</td>
+                    <td className="p-2">{user.profile.fullName}</td>
                     <td className="p-2">{user.email}</td>
                     <td className="p-2">
-                      {user.roles.includes("admin")
-                        ? "مدير"
-                        : user.roles.includes("manager")
-                        ? "مشرف"
-                        : user.roles.includes("accountant")
-                        ? "محاسب"
-                        : user.roles.includes("sales")
-                        ? "مبيعات"
-                        : "مستخدم عادي"}
+                      {user.roles.length > 0 ? getRoleDisplay(user.roles[0]) : getRoleDisplay(UserRole.USER)}
                     </td>
                     <td className="p-2">
                       {new Date(user.created_at).toLocaleDateString('ar-EG')}

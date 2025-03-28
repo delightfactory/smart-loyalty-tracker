@@ -40,7 +40,7 @@ export const useSettings = () => {
         description: "تم تحديث الإعدادات العامة بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث الإعدادات العامة",
@@ -60,7 +60,7 @@ export const useSettings = () => {
         description: "تم تحديث بيانات الشركة بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث بيانات الشركة",
@@ -80,7 +80,7 @@ export const useSettings = () => {
         description: "تم تحديث إعدادات الفواتير بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث إعدادات الفواتير",
@@ -100,7 +100,7 @@ export const useSettings = () => {
         description: "تم تحديث إعدادات المدفوعات بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث إعدادات المدفوعات",
@@ -120,7 +120,7 @@ export const useSettings = () => {
         description: "تم تحديث إعدادات برنامج الولاء بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث إعدادات برنامج الولاء",
@@ -140,7 +140,7 @@ export const useSettings = () => {
         description: "تم تحديث إعدادات النسخ الاحتياطي بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث إعدادات النسخ الاحتياطي",
@@ -160,7 +160,7 @@ export const useSettings = () => {
         description: "تم تحديث إعدادات الأمان بنجاح",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء تحديث إعدادات الأمان",
