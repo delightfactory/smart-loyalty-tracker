@@ -16,7 +16,23 @@ import { UserRole } from '@/lib/auth-types';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('general');
-  const { isLoading } = useSettings();
+  const { 
+    isLoading,
+    generalSettings,
+    companySettings,
+    invoiceSettings,
+    paymentSettings,
+    loyaltySettings,
+    backupSettings,
+    securitySettings,
+    updateGeneralSettings,
+    updateCompanySettings,
+    updateInvoiceSettings,
+    updatePaymentSettings,
+    updateLoyaltySettings,
+    updateBackupSettings,
+    updateSecuritySettings
+  } = useSettings();
   const { hasRole } = useAuth();
   const isAdmin = hasRole(UserRole.ADMIN);
   
@@ -44,31 +60,113 @@ const Settings = () => {
           ) : (
             <>
               <TabsContent value="general">
-                <GeneralSettingsForm />
+                <GeneralSettingsForm 
+                  settings={generalSettings || {
+                    language: 'ar',
+                    timezone: 'cairo',
+                    currency: 'egp',
+                    dateFormat: 'dd_mm_yyyy',
+                    sendEmailNotifications: true,
+                    collectAnalytics: true
+                  }} 
+                  onSave={(data) => updateGeneralSettings.mutate(data)}
+                  isLoading={updateGeneralSettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="company">
-                <CompanySettingsForm />
+                <CompanySettingsForm 
+                  settings={companySettings || {
+                    name: '',
+                    taxNumber: '',
+                    phone: '',
+                    email: '',
+                    address: ''
+                  }} 
+                  onSave={(data) => updateCompanySettings.mutate(data)}
+                  isLoading={updateCompanySettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="invoice">
-                <InvoiceSettingsForm />
+                <InvoiceSettingsForm 
+                  settings={invoiceSettings || {
+                    invoicePrefix: 'INV',
+                    nextInvoiceNumber: 1001,
+                    defaultPaymentTerms: 30,
+                    taxRate: 14,
+                    showTax: true,
+                    showPoints: true,
+                    defaultNotes: '',
+                    footer: ''
+                  }} 
+                  onSave={(data) => updateInvoiceSettings.mutate(data)}
+                  isLoading={updateInvoiceSettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="payment">
-                <PaymentSettingsForm />
+                <PaymentSettingsForm 
+                  settings={paymentSettings || {
+                    enabledMethods: {
+                      cash: true,
+                      credit: true,
+                      bankTransfer: true,
+                      card: true
+                    },
+                    defaultMethod: 'cash',
+                    paymentPrefix: 'PAY',
+                    allowPartialPayments: true,
+                    enableOverdueNotifications: false,
+                    overdueReminders: {
+                      firstReminder: 3,
+                      secondReminder: 7
+                    }
+                  }} 
+                  onSave={(data) => updatePaymentSettings.mutate(data)}
+                  isLoading={updatePaymentSettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="loyalty">
-                <LoyaltySettingsForm />
+                <LoyaltySettingsForm 
+                  settings={loyaltySettings || {
+                    enableLoyaltyProgram: true,
+                    pointsPerCurrency: 0.5,
+                    pointsExpiry: 365,
+                    minPointsRedemption: 100,
+                    pointsValue: 0.25,
+                    levels: [
+                      { id: 1, name: 'برونزي', minPoints: 0, maxPoints: 500 }
+                    ]
+                  }} 
+                  onSave={(data) => updateLoyaltySettings.mutate(data)}
+                  isLoading={updateLoyaltySettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="backup">
-                <BackupSettingsTab />
+                <BackupSettingsTab 
+                  settings={backupSettings || {
+                    enableAutoBackup: true,
+                    backupFrequency: 'weekly',
+                    backupRetention: 30
+                  }} 
+                  onSave={(data) => updateBackupSettings.mutate(data)}
+                  isLoading={updateBackupSettings.isPending}
+                />
               </TabsContent>
               
               <TabsContent value="security">
-                <SecuritySettingsTab />
+                <SecuritySettingsTab 
+                  settings={securitySettings || {
+                    twoFactorEnabled: false,
+                    sessionTimeout: true,
+                    sessionTimeoutMinutes: 30
+                  }} 
+                  onSave={(data) => updateSecuritySettings.mutate(data)}
+                  isLoading={updateSecuritySettings.isPending}
+                />
               </TabsContent>
               
               {isAdmin && (
