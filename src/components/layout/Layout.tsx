@@ -29,20 +29,7 @@ const Layout = ({ children }: LayoutProps) => {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <div className="relative flex flex-1 flex-col overflow-auto">
-        <Header 
-          title="نظام إدارة العملاء والمخزون" 
-          subtitle="إدارة منتجات وعملاء وفواتير منشأتك بكفاءة"
-          onMenuClick={toggleSidebar}
-        >
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            {isMobile && (
-              <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-                <Menu className="h-5 w-5" />
-              </Button>
-            )}
-          </div>
-        </Header>
+        <Header />
         <main className="flex-1 transition-all duration-300">
           {children}
         </main>

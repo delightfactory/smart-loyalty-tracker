@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { MoonIcon, SunIcon, Menu as MenuIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useSidebar } from '@/components/layout/SidebarContent';
+import { useSidebar } from '@/components/ui/sidebar';
 import { UserMenu } from '@/components/auth/UserMenu';
 
 const Header = () => {
