@@ -7,13 +7,13 @@ import {
   Package, 
   Users, 
   FileText, 
-  PieChart, 
   CreditCard,
   Settings,
   Star,
   BarChart2,
   UserRoundCheck
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SidebarContentProps {
   isSidebarOpen: boolean;
@@ -21,7 +21,6 @@ interface SidebarContentProps {
 
 const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
   const navItems = [
-    { icon: <Home className="ml-2 h-4 w-4" />, label: "الصفحة الرئيسية", href: "/" },
     { icon: <BarChart2 className="ml-2 h-4 w-4" />, label: "لوحة التحكم", href: "/dashboard" },
     { icon: <Package className="ml-2 h-4 w-4" />, label: "المنتجات", href: "/products", badge: "25" },
     { icon: <Users className="ml-2 h-4 w-4" />, label: "العملاء", href: "/customers" },
@@ -29,18 +28,17 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
     { icon: <FileText className="ml-2 h-4 w-4" />, label: "الفواتير", href: "/invoices" },
     { icon: <CreditCard className="ml-2 h-4 w-4" />, label: "المدفوعات", href: "/create-payment" },
     { icon: <Star className="ml-2 h-4 w-4" />, label: "استبدال النقاط", href: "/create-redemption/C001" },
-    { icon: <PieChart className="ml-2 h-4 w-4" />, label: "التحليلات", href: "/analytics" },
     { icon: <Settings className="ml-2 h-4 w-4" />, label: "الإعدادات", href: "/settings" },
   ];
 
   return (
     <>
-      <div className="flex items-center justify-between py-4 px-4">
-        <h2 className={cn(
-          "text-lg font-semibold transition-opacity duration-200",
-          !isSidebarOpen && "opacity-0"
-        )}>
-          القائمة الرئيسية
+      <div className={cn(
+        "flex items-center justify-between py-4 px-4",
+        !isSidebarOpen && "opacity-0"
+      )}>
+        <h2 className="text-lg font-semibold transition-opacity duration-200">
+          نظام العناية بالسيارات
         </h2>
       </div>
       
@@ -78,5 +76,3 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
 };
 
 export default SidebarContent;
-
-import { cn } from '@/lib/utils';
