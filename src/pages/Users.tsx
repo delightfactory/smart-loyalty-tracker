@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
@@ -9,8 +8,10 @@ import {
   getAllUsers, 
   addRoleToUser, 
   removeRoleFromUser,
-  getUserById
+  getUserById,
+  createUser
 } from '@/services/users';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Table, 
   TableBody, 
@@ -62,7 +63,6 @@ const Users = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdminCheckDone, setIsAdminCheckDone] = useState(false);
   
-  // أضف حالة النموذج لإضافة مستخدم جديد
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
@@ -77,7 +77,6 @@ const Users = () => {
   
   const checkAdminAccess = async () => {
     try {
-      // التحقق من وجود الصلاحيات الكافية
       if (isAuthenticated) {
         const isAdmin = hasRole(UserRole.ADMIN);
         setIsAdminCheckDone(true);
@@ -92,7 +91,6 @@ const Users = () => {
           return;
         }
         
-        // استرجاع قائمة المستخدمين
         await fetchUsers();
       }
     } catch (error: any) {
@@ -134,27 +132,15 @@ const Users = () => {
     try {
       setIsLoading(true);
       
-      // إنشاء مستخدم جديد باستخدام Supabase Admin API
-      const { data, error } = await supabase.auth.admin.createUser({
+      await createUser({
         email: newUser.email,
         password: newUser.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: newUser.fullName,
-        },
+        fullName: newUser.fullName,
+        role: newUser.role
       });
       
-      if (error) throw error;
-      
-      // إضافة الدور للمستخدم الجديد
-      if (data.user) {
-        await addRoleToUser(data.user.id, newUser.role);
-      }
-      
-      // تحديث قائمة المستخدمين
       await fetchUsers();
       
-      // إغلاق النموذج وإعادة تعيين البيانات
       setIsAddUserOpen(false);
       setNewUser({
         email: '',
@@ -182,7 +168,6 @@ const Users = () => {
     try {
       await addRoleToUser(userId, role);
       
-      // تحديث القائمة المحلية
       setUsers(users.map(user => {
         if (user.id === userId) {
           if (!user.roles.includes(role)) {
@@ -209,7 +194,6 @@ const Users = () => {
     try {
       await removeRoleFromUser(userId, role);
       
-      // تحديث القائمة المحلية
       setUsers(users.map(user => {
         if (user.id === userId) {
           return { ...user, roles: user.roles.filter(r => r !== role) };
@@ -269,7 +253,6 @@ const Users = () => {
       .slice(0, 2);
   };
   
-  // إذا كان التحقق من الوصول قيد التنفيذ
   if (!isAdminCheckDone || (isAdminCheckDone && isLoading && users.length === 0)) {
     return (
       <PageContainer 
