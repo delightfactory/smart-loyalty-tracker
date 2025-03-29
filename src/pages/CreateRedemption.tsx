@@ -203,8 +203,9 @@ const CreateRedemption = () => {
                         <p className="font-medium">تاريخ: {new Date(redemption.date).toLocaleDateString('ar-EG')}</p>
                         <p>النقاط المستبدلة: {redemption.totalPointsRedeemed}</p>
                       </div>
-                      <Badge className={redemption.status === 'مكتمل' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                        {redemption.status}
+                      <Badge className={redemption.status === RedemptionStatus.COMPLETED ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                        {redemption.status === RedemptionStatus.COMPLETED ? 'مكتمل' : 
+                         redemption.status === RedemptionStatus.PENDING ? 'قيد الانتظار' : 'ملغي'}
                       </Badge>
                     </div>
                   ))}
