@@ -1,4 +1,3 @@
-
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import SidebarLink from './SidebarLink';
@@ -11,7 +10,8 @@ import {
   Settings,
   Star,
   BarChart2,
-  UserRoundCheck
+  UserRoundCheck,
+  UserCog
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +28,7 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
     { icon: <FileText className="ml-2 h-4 w-4" />, label: "الفواتير", href: "/invoices" },
     { icon: <CreditCard className="ml-2 h-4 w-4" />, label: "المدفوعات", href: "/create-payment" },
     { icon: <Star className="ml-2 h-4 w-4" />, label: "استبدال النقاط", href: "/create-redemption/C001" },
+    { icon: <UserCog className="ml-2 h-4 w-4" />, label: "إدارة المستخدمين", href: "/users" },
     { icon: <Settings className="ml-2 h-4 w-4" />, label: "الإعدادات", href: "/settings" },
   ];
 

@@ -5,28 +5,42 @@ import { Invoice, InvoiceItem } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
-export function useInvoices() {
-  const queryClient = useQueryClient();
-  
-  // Set up realtime updates for invoices
+// Custom hook for fetching all invoices
+export function useAllInvoices() {
   useRealtime('invoices');
   
-  const getAll = useQuery({
+  return useQuery({
     queryKey: ['invoices'],
-    queryFn: () => invoicesService.getAll()
+    queryFn: () => invoicesService.getAll(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
-  
-  const getById = (id: string) => useQuery({
+}
+
+// Custom hook for fetching a single invoice
+export function useInvoice(id: string) {
+  return useQuery({
     queryKey: ['invoices', id],
     queryFn: () => invoicesService.getById(id),
-    enabled: !!id
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
-  
-  const getByCustomerId = (customerId: string) => useQuery({
+}
+
+// Custom hook for fetching customer invoices
+export function useCustomerInvoices(customerId: string) {
+  return useQuery({
     queryKey: ['invoices', 'customer', customerId],
     queryFn: () => invoicesService.getByCustomerId(customerId),
-    enabled: !!customerId
+    enabled: !!customerId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
+}
+
+// Mutation hooks for invoice operations
+export function useInvoiceMutations() {
+  const queryClient = useQueryClient();
   
   const addInvoice = useMutation({
     mutationFn: ({ invoice, items }: { invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[] }) => 
@@ -92,6 +106,23 @@ export function useInvoices() {
       });
     }
   });
+  
+  return {
+    addInvoice,
+    updateInvoice,
+    deleteInvoice
+  };
+}
+
+// Main hook that combines all invoice hooks
+export function useInvoices() {
+  // Set up realtime updates for invoices
+  useRealtime('invoices');
+  
+  const getAll = useAllInvoices();
+  const getById = useInvoice;
+  const getByCustomerId = useCustomerInvoices;
+  const { addInvoice, updateInvoice, deleteInvoice } = useInvoiceMutations();
   
   return {
     getAll,

@@ -24,14 +24,14 @@ const Layout = ({ children }: LayoutProps) => {
   
   return (
     <SidebarProvider>
-      <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
+      <div className="flex h-screen bg-background">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         
         <div className="relative flex flex-1 flex-col overflow-auto">
-          <Header />
-          <div className="flex-1 p-4 pt-20">
+          <Header onToggleSidebar={toggleSidebar} />
+          <main className="flex-1 p-4 pt-20">
             {children}
-          </div>
+          </main>
         </div>
       </div>
     </SidebarProvider>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   Table, 
@@ -32,8 +31,6 @@ import { ProductCategory, Product } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useProducts } from '@/hooks/useProducts';
 import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useEffect } from 'react';
 
 const Products = () => {
   const navigate = useNavigate();
@@ -44,28 +41,6 @@ const Products = () => {
   // استخدام React Query hook
   const { getAll, addProduct } = useProducts();
   const { data: products = [], isLoading, refetch } = getAll;
-  
-  // إعداد الاستماع لتحديثات المنتجات في الوقت الفعلي
-  useEffect(() => {
-    const channel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'products'
-        },
-        () => {
-          refetch();
-        }
-      )
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
   
   // Form state
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -101,7 +76,15 @@ const Products = () => {
       return;
     }
     
-    addProduct.mutate(newProduct as Omit<Product, 'id'>, {
+    // Ensure pointsRequired is a number for database consistency
+    const productToAdd = {
+      ...newProduct,
+      pointsRequired: Number(newProduct.pointsRequired) || 0,
+      pointsEarned: Number(newProduct.pointsEarned) || 0,
+      price: Number(newProduct.price) || 0
+    };
+    
+    addProduct.mutate(productToAdd as Omit<Product, 'id'>, {
       onSuccess: () => {
         setNewProduct({
           name: '',
