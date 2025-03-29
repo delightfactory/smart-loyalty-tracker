@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Users, 
@@ -27,38 +26,48 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     return () => setIsMounted(false);
   }, []);
   
-  // البيانات المطلوبة للبطاقات
   const { data: customers, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ['customers'],
     queryFn: () => customersService.getAll(),
-    enabled: isMounted
+    enabled: isMounted,
+    staleTime: 60000,
+    retry: 2
   });
   
   const { data: products, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: () => productsService.getAll(),
-    enabled: isMounted
+    enabled: isMounted,
+    staleTime: 60000,
+    retry: 2
   });
   
   const { data: invoices, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => invoicesService.getAll(),
-    enabled: isMounted
+    enabled: isMounted,
+    staleTime: 60000,
+    retry: 2
   });
   
   const { data: payments, isLoading: isLoadingPayments } = useQuery({
     queryKey: ['payments'],
     queryFn: () => paymentsService.getAll(),
-    enabled: isMounted
+    enabled: isMounted,
+    staleTime: 60000,
+    retry: 2
   });
   
   const { data: redemptions, isLoading: isLoadingRedemptions } = useQuery({
     queryKey: ['redemptions'],
     queryFn: () => redemptionsService.getAll(),
-    enabled: isMounted
+    enabled: isMounted,
+    staleTime: 60000,
+    retry: 2
   });
   
-  // حساب الإحصائيات
+  const isError = false;
+  
   const calculateTotalRevenue = () => {
     if (summary) return summary.totalRevenue;
     
@@ -77,7 +86,6 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
       .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
   };
   
-  // كروت الإحصائيات
   const cardDataDefault: CardData[] = [
     {
       title: 'إجمالي العملاء',
@@ -141,14 +149,12 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     }
   ];
 
-  // تفاصيل البطاقات للعرض "المبيعات"
   const salesCards = [
-    cardDataDefault[2], // الفواتير
-    cardDataDefault[3], // الإيرادات
-    cardDataDefault[4], // المبالغ المستحقة
+    cardDataDefault[2],
+    cardDataDefault[3],
+    cardDataDefault[4]
   ];
 
-  // تحديد أي البطاقات لعرضها
   const cardData = view === 'sales' ? salesCards : cardDataDefault;
 
   return (

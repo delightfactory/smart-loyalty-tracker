@@ -3,9 +3,6 @@ import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 interface LayoutProps {
@@ -32,9 +29,9 @@ const Layout = ({ children }: LayoutProps) => {
         
         <div className="relative flex flex-1 flex-col overflow-auto">
           <Header />
-          <main className="flex-1 transition-all duration-300">
+          <div className="flex-1 p-4 pt-20">
             {children}
-          </main>
+          </div>
         </div>
       </div>
     </SidebarProvider>

@@ -1,7 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { MoonIcon, SunIcon, Menu as MenuIcon } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/ui/theme-provider';
 import { useSidebar } from '@/components/ui/sidebar';
 import { UserMenu } from '@/components/auth/UserMenu';
 
