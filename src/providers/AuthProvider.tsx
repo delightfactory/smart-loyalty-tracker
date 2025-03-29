@@ -35,12 +35,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     // تعيين مستمع لحالة المصادقة
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          await fetchUserProfile(currentSession.user.id);
+          // استخدام setTimeout لمنع التداخل مع استدعاءات supabase الأخرى
+          setTimeout(() => {
+            fetchUserProfile(currentSession.user.id);
+          }, 0);
         } else {
           setProfile(null);
           setRoles([]);
@@ -49,15 +52,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
     
     // التحقق من وجود جلسة للمستخدم
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        await fetchUserProfile(currentSession.user.id);
+        fetchUserProfile(currentSession.user.id);
+      } else {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     });
     
     return () => {
@@ -73,7 +76,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (profileError) throw profileError;
       
@@ -87,21 +90,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const userRoles = rolesData.map(r => r.role as UserRole);
       
-      const userProfile: UserProfile = {
-        id: profileData.id,
-        fullName: profileData.full_name,
-        avatarUrl: profileData.avatar_url,
-        phone: profileData.phone,
-        position: profileData.position,
-        roles: userRoles
-      };
-      
-      setProfile(userProfile);
-      setRoles(userRoles);
+      if (profileData) {
+        const userProfile: UserProfile = {
+          id: profileData.id,
+          fullName: profileData.full_name,
+          avatarUrl: profileData.avatar_url,
+          phone: profileData.phone,
+          position: profileData.position,
+          roles: userRoles
+        };
+        
+        setProfile(userProfile);
+        setRoles(userRoles);
+      }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
       setProfile(null);
       setRoles([]);
+    } finally {
+      setIsLoading(false);
     }
   };
   

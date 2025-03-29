@@ -5,7 +5,12 @@ import PageContainer from '@/components/layout/PageContainer';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
 import { UserRole, UserProfile } from '@/lib/auth-types';
-import { getAllUsers, addRoleToUser, removeRoleFromUser } from '@/services/users';
+import { 
+  getAllUsers, 
+  addRoleToUser, 
+  removeRoleFromUser,
+  getUserById
+} from '@/services/users';
 import { 
   Table, 
   TableBody, 
@@ -26,12 +31,26 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
   ChevronDown, 
   Shield, 
   ShieldAlert, 
   ShieldCheck, 
   ShieldX, 
-  UserCog 
+  UserCog,
+  Loader2,
+  UserPlus
 } from 'lucide-react';
 
 const Users = () => {
@@ -41,21 +60,50 @@ const Users = () => {
   
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdminCheckDone, setIsAdminCheckDone] = useState(false);
+  
+  // أضف حالة النموذج لإضافة مستخدم جديد
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    role: UserRole.USER
+  });
   
   useEffect(() => {
-    // التحقق من الصلاحيات
-    if (isAuthenticated && !hasRole(UserRole.ADMIN)) {
+    checkAdminAccess();
+  }, [isAuthenticated]);
+  
+  const checkAdminAccess = async () => {
+    try {
+      // التحقق من وجود الصلاحيات الكافية
+      if (isAuthenticated) {
+        const isAdmin = hasRole(UserRole.ADMIN);
+        setIsAdminCheckDone(true);
+        
+        if (!isAdmin) {
+          toast({
+            title: "غير مصرح",
+            description: "ليس لديك صلاحيات كافية للوصول إلى هذه الصفحة",
+            variant: "destructive"
+          });
+          navigate('/dashboard');
+          return;
+        }
+        
+        // استرجاع قائمة المستخدمين
+        await fetchUsers();
+      }
+    } catch (error: any) {
+      console.error('Error checking admin access:', error);
       toast({
-        title: "غير مصرح",
-        description: "ليس لديك صلاحيات كافية للوصول إلى هذه الصفحة",
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء التحقق من الصلاحيات",
         variant: "destructive"
       });
-      navigate('/dashboard');
-      return;
     }
-    
-    fetchUsers();
-  }, [isAuthenticated]);
+  };
   
   const fetchUsers = async () => {
     try {
@@ -65,7 +113,64 @@ const Users = () => {
     } catch (error: any) {
       toast({
         title: "خطأ",
-        description: error.message,
+        description: error.message || "حدث خطأ أثناء جلب المستخدمين",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleAddUser = async () => {
+    if (!newUser.email || !newUser.password || !newUser.fullName) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // إنشاء مستخدم جديد باستخدام Supabase Admin API
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: newUser.email,
+        password: newUser.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: newUser.fullName,
+        },
+      });
+      
+      if (error) throw error;
+      
+      // إضافة الدور للمستخدم الجديد
+      if (data.user) {
+        await addRoleToUser(data.user.id, newUser.role);
+      }
+      
+      // تحديث قائمة المستخدمين
+      await fetchUsers();
+      
+      // إغلاق النموذج وإعادة تعيين البيانات
+      setIsAddUserOpen(false);
+      setNewUser({
+        email: '',
+        password: '',
+        fullName: '',
+        role: UserRole.USER
+      });
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم إضافة المستخدم بنجاح",
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء إضافة المستخدم",
         variant: "destructive"
       });
     } finally {
@@ -94,7 +199,7 @@ const Users = () => {
     } catch (error: any) {
       toast({
         title: "خطأ",
-        description: error.message,
+        description: error.message || "حدث خطأ أثناء إضافة الدور",
         variant: "destructive"
       });
     }
@@ -119,7 +224,7 @@ const Users = () => {
     } catch (error: any) {
       toast({
         title: "خطأ",
-        description: error.message,
+        description: error.message || "حدث خطأ أثناء إزالة الدور",
         variant: "destructive"
       });
     }
@@ -164,6 +269,20 @@ const Users = () => {
       .slice(0, 2);
   };
   
+  // إذا كان التحقق من الوصول قيد التنفيذ
+  if (!isAdminCheckDone || (isAdminCheckDone && isLoading && users.length === 0)) {
+    return (
+      <PageContainer 
+        title="إدارة المستخدمين" 
+        subtitle="جاري التحميل..."
+      >
+        <div className="h-[400px] flex items-center justify-center">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        </div>
+      </PageContainer>
+    );
+  }
+  
   return (
     <PageContainer 
       title="إدارة المستخدمين" 
@@ -175,9 +294,105 @@ const Users = () => {
             <UserCog className="h-5 w-5 mr-2" />
             المستخدمين
           </h2>
-          <Button onClick={fetchUsers} disabled={isLoading}>
-            تحديث القائمة
-          </Button>
+          
+          <div className="flex gap-2">
+            <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  إضافة مستخدم جديد
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>إضافة مستخدم جديد</DialogTitle>
+                  <DialogDescription>
+                    أضف مستخدم جديد وحدد صلاحياته
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">الاسم الكامل</Label>
+                      <Input
+                        id="fullName"
+                        value={newUser.fullName}
+                        onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="email">البريد الإلكتروني</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="password">كلمة المرور</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="role">الصلاحية</Label>
+                      <Select
+                        value={newUser.role}
+                        onValueChange={(value) => setNewUser({ ...newUser, role: value as UserRole })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر الصلاحية" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                          <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                          <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                          <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                          <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button onClick={handleAddUser} disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        جاري الإضافة...
+                      </>
+                    ) : (
+                      'إضافة المستخدم'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            <Button onClick={fetchUsers} variant="outline" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  جاري التحديث...
+                </>
+              ) : (
+                'تحديث القائمة'
+              )}
+            </Button>
+          </div>
         </div>
         
         <Table>
