@@ -12,6 +12,7 @@ export enum UserRole {
 export interface UserProfile {
   id: string;
   fullName: string;
+  email?: string;
   avatarUrl: string | null;
   phone: string | null;
   position: string | null;

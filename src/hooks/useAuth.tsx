@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { UserRole } from '@/lib/auth-types';
@@ -7,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface UserProfile {
   id: string;
   fullName: string;
+  email?: string;
   avatarUrl: string | null;
   phone: string | null;
   position: string | null;
@@ -25,22 +25,18 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-// Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Auth provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       console.info(`Fetching user profile for ID: ${userId}`);
       
-      // Get profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -50,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileError) throw profileError;
       console.info('Profile data:', profileData);
       
-      // Get roles data
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -59,14 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rolesError) throw rolesError;
       console.info('Roles data:', rolesData);
       
-      // Extract roles
       const userRoles = rolesData.map(r => r.role as UserRole);
       setRoles(userRoles);
       
-      // Set profile
       const userProfile: UserProfile = {
         id: profileData.id,
         fullName: profileData.full_name,
+        email: user?.email,
         avatarUrl: profileData.avatar_url,
         phone: profileData.phone,
         position: profileData.position,
@@ -78,22 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error fetching user profile:', error);
     }
-  }, []);
+  }, [user]);
   
-  // Check if user has a specific role
   const hasRole = useCallback((role: UserRole): boolean => {
     console.info(`Checking for role: ${role} in user roles:`, roles);
     return roles.includes(role);
   }, [roles]);
   
-  // Refresh user profile
   const refreshProfile = useCallback(async () => {
     if (user) {
       await fetchProfile(user.id);
     }
   }, [user, fetchProfile]);
   
-  // Sign in function
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -113,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  // Sign out function
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -128,13 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  // Effect to check for initial session
   useEffect(() => {
     const checkSession = async () => {
       try {
         setIsLoading(true);
         
-        // Get current session
         const { data: { session } } = await supabase.auth.getSession();
         console.info('Initial session check:', session ? 'Session exists' : 'No session');
         
@@ -151,7 +139,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     checkSession();
     
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.info('Auth state change event:', event);
@@ -172,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
   
-  // Context value
   const value = {
     user,
     profile,
@@ -188,7 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Hook to use auth context
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

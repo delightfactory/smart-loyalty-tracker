@@ -101,6 +101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const userProfile: UserProfile = {
           id: profileData.id,
           fullName: profileData.full_name,
+          email: user?.email || null,
           avatarUrl: profileData.avatar_url,
           phone: profileData.phone,
           position: profileData.position,
@@ -147,6 +148,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const userProfile: UserProfile = {
             id: newProfileData.id,
             fullName: newProfileData.full_name,
+            email: user.email || null,
             avatarUrl: newProfileData.avatar_url,
             phone: newProfileData.phone,
             position: newProfileData.position,
