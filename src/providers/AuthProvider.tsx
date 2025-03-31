@@ -1,8 +1,7 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { AuthState, UserProfile, UserRole } from '@/lib/auth-types';
+import { UserRole, UserProfile } from '@/lib/auth-types';
 import { useToast } from '@/components/ui/use-toast';
 
 interface AuthContextProps {
@@ -29,11 +28,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // تحقق من المستخدم الحالي عند تحميل التطبيق
   useEffect(() => {
     setIsLoading(true);
     
-    // تعيين مستمع لحالة المصادقة
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log("Auth state change event:", event);
@@ -41,7 +38,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          // استخدام setTimeout لمنع التداخل مع استدعاءات supabase الأخرى
           setTimeout(() => {
             fetchUserProfile(currentSession.user.id);
           }, 0);
@@ -53,7 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
     
-    // التحقق من وجود جلسة للمستخدم
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log("Initial session check:", currentSession ? "Session exists" : "No session");
       setSession(currentSession);
@@ -71,12 +66,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
   
-  // استرجاع بيانات المستخدم وأدواره
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log("Fetching user profile for ID:", userId);
       
-      // استرجاع الملف الشخصي
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -90,7 +83,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       console.log("Profile data:", profileData);
       
-      // استرجاع الأدوار
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -119,11 +111,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile(userProfile);
         setRoles(userRoles);
       } else {
-        // إذا لم يكن هناك ملف شخصي، ننشئ واحدًا باستخدام بيانات الـ metadata
         if (user && user.user_metadata) {
           const fullName = user.user_metadata.full_name || '';
           
-          // إنشاء ملف شخصي جديد
           const { data: newProfileData, error: newProfileError } = await supabase
             .from('profiles')
             .insert({
@@ -138,7 +128,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             throw newProfileError;
           }
           
-          // إضافة دور "user" افتراضي إذا لم يكن هناك أدوار
           if (userRoles.length === 0) {
             const { error: roleError } = await supabase
               .from('user_roles')
@@ -178,7 +167,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // دالة تسجيل الدخول
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -202,7 +190,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // دالة إنشاء حساب جديد
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       setIsLoading(true);
@@ -234,7 +221,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // دالة تسجيل الخروج
   const signOut = async () => {
     try {
       setIsLoading(true);
@@ -256,7 +242,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // التحقق من صلاحيات المستخدم
   const hasRole = (role: UserRole) => {
     console.log("Checking for role:", role, "in user roles:", roles);
     return roles.includes(role);

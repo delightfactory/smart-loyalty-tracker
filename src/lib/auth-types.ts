@@ -8,6 +8,16 @@ export enum UserRole {
   USER = "user"
 }
 
+// User Profile Interface
+export interface UserProfile {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+  phone: string | null;
+  position: string | null;
+  roles: UserRole[];
+}
+
 // Auth State Interface
 export interface AuthState {
   user: any | null;

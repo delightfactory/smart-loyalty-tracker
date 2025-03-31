@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { useAuth } from '@/hooks/useAuth';
-import { UserRole } from '@/lib/auth-types';
+import { UserRole, UserProfile } from '@/lib/auth-types';
 import { 
   getAllUsers, 
   addRoleToUser, 
@@ -68,7 +68,7 @@ import {
 } from '@/components/ui/avatar';
 import { 
   User, 
-  Users, 
+  Users as UsersIcon, 
   Search, 
   Edit, 
   Trash, 
@@ -78,7 +78,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-const Users = () => {
+const UsersPage = () => {
   const { user, hasRole, isAuthenticated, roles } = useAuth();
   const navigate = useNavigate();
   
@@ -410,7 +410,7 @@ const Users = () => {
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-6">
                           <div className="flex flex-col items-center justify-center text-muted-foreground">
-                            <Users className="h-8 w-8 mb-2" />
+                            <UsersIcon className="h-8 w-8 mb-2" />
                             <p>لا يوجد مستخدمين</p>
                             {searchTerm && <p className="text-sm">جرب البحث بكلمة أخرى</p>}
                           </div>
@@ -420,7 +420,7 @@ const Users = () => {
                       filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>
-                            <div className="flex items-center space-x-3 space-x-reverse">
+                            <div className="flex items-center space-x-3 rtl:space-x-reverse">
                               <Avatar>
                                 <AvatarFallback>{getUserInitials(user.fullName)}</AvatarFallback>
                               </Avatar>
@@ -452,7 +452,7 @@ const Users = () => {
                             {user.email || 'غير متوفر'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex space-x-2 space-x-reverse">
+                            <div className="flex space-x-2 rtl:space-x-reverse">
                               <Dialog open={isEditDialogOpen && currentUser?.id === user.id} onOpenChange={(open) => {
                                 if (!open) setCurrentUser(null);
                                 setIsEditDialogOpen(open);
@@ -545,4 +545,4 @@ const Users = () => {
   );
 };
 
-export default Users;
+export default UsersPage;

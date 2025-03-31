@@ -22,7 +22,7 @@ import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
-import Users from '@/pages/Users';
+import UsersPage from '@/pages/Users';
 import RequireAuth from '@/components/auth/RequireAuth';
 import './App.css';
 
@@ -108,7 +108,7 @@ function App() {
                 } />
                 <Route path="/users" element={
                   <RequireAuth>
-                    <Users />
+                    <UsersPage />
                   </RequireAuth>
                 } />
                 <Route path="/profile" element={
