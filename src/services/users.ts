@@ -1,45 +1,52 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/auth-types';
 
 // استرجاع جميع المستخدمين (للمسؤولين فقط)
 export const getAllUsers = async (): Promise<UserProfile[]> => {
   try {
-    // استرجاع بيانات المستخدمين من Supabase Auth
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-    
-    if (authError) throw authError;
+    console.log("Fetching all users");
     
     // استرجاع الملفات الشخصية
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*');
       
-    if (profilesError) throw profilesError;
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+      throw profilesError;
+    }
+    
+    console.log("Profiles data:", profiles);
     
     // استرجاع أدوار المستخدمين
     const { data: roles, error: rolesError } = await supabase
       .from('user_roles')
       .select('user_id, role');
       
-    if (rolesError) throw rolesError;
+    if (rolesError) {
+      console.error("Error fetching roles:", rolesError);
+      throw rolesError;
+    }
+    
+    console.log("Roles data:", roles);
     
     // دمج البيانات
-    const users = authUsers.users.map(authUser => {
-      const profile = profiles?.find(p => p.id === authUser.id);
+    const users = profiles.map(profile => {
       const userRoles = roles
-        ?.filter(r => r.user_id === authUser.id)
+        .filter(r => r.user_id === profile.id)
         .map(r => r.role as UserRole) || [];
         
       return {
-        id: authUser.id,
-        fullName: profile?.full_name || authUser.email || '',
-        avatarUrl: profile?.avatar_url,
-        phone: profile?.phone,
-        position: profile?.position,
+        id: profile.id,
+        fullName: profile.full_name || '',
+        avatarUrl: profile.avatar_url,
+        phone: profile.phone,
+        position: profile.position,
         roles: userRoles
       };
     });
+    
+    console.log("Merged user data:", users);
     
     return users;
   } catch (error) {
@@ -56,6 +63,8 @@ export const createUser = async (userData: {
   role: UserRole;
 }): Promise<string> => {
   try {
+    console.log("Creating new user:", userData.email);
+    
     // إنشاء المستخدم
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: userData.email,
@@ -66,7 +75,12 @@ export const createUser = async (userData: {
       },
     });
     
-    if (authError) throw authError;
+    if (authError) {
+      console.error("Error creating user:", authError);
+      throw authError;
+    }
+    
+    console.log("User created:", authData.user);
     
     const userId = authData.user.id;
     
@@ -140,14 +154,39 @@ export const deleteUser = async (userId: string): Promise<void> => {
 // إضافة دور للمستخدم
 export const addRoleToUser = async (userId: string, role: UserRole): Promise<void> => {
   try {
-    const { error } = await supabase
+    console.log("Adding role", role, "to user", userId);
+    
+    // التحقق من وجود هذا الدور مسبقاً للمستخدم
+    const { data: existingRole, error: checkError } = await supabase
       .from('user_roles')
-      .insert({
-        user_id: userId,
-        role: role
-      });
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', role)
+      .maybeSingle();
       
-    if (error) throw error;
+    if (checkError) {
+      console.error("Error checking existing role:", checkError);
+      throw checkError;
+    }
+    
+    // إضافة الدور فقط إذا لم يكن موجوداً بالفعل
+    if (!existingRole) {
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: role
+        });
+        
+      if (error) {
+        console.error("Error adding role:", error);
+        throw error;
+      }
+      
+      console.log("Role added successfully");
+    } else {
+      console.log("Role already exists for this user");
+    }
   } catch (error) {
     console.error('Error adding role to user:', error);
     throw error;
@@ -157,13 +196,20 @@ export const addRoleToUser = async (userId: string, role: UserRole): Promise<voi
 // حذف دور من المستخدم
 export const removeRoleFromUser = async (userId: string, role: UserRole): Promise<void> => {
   try {
+    console.log("Removing role", role, "from user", userId);
+    
     const { error } = await supabase
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
       .eq('role', role);
       
-    if (error) throw error;
+    if (error) {
+      console.error("Error removing role:", error);
+      throw error;
+    }
+    
+    console.log("Role removed successfully");
   } catch (error) {
     console.error('Error removing role from user:', error);
     throw error;

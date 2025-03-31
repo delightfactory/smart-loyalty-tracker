@@ -55,7 +55,7 @@ import {
 } from 'lucide-react';
 
 const Users = () => {
-  const { hasRole, isAuthenticated } = useAuth();
+  const { hasRole, isAuthenticated, roles } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -73,12 +73,15 @@ const Users = () => {
   
   useEffect(() => {
     checkAdminAccess();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, roles]);
   
   const checkAdminAccess = async () => {
     try {
       if (isAuthenticated) {
         const isAdmin = hasRole(UserRole.ADMIN);
+        console.log("Is admin check:", isAdmin);
+        console.log("Current roles:", roles);
+        
         setIsAdminCheckDone(true);
         
         if (!isAdmin) {
@@ -109,6 +112,7 @@ const Users = () => {
       const data = await getAllUsers();
       setUsers(data);
     } catch (error: any) {
+      console.error('Error fetching users:', error);
       toast({
         title: "خطأ",
         description: error.message || "حدث خطأ أثناء جلب المستخدمين",
@@ -154,6 +158,7 @@ const Users = () => {
         description: "تم إضافة المستخدم بنجاح",
       });
     } catch (error: any) {
+      console.error('Error adding user:', error);
       toast({
         title: "خطأ",
         description: error.message || "حدث خطأ أثناء إضافة المستخدم",
@@ -182,6 +187,7 @@ const Users = () => {
         description: `تم إضافة دور ${role} للمستخدم`,
       });
     } catch (error: any) {
+      console.error('Error adding role:', error);
       toast({
         title: "خطأ",
         description: error.message || "حدث خطأ أثناء إضافة الدور",
@@ -206,6 +212,7 @@ const Users = () => {
         description: `تم إزالة دور ${role} من المستخدم`,
       });
     } catch (error: any) {
+      console.error('Error removing role:', error);
       toast({
         title: "خطأ",
         description: error.message || "حدث خطأ أثناء إزالة الدور",
@@ -253,7 +260,7 @@ const Users = () => {
       .slice(0, 2);
   };
   
-  if (!isAdminCheckDone || (isAdminCheckDone && isLoading && users.length === 0)) {
+  if (!isAdminCheckDone) {
     return (
       <PageContainer 
         title="إدارة المستخدمين" 

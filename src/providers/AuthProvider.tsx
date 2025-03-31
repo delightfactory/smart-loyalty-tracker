@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // تعيين مستمع لحالة المصادقة
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        console.log("Auth state change event:", event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -47,12 +48,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setProfile(null);
           setRoles([]);
+          setIsLoading(false);
         }
       }
     );
     
     // التحقق من وجود جلسة للمستخدم
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Initial session check:", currentSession ? "Session exists" : "No session");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -71,6 +74,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // استرجاع بيانات المستخدم وأدواره
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching user profile for ID:", userId);
+      
       // استرجاع الملف الشخصي
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -78,7 +83,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', userId)
         .maybeSingle();
       
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Profile fetch error:", profileError);
+        throw profileError;
+      }
+      
+      console.log("Profile data:", profileData);
       
       // استرجاع الأدوار
       const { data: rolesData, error: rolesError } = await supabase
@@ -86,7 +96,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('role')
         .eq('user_id', userId);
       
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error("Roles fetch error:", rolesError);
+        throw rolesError;
+      }
+      
+      console.log("Roles data:", rolesData);
       
       const userRoles = rolesData.map(r => r.role as UserRole);
       
@@ -100,8 +115,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           roles: userRoles
         };
         
+        console.log("Setting user profile:", userProfile);
         setProfile(userProfile);
         setRoles(userRoles);
+      } else {
+        console.warn("No profile found for user", userId);
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
@@ -192,6 +210,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   // التحقق من صلاحيات المستخدم
   const hasRole = (role: UserRole) => {
+    console.log("Checking for role:", role, "in user roles:", roles);
     return roles.includes(role);
   };
   
