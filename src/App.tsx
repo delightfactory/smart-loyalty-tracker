@@ -1,9 +1,8 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryProvider } from '@/providers/QueryProvider';
-import { AuthProvider } from '@/providers/AuthProvider';
+import { AuthProvider } from '@/hooks/useAuth';
 import Layout from '@/components/layout/Layout';
 import Index from '@/pages/Index';
 import Products from '@/pages/Products';
