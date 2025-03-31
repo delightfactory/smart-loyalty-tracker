@@ -55,7 +55,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/components/ui/use-toast';
-import CustomerSelector from '@/components/customer/CustomerSelector';
+import CustomerSelector from '@/components/invoice/CustomerSelector';
 import ProductSelector from '@/components/invoice/ProductSelector';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -241,7 +241,7 @@ const CreateInvoice = () => {
         
         toast({
           title: "تم التحديث",
-          description: "تم تحديث الفاتورة بنجاح",
+          description: "تم ت��ديث الفاتورة بنجاح",
         });
       } else {
         const newInvoice: Omit<Invoice, 'id'> = {
@@ -253,7 +253,8 @@ const CreateInvoice = () => {
           pointsRedeemed: 0,
           status,
           paymentMethod,
-          categoriesCount
+          categoriesCount,
+          items: invoiceItems
         };
         
         await addInvoice.mutateAsync({ invoice: newInvoice, items: invoiceItems });

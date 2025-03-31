@@ -11,16 +11,31 @@ import SmartSearch from '@/components/search/SmartSearch';
 import { Customer } from '@/lib/types';
 import { useCustomers } from '@/hooks/useCustomers';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
 
 interface CustomerSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
+  selectedCustomerId: string;
+  onSelectCustomer: (customerId: string) => void;
   disabled?: boolean;
 }
 
-const CustomerSelector = ({ value, onChange, disabled = false }: CustomerSelectorProps) => {
+const CustomerSelector = ({ 
+  selectedCustomerId, 
+  onSelectCustomer, 
+  disabled = false 
+}: CustomerSelectorProps) => {
   const { getAll: getCustomers } = useCustomers();
   const { data: customers, isLoading, error } = getCustomers;
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -47,8 +62,8 @@ const CustomerSelector = ({ value, onChange, disabled = false }: CustomerSelecto
       <Label htmlFor="customer">العميل</Label>
       <div className="flex gap-2">
         <Select
-          value={value}
-          onValueChange={onChange}
+          value={selectedCustomerId}
+          onValueChange={onSelectCustomer}
           disabled={disabled}
         >
           <SelectTrigger id="customer" className="flex-1">
@@ -68,7 +83,7 @@ const CustomerSelector = ({ value, onChange, disabled = false }: CustomerSelecto
             <SmartSearch 
               type="customer"
               placeholder="بحث سريع..."
-              onSelectCustomer={(customer) => onChange(customer.id)}
+              onSelectCustomer={(customer) => onSelectCustomer(customer.id)}
             />
           </div>
         )}
