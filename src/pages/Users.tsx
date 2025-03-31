@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
@@ -10,7 +9,10 @@ import {
   addRoleToUser, 
   removeRoleFromUser,
   getUserById,
-  createUser
+  createUser,
+  updateUserProfile,
+  updateUserRoles,
+  deleteUser
 } from '@/services/users';
 import { 
   Table, 
@@ -35,11 +37,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +66,7 @@ import {
   UserPlus,
   AlertTriangle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Users = () => {
   const { user, hasRole, isAuthenticated, roles } = useAuth();
@@ -91,7 +94,6 @@ const Users = () => {
   const checkAdminAccess = async () => {
     try {
       if (isAuthenticated) {
-        // توضيح عملية فحص صلاحية المسؤول بشكل أفضل
         const adminCheck = hasRole(UserRole.ADMIN);
         console.log("Admin access check result:", adminCheck);
         console.log("Current roles:", roles);
@@ -208,13 +210,11 @@ const Users = () => {
     try {
       setIsLoading(true);
       
-      // تحديث الاسم في ملف التعريف
       await updateUserProfile({
         id: currentUser.id,
         fullName: editUser.fullName
       });
       
-      // إذا تغير الدور، قم بتحديثه
       if (!currentUser.roles.includes(editUser.role)) {
         await updateUserRoles(currentUser.id, [editUser.role]);
       }
@@ -361,93 +361,6 @@ const Users = () => {
       .toUpperCase()
       .slice(0, 2);
   };
-  
-  // كود مستورد من services/users.ts للتوافق
-  const updateUserProfile = async (profile: Partial<UserProfile> & { id: string }): Promise<UserProfile> => {
-    try {
-      const { id, fullName, avatarUrl, phone, position } = profile;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName,
-          avatar_url: avatarUrl,
-          phone: phone,
-          position: position
-        })
-        .eq('id', id)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      // استرجاع الأدوار
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', id);
-        
-      if (rolesError) throw rolesError;
-      
-      const userRoles = rolesData.map(r => r.role as UserRole);
-      
-      return {
-        id: data.id,
-        fullName: data.full_name,
-        avatarUrl: data.avatar_url,
-        phone: data.phone,
-        position: data.position,
-        roles: userRoles
-      };
-    } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
-    }
-  };
-  
-  const updateUserRoles = async (userId: string, roles: UserRole[]): Promise<void> => {
-    try {
-      // حذف جميع الأدوار الحالية
-      const { error: deleteError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-        
-      if (deleteError) throw deleteError;
-      
-      // إذا كانت الأدوار فارغة، توقف هنا
-      if (!roles.length) return;
-      
-      // إضافة الأدوار الجديدة
-      const rolesToInsert = roles.map(role => ({
-        user_id: userId,
-        role: role
-      }));
-      
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert(rolesToInsert);
-        
-      if (insertError) throw insertError;
-    } catch (error) {
-      console.error('Error updating user roles:', error);
-      throw error;
-    }
-  };
-  
-  const deleteUser = async (userId: string): Promise<void> => {
-    try {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
-  };
-  
-  // إضافة استيراد supabase
-  const { supabase } = require('@/integrations/supabase/client');
   
   if (!isAdminCheckDone) {
     return (
