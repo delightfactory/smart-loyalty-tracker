@@ -40,6 +40,16 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,17 +61,19 @@ import {
   ShieldX, 
   UserCog,
   Loader2,
-  UserPlus
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 
 const Users = () => {
-  const { hasRole, isAuthenticated, roles } = useAuth();
+  const { user, hasRole, isAuthenticated, roles } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdminCheckDone, setIsAdminCheckDone] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -72,19 +84,22 @@ const Users = () => {
   });
   
   useEffect(() => {
+    console.log("Auth state:", { isAuthenticated, roles, user });
     checkAdminAccess();
-  }, [isAuthenticated, roles]);
+  }, [isAuthenticated, roles, user]);
   
   const checkAdminAccess = async () => {
     try {
       if (isAuthenticated) {
-        const isAdmin = hasRole(UserRole.ADMIN);
-        console.log("Is admin check:", isAdmin);
+        // توضيح عملية فحص صلاحية المسؤول بشكل أفضل
+        const adminCheck = hasRole(UserRole.ADMIN);
+        console.log("Admin access check result:", adminCheck);
         console.log("Current roles:", roles);
         
+        setIsAdmin(adminCheck);
         setIsAdminCheckDone(true);
         
-        if (!isAdmin) {
+        if (!adminCheck) {
           toast({
             title: "غير مصرح",
             description: "ليس لديك صلاحيات كافية للوصول إلى هذه الصفحة",
@@ -103,6 +118,7 @@ const Users = () => {
         description: error.message || "حدث خطأ أثناء التحقق من الصلاحيات",
         variant: "destructive"
       });
+      setIsAdminCheckDone(true);
     }
   };
   
@@ -170,6 +186,59 @@ const Users = () => {
     }
   };
   
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editUser, setEditUser] = useState({
+    fullName: '',
+    role: UserRole.USER
+  });
+  
+  const openEditUser = (user: UserProfile) => {
+    setCurrentUser(user);
+    setEditUser({
+      fullName: user.fullName,
+      role: user.roles[0] || UserRole.USER,
+    });
+    setIsEditUserOpen(true);
+  };
+  
+  const handleEditUser = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // تحديث الاسم في ملف التعريف
+      await updateUserProfile({
+        id: currentUser.id,
+        fullName: editUser.fullName
+      });
+      
+      // إذا تغير الدور، قم بتحديثه
+      if (!currentUser.roles.includes(editUser.role)) {
+        await updateUserRoles(currentUser.id, [editUser.role]);
+      }
+      
+      await fetchUsers();
+      
+      setIsEditUserOpen(false);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث المستخدم بنجاح",
+      });
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء تحديث المستخدم",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const handleAddRole = async (userId: string, role: UserRole) => {
     try {
       await addRoleToUser(userId, role);
@@ -222,6 +291,38 @@ const Users = () => {
     }
   };
   
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      setIsLoading(true);
+      
+      await deleteUser(userToDelete);
+      
+      setUsers(users.filter(user => user.id !== userToDelete));
+      
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف المستخدم بنجاح",
+      });
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء حذف المستخدم",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case UserRole.ADMIN:
@@ -261,6 +362,93 @@ const Users = () => {
       .slice(0, 2);
   };
   
+  // كود مستورد من services/users.ts للتوافق
+  const updateUserProfile = async (profile: Partial<UserProfile> & { id: string }): Promise<UserProfile> => {
+    try {
+      const { id, fullName, avatarUrl, phone, position } = profile;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          avatar_url: avatarUrl,
+          phone: phone,
+          position: position
+        })
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // استرجاع الأدوار
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', id);
+        
+      if (rolesError) throw rolesError;
+      
+      const userRoles = rolesData.map(r => r.role as UserRole);
+      
+      return {
+        id: data.id,
+        fullName: data.full_name,
+        avatarUrl: data.avatar_url,
+        phone: data.phone,
+        position: data.position,
+        roles: userRoles
+      };
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  };
+  
+  const updateUserRoles = async (userId: string, roles: UserRole[]): Promise<void> => {
+    try {
+      // حذف جميع الأدوار الحالية
+      const { error: deleteError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+        
+      if (deleteError) throw deleteError;
+      
+      // إذا كانت الأدوار فارغة، توقف هنا
+      if (!roles.length) return;
+      
+      // إضافة الأدوار الجديدة
+      const rolesToInsert = roles.map(role => ({
+        user_id: userId,
+        role: role
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert(rolesToInsert);
+        
+      if (insertError) throw insertError;
+    } catch (error) {
+      console.error('Error updating user roles:', error);
+      throw error;
+    }
+  };
+  
+  const deleteUser = async (userId: string): Promise<void> => {
+    try {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  };
+  
+  // إضافة استيراد supabase
+  const { supabase } = require('@/integrations/supabase/client');
+  
   if (!isAdminCheckDone) {
     return (
       <PageContainer 
@@ -269,6 +457,26 @@ const Users = () => {
       >
         <div className="h-[400px] flex items-center justify-center">
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        </div>
+      </PageContainer>
+    );
+  }
+  
+  if (!isAdmin) {
+    return (
+      <PageContainer 
+        title="إدارة المستخدمين" 
+        subtitle="غير مصرح بالوصول"
+      >
+        <div className="h-[400px] flex flex-col items-center justify-center gap-4">
+          <AlertTriangle className="w-16 h-16 text-amber-500" />
+          <h2 className="text-2xl font-bold">ليس لديك صلاحيات كافية</h2>
+          <p className="text-muted-foreground">
+            يتطلب الوصول إلى هذه الصفحة صلاحيات المسؤول.
+          </p>
+          <Button onClick={() => navigate('/dashboard')}>
+            العودة إلى لوحة التحكم
+          </Button>
         </div>
       </PageContainer>
     );
@@ -398,77 +606,180 @@ const Users = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map(user => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={user.avatarUrl || ''} />
-                      <AvatarFallback>{getNameInitials(user.fullName)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.fullName}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>{user.position || '-'}</TableCell>
-                <TableCell>{user.phone || '-'}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {user.roles.map(role => (
-                      <Badge key={role} variant="outline" className={getRoleBadgeColor(role)}>
-                        {role}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        إدارة الأدوار
-                        <ChevronDown className="h-4 w-4 mr-2" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem disabled className="font-semibold">
-                        إضافة دور
-                      </DropdownMenuItem>
-                      {Object.values(UserRole).map(role => (
-                        <DropdownMenuItem
-                          key={`add-${role}`}
-                          disabled={user.roles.includes(role)}
-                          onClick={() => handleAddRole(user.id, role)}
-                        >
-                          {getRoleIcon(role)}
-                          إضافة دور {role}
-                        </DropdownMenuItem>
-                      ))}
-                      
-                      <DropdownMenuSeparator />
-                      
-                      <DropdownMenuItem disabled className="font-semibold">
-                        إزالة دور
-                      </DropdownMenuItem>
-                      {Object.values(UserRole).map(role => (
-                        <DropdownMenuItem
-                          key={`remove-${role}`}
-                          disabled={!user.roles.includes(role)}
-                          onClick={() => handleRemoveRole(user.id, role)}
-                          className="text-red-500"
-                        >
-                          {getRoleIcon(role)}
-                          إزالة دور {role}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                  <p className="mt-2">جاري تحميل البيانات...</p>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  <p>لا يوجد مستخدمين</p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map(user => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={user.avatarUrl || ''} />
+                        <AvatarFallback>{getNameInitials(user.fullName)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{user.fullName}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{user.position || '-'}</TableCell>
+                  <TableCell>{user.phone || '-'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {user.roles.map(role => (
+                        <Badge key={role} variant="outline" className={getRoleBadgeColor(role)}>
+                          {role}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          إدارة الأدوار
+                          <ChevronDown className="h-4 w-4 mr-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => openEditUser(user)}>
+                          تعديل المستخدم
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem disabled className="font-semibold">
+                          إضافة دور
+                        </DropdownMenuItem>
+                        {Object.values(UserRole).map(role => (
+                          <DropdownMenuItem
+                            key={`add-${role}`}
+                            disabled={user.roles.includes(role)}
+                            onClick={() => handleAddRole(user.id, role)}
+                          >
+                            {getRoleIcon(role)}
+                            إضافة دور {role}
+                          </DropdownMenuItem>
+                        ))}
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem disabled className="font-semibold">
+                          إزالة دور
+                        </DropdownMenuItem>
+                        {Object.values(UserRole).map(role => (
+                          <DropdownMenuItem
+                            key={`remove-${role}`}
+                            disabled={!user.roles.includes(role)}
+                            onClick={() => handleRemoveRole(user.id, role)}
+                            className="text-red-500"
+                          >
+                            {getRoleIcon(role)}
+                            إزالة دور {role}
+                          </DropdownMenuItem>
+                        ))}
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setUserToDelete(user.id);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="text-red-500"
+                        >
+                          حذف المستخدم
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
+      
+      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+        <DialogContent>
+          {currentUser && (
+            <>
+              <DialogHeader>
+                <DialogTitle>تعديل المستخدم</DialogTitle>
+                <DialogDescription>
+                  تعديل بيانات المستخدم {currentUser.fullName}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-fullName">الاسم الكامل</Label>
+                  <Input
+                    id="edit-fullName"
+                    value={editUser.fullName}
+                    onChange={(e) => setEditUser({ ...editUser, fullName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">الصلاحية الرئيسية</Label>
+                  <Select
+                    value={editUser.role}
+                    onValueChange={(value) => setEditUser({ ...editUser, role: value as UserRole })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الصلاحية" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                      <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                      <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                      <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                      <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleEditUser} disabled={isLoading}>
+                  {isLoading ? 'جاري التحديث...' : 'حفظ التغييرات'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من حذف المستخدم؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              هذا الإجراء لا يمكن التراجع عنه. سيتم حذف المستخدم نهائياً من النظام.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteUser}
+              disabled={isLoading}
+            >
+              {isLoading ? 'جاري الحذف...' : 'تأكيد الحذف'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 };

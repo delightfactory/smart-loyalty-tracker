@@ -1,690 +1,529 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useProducts } from '@/hooks/useProducts';
+import { useCustomers } from '@/hooks/useCustomers';
 import { 
-  Card, 
-  CardContent, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+  Invoice, 
+  InvoiceItem, 
+  InvoiceStatus, 
+  PaymentMethod, 
+  Product,
+  Customer
+} from '@/lib/types';
+import PageContainer from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
 import { 
+  Popover, 
+  PopoverTrigger, 
+  PopoverContent
+} from '@/components/ui/popover';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { useToast } from "@/components/ui/use-toast";
-import { 
-  Plus, 
-  Trash2, 
-  ArrowLeft, 
-  ShoppingCart, 
-  CreditCard, 
-  Star, 
-  Check, 
-  X 
-} from 'lucide-react';
-import PageContainer from '@/components/layout/PageContainer';
-import { 
-  Product, 
-  Customer, 
-  InvoiceItem, 
-  ProductCategory, 
-  PaymentMethod, 
-  RedemptionItem 
-} from '@/lib/types';
-import { 
-  products, 
-  customers, 
-  getProductById, 
-  getCustomerById, 
-  addInvoice, 
-  updateCustomer 
-} from '@/lib/data';
-import { 
-  calculatePoints, 
-  calculateRedemptionPoints, 
-  canRedeemPoints,
-  generateInvoice 
-} from '@/lib/calculations';
-import { cn } from '@/lib/utils';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/components/ui/use-toast';
+import CustomerSelector from '@/components/customer/CustomerSelector';
+import ProductSelector from '@/components/invoice/ProductSelector';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { CalendarIcon, ChevronLeft, Trash, Loader2 } from 'lucide-react';
 
 const CreateInvoice = () => {
-  const { customerId } = useParams<{ customerId?: string }>();
   const navigate = useNavigate();
+  const { customerId } = useParams();
+  const location = useLocation();
   const { toast } = useToast();
   
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(customerId || '');
-  const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [redemptionItems, setRedemptionItems] = useState<RedemptionItem[]>([]);
-  const [newItem, setNewItem] = useState<Partial<InvoiceItem>>({
-    productId: '',
-    quantity: 1,
-    price: 0,
-    totalPrice: 0,
-    pointsEarned: 0
-  });
-  const [newRedemptionItem, setNewRedemptionItem] = useState<Partial<RedemptionItem>>({
-    productId: '',
-    quantity: 1,
-    pointsRequired: 0,
-    totalPointsRequired: 0
-  });
+  const editInvoice = location.state?.editInvoice as Invoice | undefined;
+  
+  const { addInvoice, updateInvoice } = useInvoices();
+  const { getAll: getAllProducts } = useProducts();
+  const { getAll: getAllCustomers, getById: getCustomerById } = useCustomers();
+  
+  const { data: products = [], isLoading: isLoadingProducts } = getAllProducts;
+  const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
+  const { data: selectedCustomer, isLoading: isLoadingCustomer } = getCustomerById(customerId || '');
+  
+  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [status, setStatus] = useState<InvoiceStatus>(InvoiceStatus.UNPAID);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
-  const [pointsEarned, setPointsEarned] = useState<number>(0);
-  const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [totalRedemptionPoints, setTotalRedemptionPoints] = useState<number>(0);
-  const [categoriesCount, setCategoriesCount] = useState<number>(0);
-  
-  const customer = selectedCustomerId ? getCustomerById(selectedCustomerId) : null;
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  const [newItemProductId, setNewItemProductId] = useState<string>('');
+  const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
   
   useEffect(() => {
-    if (items.length > 0) {
-      const uniqueCategories = new Set<ProductCategory>();
+    console.log('Component mounted. customerId:', customerId, 'editInvoice:', editInvoice);
+    
+    if (customerId) {
+      setSelectedCustomerId(customerId);
+    }
+    
+    if (editInvoice) {
+      console.log('Editing existing invoice:', editInvoice);
       
-      items.forEach(item => {
-        const product = getProductById(item.productId);
-        if (product) {
-          uniqueCategories.add(product.category);
-        }
+      setInvoiceDate(new Date(editInvoice.date));
+      setDueDate(editInvoice.dueDate ? new Date(editInvoice.dueDate) : undefined);
+      setStatus(editInvoice.status);
+      setPaymentMethod(editInvoice.paymentMethod);
+      setSelectedCustomerId(editInvoice.customerId);
+      setInvoiceItems(editInvoice.items || []);
+    }
+  }, [customerId, editInvoice]);
+  
+  useEffect(() => {
+    if (paymentMethod === PaymentMethod.CASH) {
+      setStatus(InvoiceStatus.PAID);
+    } else if (paymentMethod === PaymentMethod.CREDIT && status === InvoiceStatus.PAID) {
+      setStatus(InvoiceStatus.UNPAID);
+    }
+  }, [paymentMethod]);
+  
+  const handleAddItem = () => {
+    if (!newItemProductId || newItemQuantity <= 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار منتج وتحديد كمية صحيحة",
+        variant: "destructive",
       });
-      
-      setCategoriesCount(uniqueCategories.size);
-      
-      const calculatedTotalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
-      setTotalAmount(calculatedTotalAmount);
-      
-      const calculatedPointsEarned = calculatePoints(items);
-      setPointsEarned(calculatedPointsEarned);
-    } else {
-      setCategoriesCount(0);
-      setTotalAmount(0);
-      setPointsEarned(0);
+      return;
     }
-  }, [items]);
-  
-  useEffect(() => {
-    if (redemptionItems.length > 0) {
-      const calculatedTotalPoints = redemptionItems.reduce((sum, item) => sum + (item.totalPointsRequired || 0), 0);
-      setTotalRedemptionPoints(calculatedTotalPoints);
-    } else {
-      setTotalRedemptionPoints(0);
+    
+    const selectedProduct = products.find(p => p.id === newItemProductId);
+    
+    if (!selectedProduct) {
+      toast({
+        title: "خطأ",
+        description: "لم يتم العثور على المنتج المحدد",
+        variant: "destructive",
+      });
+      return;
     }
-  }, [redemptionItems]);
-  
-  const handleProductChange = (productId: string) => {
-    const selectedProduct = getProductById(productId);
-    if (selectedProduct) {
-      setNewItem({
-        ...newItem,
-        productId,
+    
+    const existingItemIndex = invoiceItems.findIndex(item => item.productId === newItemProductId);
+    
+    if (existingItemIndex >= 0) {
+      const updatedItems = [...invoiceItems];
+      const existingItem = updatedItems[existingItemIndex];
+      
+      const newQuantity = existingItem.quantity + newItemQuantity;
+      const newTotalPrice = selectedProduct.price * newQuantity;
+      const newPointsEarned = selectedProduct.pointsEarned * newQuantity;
+      
+      updatedItems[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        totalPrice: newTotalPrice,
+        pointsEarned: newPointsEarned
+      };
+      
+      setInvoiceItems(updatedItems);
+    } else {
+      const newItem: InvoiceItem = {
+        productId: selectedProduct.id,
+        quantity: newItemQuantity,
         price: selectedProduct.price,
-        totalPrice: selectedProduct.price * (newItem.quantity || 1),
-        pointsEarned: selectedProduct.pointsEarned
-      });
-    }
-  };
-  
-  const handleRedemptionProductChange = (productId: string) => {
-    const selectedProduct = getProductById(productId);
-    if (selectedProduct) {
-      setNewRedemptionItem({
-        ...newRedemptionItem,
-        productId,
-        pointsRequired: selectedProduct.pointsRequired,
-        totalPointsRequired: selectedProduct.pointsRequired * (newRedemptionItem.quantity || 1)
-      });
-    }
-  };
-  
-  const handleQuantityChange = (quantity: number) => {
-    const selectedProduct = getProductById(newItem.productId || '');
-    if (selectedProduct) {
-      setNewItem({
-        ...newItem,
-        quantity,
-        totalPrice: selectedProduct.price * quantity
-      });
-    } else {
-      setNewItem({
-        ...newItem,
-        quantity
-      });
-    }
-  };
-  
-  const handleRedemptionQuantityChange = (quantity: number) => {
-    const selectedProduct = getProductById(newRedemptionItem.productId || '');
-    if (selectedProduct) {
-      setNewRedemptionItem({
-        ...newRedemptionItem,
-        quantity,
-        totalPointsRequired: selectedProduct.pointsRequired * quantity
-      });
-    } else {
-      setNewRedemptionItem({
-        ...newRedemptionItem,
-        quantity
-      });
-    }
-  };
-  
-  const addItemToInvoice = () => {
-    if (!newItem.productId || !newItem.quantity) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار منتج وتحديد الكمية",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const item: InvoiceItem = {
-      productId: newItem.productId,
-      quantity: newItem.quantity,
-      price: newItem.price || 0,
-      totalPrice: newItem.totalPrice || 0,
-      pointsEarned: newItem.pointsEarned || 0
-    };
-    
-    setItems([...items, item]);
-    
-    setNewItem({
-      productId: '',
-      quantity: 1,
-      price: 0,
-      totalPrice: 0,
-      pointsEarned: 0
-    });
-  };
-  
-  const addRedemptionItem = () => {
-    if (!newRedemptionItem.productId || !newRedemptionItem.quantity) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار منتج وتحديد الكمية",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (customer && !canRedeemPoints(customer.id, totalRedemptionPoints + (newRedemptionItem.totalPointsRequired || 0))) {
-      toast({
-        title: "خطأ",
-        description: "العميل لا يملك نقاط كافية أو لديه فواتير غير مدفوعة",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const item: RedemptionItem = {
-      productId: newRedemptionItem.productId,
-      quantity: newRedemptionItem.quantity,
-      pointsRequired: newRedemptionItem.pointsRequired || 0,
-      totalPointsRequired: newRedemptionItem.totalPointsRequired || 0
-    };
-    
-    setRedemptionItems([...redemptionItems, item]);
-    
-    setNewRedemptionItem({
-      productId: '',
-      quantity: 1,
-      pointsRequired: 0,
-      totalPointsRequired: 0
-    });
-  };
-  
-  const removeItem = (index: number) => {
-    const updatedItems = [...items];
-    updatedItems.splice(index, 1);
-    setItems(updatedItems);
-  };
-  
-  const removeRedemptionItem = (index: number) => {
-    const updatedItems = [...redemptionItems];
-    updatedItems.splice(index, 1);
-    setRedemptionItems(updatedItems);
-  };
-  
-  const handleCreateInvoice = () => {
-    if (!selectedCustomerId) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار عميل",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (items.length === 0) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إضافة منتج واحد على الأقل",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const invoice = generateInvoice(selectedCustomerId, items, paymentMethod, totalRedemptionPoints);
-    
-    if (invoice) {
-      addInvoice(invoice);
+        totalPrice: selectedProduct.price * newItemQuantity,
+        pointsEarned: selectedProduct.pointsEarned * newItemQuantity
+      };
       
-      if (customer) {
-        const updatedCustomer = { ...customer };
-        updatedCustomer.pointsEarned += invoice.pointsEarned;
+      setInvoiceItems([...invoiceItems, newItem]);
+    }
+    
+    setNewItemProductId('');
+    setNewItemQuantity(1);
+    
+    toast({
+      title: "تم الإضافة",
+      description: "تمت إضافة المنتج إلى الفاتورة",
+    });
+  };
+  
+  const handleRemoveItem = (index: number) => {
+    const updatedItems = [...invoiceItems];
+    updatedItems.splice(index, 1);
+    setInvoiceItems(updatedItems);
+  };
+  
+  const calculateTotals = () => {
+    const totalAmount = invoiceItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const totalPointsEarned = invoiceItems.reduce((sum, item) => sum + item.pointsEarned, 0);
+    
+    return {
+      totalAmount,
+      totalPointsEarned
+    };
+  };
+  
+  const getUniqueCategoriesCount = () => {
+    const categories = new Set();
+    
+    invoiceItems.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        categories.add(product.category);
+      }
+    });
+    
+    return categories.size;
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedCustomerId || invoiceItems.length === 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار عميل وإضافة منتج واحد على الأقل",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      const { totalAmount, totalPointsEarned } = calculateTotals();
+      const categoriesCount = getUniqueCategoriesCount();
+      
+      if (editInvoice) {
+        const updatedInvoice: Invoice = {
+          ...editInvoice,
+          date: invoiceDate,
+          dueDate,
+          customerId: selectedCustomerId,
+          status,
+          paymentMethod,
+          items: invoiceItems,
+          totalAmount,
+          pointsEarned: totalPointsEarned,
+          pointsRedeemed: editInvoice.pointsRedeemed || 0,
+          categoriesCount
+        };
         
-        if (redemptionItems.length > 0) {
-          updatedCustomer.pointsRedeemed += totalRedemptionPoints;
-        }
+        await updateInvoice.mutateAsync(updatedInvoice);
         
-        updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
+        toast({
+          title: "تم التحديث",
+          description: "تم تحديث الفاتورة بنجاح",
+        });
+      } else {
+        const newInvoice: Omit<Invoice, 'id'> = {
+          customerId: selectedCustomerId,
+          date: invoiceDate,
+          dueDate,
+          totalAmount,
+          pointsEarned: totalPointsEarned,
+          pointsRedeemed: 0,
+          status,
+          paymentMethod,
+          categoriesCount
+        };
         
-        if (paymentMethod === PaymentMethod.CREDIT) {
-          updatedCustomer.creditBalance += invoice.totalAmount;
-        }
+        await addInvoice.mutateAsync({ invoice: newInvoice, items: invoiceItems });
         
-        updateCustomer(updatedCustomer);
+        toast({
+          title: "تم الإنشاء",
+          description: "تم إنشاء الفاتورة بنجاح",
+        });
       }
       
+      navigate('/invoices');
+    } catch (error) {
+      console.error('Error submitting invoice:', error);
       toast({
-        title: "نجاح",
-        description: "تم إنشاء الفاتورة بنجاح",
+        title: "خطأ",
+        description: "حدث خطأ أثناء حفظ الفاتورة. يرجى المحاولة مرة أخرى.",
+        variant: "destructive",
       });
-      
-      navigate(customerId ? `/customer/${customerId}` : '/invoices');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+  
+  const handleDiscard = () => {
+    setDiscardDialogOpen(true);
+  };
+  
+  const confirmDiscard = () => {
+    setDiscardDialogOpen(false);
+    navigate('/invoices');
   };
   
   const formatCurrency = (value: number) => {
     return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
   };
   
-  const getPointsMultiplierLabel = () => {
-    switch (categoriesCount) {
-      case 0:
-        return "0%";
-      case 1:
-        return "25%";
-      case 2:
-        return "50%";
-      case 3:
-        return "75%";
-      default:
-        return "100%";
-    }
+  const getProductById = (productId: string): Product | undefined => {
+    return products.find(product => product.id === productId);
   };
   
-  const getCategoryBadgeColor = (category: ProductCategory) => {
-    switch(category) {
-      case ProductCategory.ENGINE_CARE:
-        return "bg-blue-100 text-blue-800";
-      case ProductCategory.EXTERIOR_CARE:
-        return "bg-green-100 text-green-800";
-      case ProductCategory.TIRE_CARE:
-        return "bg-purple-100 text-purple-800";
-      case ProductCategory.DASHBOARD_CARE:
-        return "bg-amber-100 text-amber-800";
-      case ProductCategory.INTERIOR_CARE:
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  const totals = calculateTotals();
   
   return (
-    <PageContainer title="إنشاء فاتورة جديدة" subtitle="إضافة منتجات وحساب النقاط">
-      <div className="mb-6">
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          العودة
+    <PageContainer 
+      title={editInvoice ? "تعديل فاتورة" : "إنشاء فاتورة جديدة"} 
+      subtitle={editInvoice ? "تعديل بيانات الفاتورة" : "إضافة فاتورة جديدة للعميل"}
+    >
+      <div className="flex mb-4">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/invoices')}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          العودة إلى الفواتير
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              تفاصيل الفاتورة
-            </CardTitle>
+            <CardTitle>بيانات الفاتورة</CardTitle>
+            <CardDescription>أدخل البيانات الرئيسية للفاتورة</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="customer">العميل</Label>
-                <Select
-                  value={selectedCustomerId}
-                  onValueChange={setSelectedCustomerId}
-                  disabled={!!customerId}
-                >
-                  <SelectTrigger id="customer">
-                    <SelectValue placeholder="اختر العميل" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isLoadingCustomers || isLoadingCustomer ? (
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>جاري تحميل العملاء...</span>
+                  </div>
+                ) : (
+                  <CustomerSelector 
+                    selectedCustomerId={selectedCustomerId}
+                    onSelectCustomer={(customerId) => setSelectedCustomerId(customerId)}
+                  />
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label>تاريخ الفاتورة</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-right"
+                    >
+                      <CalendarIcon className="ml-2 h-4 w-4" />
+                      {invoiceDate ? format(invoiceDate, 'PPP', { locale: ar }) : 'اختر التاريخ'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={invoiceDate}
+                      onSelect={(date) => date && setInvoiceDate(date)}
+                      locale={ar}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>تاريخ الاستحقاق</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-right"
+                    >
+                      <CalendarIcon className="ml-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, 'PPP', { locale: ar }) : 'اختياري'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={setDueDate}
+                      locale={ar}
+                      disabled={(date) => date < invoiceDate}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">طريقة الدفع</Label>
-                <Select
-                  value={paymentMethod}
+                <Select 
+                  value={paymentMethod} 
                   onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
                 >
                   <SelectTrigger id="paymentMethod">
                     <SelectValue placeholder="اختر طريقة الدفع" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={PaymentMethod.CASH}>{PaymentMethod.CASH}</SelectItem>
-                    <SelectItem value={PaymentMethod.CREDIT}>{PaymentMethod.CREDIT}</SelectItem>
+                    <SelectItem value={PaymentMethod.CASH}>نقداً</SelectItem>
+                    <SelectItem value={PaymentMethod.CREDIT}>آجل</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="border rounded-lg p-4">
-                <h3 className="text-sm font-medium mb-4">إضافة منتج</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="product">المنتج</Label>
-                    <Select
-                      value={newItem.productId}
-                      onValueChange={handleProductChange}
-                    >
-                      <SelectTrigger id="product">
-                        <SelectValue placeholder="اختر منتج" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} ({formatCurrency(product.price)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="quantity">الكمية</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="1"
-                      value={newItem.quantity}
-                      onChange={(e) => handleQuantityChange(Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={addItemToInvoice} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      إضافة
-                    </Button>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">حالة الفاتورة</Label>
+                <Select 
+                  value={status} 
+                  onValueChange={(value) => setStatus(value as InvoiceStatus)}
+                  disabled={paymentMethod === PaymentMethod.CASH}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="اختر حالة الفاتورة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={InvoiceStatus.PAID} disabled={paymentMethod === PaymentMethod.CREDIT}>مدفوع</SelectItem>
+                    <SelectItem value={InvoiceStatus.UNPAID}>غير مدفوع</SelectItem>
+                    <SelectItem value={InvoiceStatus.PARTIALLY_PAID}>مدفوع جزئياً</SelectItem>
+                    <SelectItem value={InvoiceStatus.OVERDUE}>متأخر</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              
-              {items.length > 0 ? (
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>المنتج</TableHead>
-                        <TableHead>القسم</TableHead>
-                        <TableHead>السعر</TableHead>
-                        <TableHead>الكمية</TableHead>
-                        <TableHead>الإجمالي</TableHead>
-                        <TableHead>النقاط</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.map((item, index) => {
-                        const product = getProductById(item.productId);
-                        return (
-                          <TableRow key={index}>
-                            <TableCell>{product?.name || 'غير معروف'}</TableCell>
-                            <TableCell>
-                              {product && (
-                                <span className={cn(
-                                  "px-2 py-1 rounded-full text-xs font-medium",
-                                  getCategoryBadgeColor(product.category)
-                                )}>
-                                  {product.category}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>{formatCurrency(item.price)}</TableCell>
-                            <TableCell>{item.quantity}</TableCell>
-                            <TableCell>{formatCurrency(item.totalPrice)}</TableCell>
-                            <TableCell>{item.pointsEarned}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeItem(index)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                  <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>لم يتم إضافة منتجات بعد</p>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <CreditCard className="h-5 w-5 mr-2" />
-              ملخص الفاتورة
-            </CardTitle>
+            <CardTitle>المنتجات</CardTitle>
+            <CardDescription>أضف المنتجات إلى الفاتورة</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">عدد المنتجات:</span>
-                <span>{items.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">عدد الأقسام:</span>
-                <span className="flex items-center">
-                  {categoriesCount}
-                  <span className={cn(
-                    "ml-2 px-2 py-1 rounded-full text-xs font-medium",
-                    categoriesCount >= 4 ? "bg-green-100 text-green-800" :
-                    categoriesCount === 3 ? "bg-blue-100 text-blue-800" :
-                    categoriesCount === 2 ? "bg-amber-100 text-amber-800" :
-                    categoriesCount === 1 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
-                  )}>
-                    {getPointsMultiplierLabel()}
-                  </span>
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">النقاط المكتسبة:</span>
-                <span className="font-medium">{pointsEarned}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">النقاط المستبدلة:</span>
-                <span className="font-medium">{totalRedemptionPoints}</span>
-              </div>
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">الإجمالي:</span>
-                  <span className="text-xl font-bold">{formatCurrency(totalAmount)}</span>
-                </div>
-              </div>
-            </div>
+            <ProductSelector 
+              productId={newItemProductId}
+              quantity={newItemQuantity}
+              onProductChange={setNewItemProductId}
+              onQuantityChange={setNewItemQuantity}
+              onAddItem={handleAddItem}
+            />
             
-            {paymentMethod === PaymentMethod.CASH && customer && (
-              <Accordion type="single" collapsible className="border rounded-lg">
-                <AccordionItem value="redemption" className="border-none">
-                  <AccordionTrigger className="px-4">
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 mr-2 text-amber-500" />
-                      استبدال النقاط
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-4">
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-sm">
-                        <span>رصيد النقاط الحالي:</span>
-                        <span className="font-medium">{customer.currentPoints}</span>
-                      </div>
-                      
-                      <div className="border rounded-lg p-3">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          <div className="md:col-span-2">
-                            <Label htmlFor="redemptionProduct" className="text-xs">المنتج</Label>
-                            <Select
-                              value={newRedemptionItem.productId}
-                              onValueChange={handleRedemptionProductChange}
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>المنتج</TableHead>
+                    <TableHead>السعر</TableHead>
+                    <TableHead>الكمية</TableHead>
+                    <TableHead>الإجمالي</TableHead>
+                    <TableHead>النقاط</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoiceItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        لم تتم إضافة منتجات بعد
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    invoiceItems.map((item, index) => {
+                      const product = getProductById(item.productId);
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>{product?.name || 'منتج غير معروف'}</TableCell>
+                          <TableCell>{formatCurrency(item.price)}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{formatCurrency(item.totalPrice)}</TableCell>
+                          <TableCell>{item.pointsEarned}</TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRemoveItem(index)}
                             >
-                              <SelectTrigger id="redemptionProduct">
-                                <SelectValue placeholder="اختر منتج" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name} ({product.pointsRequired} نقطة)
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="redemptionQuantity" className="text-xs">الكمية</Label>
-                            <Input
-                              id="redemptionQuantity"
-                              type="number"
-                              min="1"
-                              value={newRedemptionItem.quantity}
-                              onChange={(e) => handleRedemptionQuantityChange(Number(e.target.value))}
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <Button onClick={addRedemptionItem} className="w-full">
-                              <Plus className="h-4 w-4 mr-2" />
-                              إضافة
+                              <Trash className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {redemptionItems.length > 0 ? (
-                        <div className="border rounded-lg overflow-hidden">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>المنتج</TableHead>
-                                <TableHead>الكمية</TableHead>
-                                <TableHead>النقاط</TableHead>
-                                <TableHead></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {redemptionItems.map((item, index) => {
-                                const product = getProductById(item.productId);
-                                return (
-                                  <TableRow key={index}>
-                                    <TableCell>{product?.name || 'غير معروف'}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>{item.totalPointsRequired}</TableCell>
-                                    <TableCell>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeRedemptionItem(index)}
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                              <TableRow>
-                                <TableCell colSpan={2} className="font-medium">الإجمالي</TableCell>
-                                <TableCell colSpan={2} className="font-bold">{totalRedemptionPoints} نقطة</TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground text-center">
-                          لم يتم إضافة منتجات للاستبدال
-                        </div>
-                      )}
-                      
-                      {redemptionItems.length > 0 && (
-                        <div className={cn(
-                          "p-3 rounded-lg text-sm flex items-center",
-                          canRedeemPoints(customer.id, totalRedemptionPoints) 
-                            ? "bg-green-100 text-green-800" 
-                            : "bg-red-100 text-red-800"
-                        )}>
-                          {canRedeemPoints(customer.id, totalRedemptionPoints) ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              <span>يمكن استبدال النقاط</span>
-                            </>
-                          ) : (
-                            <>
-                              <X className="h-4 w-4 mr-2" />
-                              <span>لا يمكن استبدال النقاط (نقاط غير كافية أو فواتير غير مدفوعة)</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full" 
-              size="lg"
-              onClick={handleCreateInvoice}
-              disabled={items.length === 0 || !selectedCustomerId}
-            >
-              إنشاء الفاتورة
-            </Button>
+          <CardFooter className="flex flex-col sm:flex-row justify-between border-t p-4">
+            <div className="space-y-1 mb-4 sm:mb-0">
+              <div className="text-sm">إجمالي النقاط المكتسبة: <span className="font-bold">{totals.totalPointsEarned}</span></div>
+              <div className="text-xl">الإجمالي: <span className="font-bold">{formatCurrency(totals.totalAmount)}</span></div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDiscard}
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || invoiceItems.length === 0 || !selectedCustomerId}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    جاري الحفظ...
+                  </>
+                ) : (
+                  editInvoice ? 'تحديث الفاتورة' : 'إنشاء الفاتورة'
+                )}
+              </Button>
+            </div>
           </CardFooter>
         </Card>
-      </div>
+      </form>
+      
+      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من إلغاء الفاتورة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم تجاهل جميع التغييرات التي قمت بها.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDiscard}>تأكيد</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 };

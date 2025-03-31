@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import SmartSearch from '@/components/search/SmartSearch';
 import { Product } from '@/lib/types';
-import { products } from '@/lib/data';
+import { useProducts } from '@/hooks/useProducts';
+import { useEffect, useState } from 'react';
 
 interface ProductSelectorProps {
   productId: string;
@@ -29,6 +30,15 @@ const ProductSelector = ({
   onQuantityChange, 
   onAddItem 
 }: ProductSelectorProps) => {
+  const { getAll } = useProducts();
+  const { data: products = [], isLoading } = getAll;
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setAvailableProducts(products);
+    }
+  }, [products]);
   
   const formatCurrency = (value: number) => {
     return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
@@ -47,12 +57,13 @@ const ProductSelector = ({
           <Select
             value={productId}
             onValueChange={onProductChange}
+            disabled={isLoading || availableProducts.length === 0}
           >
             <SelectTrigger id="product">
-              <SelectValue placeholder="اختر منتج" />
+              <SelectValue placeholder={isLoading ? "جاري التحميل..." : "اختر منتج"} />
             </SelectTrigger>
             <SelectContent>
-              {products.map((product) => (
+              {availableProducts.map((product) => (
                 <SelectItem key={product.id} value={product.id}>
                   {product.name} ({formatCurrency(product.price)})
                 </SelectItem>
@@ -82,7 +93,11 @@ const ProductSelector = ({
         </div>
         
         <div className="md:col-span-2 flex items-end">
-          <Button onClick={onAddItem} className="w-full">
+          <Button 
+            onClick={onAddItem} 
+            className="w-full"
+            disabled={!productId || quantity <= 0}
+          >
             <Plus className="h-4 w-4 mr-2" />
             إضافة
           </Button>

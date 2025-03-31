@@ -16,7 +16,9 @@ export function useProducts() {
     queryKey: ['products'],
     queryFn: async () => {
       try {
-        return await productsService.getAll();
+        const products = await productsService.getAll();
+        console.log('Fetched products:', products);
+        return products;
       } catch (error: any) {
         console.error('Error fetching products:', error);
         toast({
@@ -33,7 +35,9 @@ export function useProducts() {
     queryKey: ['products', id],
     queryFn: async () => {
       try {
-        return await productsService.getById(id);
+        const product = await productsService.getById(id);
+        console.log(`Fetched product ${id}:`, product);
+        return product;
       } catch (error: any) {
         console.error(`Error fetching product ${id}:`, error);
         toast({
@@ -41,15 +45,26 @@ export function useProducts() {
           description: `حدث خطأ أثناء جلب المنتج: ${error.message}`,
           variant: 'destructive',
         });
-        return null;
+        throw error;
       }
     },
     enabled: !!id
   });
   
   const addProduct = useMutation({
-    mutationFn: (product: Omit<Product, 'id'>) => productsService.create(product),
-    onSuccess: () => {
+    mutationFn: async (product: Omit<Product, 'id'>) => {
+      console.log('Adding product:', product);
+      // تحويل القيم الرقمية بشكل صريح
+      const processedProduct = {
+        ...product,
+        price: Number(product.price),
+        pointsEarned: Number(product.pointsEarned),
+        pointsRequired: Number(product.pointsRequired)
+      };
+      return await productsService.create(processedProduct);
+    },
+    onSuccess: (data) => {
+      console.log('Product added successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast({
         title: 'تم إضافة المنتج بنجاح',
@@ -67,8 +82,19 @@ export function useProducts() {
   });
   
   const updateProduct = useMutation({
-    mutationFn: (product: Product) => productsService.update(product),
+    mutationFn: async (product: Product) => {
+      console.log('Updating product:', product);
+      // تحويل القيم الرقمية بشكل صريح
+      const processedProduct = {
+        ...product,
+        price: Number(product.price),
+        pointsEarned: Number(product.pointsEarned),
+        pointsRequired: Number(product.pointsRequired)
+      };
+      return await productsService.update(processedProduct);
+    },
     onSuccess: (data) => {
+      console.log('Product updated successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['products', data.id] });
       toast({
@@ -87,8 +113,12 @@ export function useProducts() {
   });
   
   const deleteProduct = useMutation({
-    mutationFn: (id: string) => productsService.delete(id),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      console.log('Deleting product:', id);
+      return await productsService.delete(id);
+    },
+    onSuccess: (_, variables) => {
+      console.log('Product deleted successfully:', variables);
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast({
         title: 'تم حذف المنتج بنجاح',

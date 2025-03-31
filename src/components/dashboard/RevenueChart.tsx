@@ -30,14 +30,32 @@ const RevenueChart = ({
 }: RevenueChartProps) => {
   const { theme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
-  
+  const [chartData, setChartData] = useState<any[]>([]);
+
   useEffect(() => {
     setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
+
+    if (data) {
+      setChartData(data);
+    }
+
+    return () => {
+      setIsMounted(false);
+    };
+  }, [data]);
   
   if (!isMounted) {
-    return null;
+    return (
+      <Card className="col-span-1 lg:col-span-1">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </CardContent>
+      </Card>
+    );
   }
   
   return (
@@ -47,14 +65,14 @@ const RevenueChart = ({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="h-[300px]">
-        {!data || data.length === 0 ? (
+        {!chartData || chartData.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">لا توجد بيانات متاحة</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={data}
+              data={chartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
               <defs>
