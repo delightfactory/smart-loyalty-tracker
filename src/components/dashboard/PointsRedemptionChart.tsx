@@ -18,12 +18,29 @@ import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { PointsRedemptionChartProps } from './DashboardCardProps';
+import { useEffect, useState } from 'react';
 
 const PointsRedemptionChart = (props: PointsRedemptionChartProps) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
   // استخراج بيانات العملاء من قاعدة البيانات
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersService.getAll()
+    queryFn: async () => {
+      try {
+        return await customersService.getAll();
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !props?.data,
+    staleTime: 60000
   });
 
   // حساب بيانات النقاط
@@ -42,6 +59,10 @@ const PointsRedemptionChart = (props: PointsRedemptionChartProps) => {
   };
 
   const pointsData = getPointsData();
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <Card className="col-span-1">

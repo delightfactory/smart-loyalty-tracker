@@ -28,45 +28,78 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
   
   const { data: customers, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersService.getAll(),
-    enabled: isMounted,
+    queryFn: async () => {
+      try {
+        return await customersService.getAll();
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !summary,
     staleTime: 60000,
     retry: 2
   });
   
   const { data: products, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
-    queryFn: () => productsService.getAll(),
-    enabled: isMounted,
+    queryFn: async () => {
+      try {
+        return await productsService.getAll();
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !summary,
     staleTime: 60000,
     retry: 2
   });
   
   const { data: invoices, isLoading: isLoadingInvoices } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => invoicesService.getAll(),
-    enabled: isMounted,
+    queryFn: async () => {
+      try {
+        return await invoicesService.getAll();
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !summary,
     staleTime: 60000,
     retry: 2
   });
   
   const { data: payments, isLoading: isLoadingPayments } = useQuery({
     queryKey: ['payments'],
-    queryFn: () => paymentsService.getAll(),
-    enabled: isMounted,
+    queryFn: async () => {
+      try {
+        return await paymentsService.getAll();
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !summary,
     staleTime: 60000,
     retry: 2
   });
   
   const { data: redemptions, isLoading: isLoadingRedemptions } = useQuery({
     queryKey: ['redemptions'],
-    queryFn: () => redemptionsService.getAll(),
-    enabled: isMounted,
+    queryFn: async () => {
+      try {
+        return await redemptionsService.getAll();
+      } catch (error) {
+        console.error('Error fetching redemptions:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !summary,
     staleTime: 60000,
     retry: 2
   });
-  
-  const isError = false;
   
   const calculateTotalRevenue = () => {
     if (summary) return summary.totalRevenue;
@@ -156,6 +189,10 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
   ];
 
   const cardData = view === 'sales' ? salesCards : cardDataDefault;
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

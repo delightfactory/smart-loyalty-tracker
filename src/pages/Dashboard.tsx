@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -12,7 +13,8 @@ import SmartSearch from '@/components/search/SmartSearch';
 import PageContainer from '@/components/layout/PageContainer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { InvoiceStatus } from '@/lib/types';
-import { products, customers, invoices, payments } from '@/lib/data';
+import { useQuery } from '@tanstack/react-query';
+import { productsService, customersService, invoicesService, paymentsService } from '@/services/database';
 
 // Import dashboard components
 import DashboardCards from '@/components/dashboard/DashboardCards';
@@ -25,6 +27,8 @@ import PointsRedemptionChart from '@/components/dashboard/PointsRedemptionChart'
 // Utility functions
 // 1. Filter data by date range
 const filterDataByTimeRange = (data: any[], timeRange: string, dateField: string = 'date') => {
+  if (!data || data.length === 0) return [];
+  
   const now = new Date();
   const startDate = new Date();
 
@@ -60,6 +64,7 @@ const formatCurrency = (value: number) => {
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('all');
+  const [isMounted, setIsMounted] = useState(false);
   const [summary, setSummary] = useState({
     totalProducts: 0,
     totalCustomers: 0,
@@ -71,12 +76,77 @@ const Dashboard = () => {
     totalPointsRedeemed: 0
   });
 
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
+  // Fetch data from API
+  const { data: productsData } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      try {
+        return await productsService.getAll();
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        return [];
+      }
+    },
+    enabled: isMounted
+  });
+
+  const { data: customersData } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      try {
+        return await customersService.getAll();
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        return [];
+      }
+    },
+    enabled: isMounted
+  });
+
+  const { data: invoicesData } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: async () => {
+      try {
+        return await invoicesService.getAll();
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
+        return [];
+      }
+    },
+    enabled: isMounted
+  });
+
+  const { data: paymentsData } = useQuery({
+    queryKey: ['payments'],
+    queryFn: async () => {
+      try {
+        return await paymentsService.getAll();
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+        return [];
+      }
+    },
+    enabled: isMounted
+  });
+  
+  const products = productsData || [];
+  const customers = customersData || [];
+  const invoices = invoicesData || [];
+  const payments = paymentsData || [];
+
   // Filter invoices based on time range
   const filteredInvoices = filterDataByTimeRange(invoices, timeRange);
   const filteredPayments = filterDataByTimeRange(payments, timeRange);
 
   // Calculate monthly revenue data
   const getMonthlyRevenueData = () => {
+    if (!filteredInvoices.length) return [];
+    
     const months = [
       'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
       'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
@@ -101,23 +171,23 @@ const Dashboard = () => {
   const monthlyRevenueData = getMonthlyRevenueData();
 
   // Calculate top customers by points
-  const topCustomers = [...customers]
-    .sort((a, b) => b.pointsEarned - a.pointsEarned)
-    .slice(0, 5);
+  const topCustomers = customers.length
+    ? [...customers]
+        .sort((a, b) => b.pointsEarned - a.pointsEarned)
+        .slice(0, 5)
+    : [];
 
   // Calculate recent invoices
-  const recentInvoices = [...filteredInvoices]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
-
-  // Calculate points redemption rate data
-  const pointsRedemptionData = [
-    { name: 'نقاط مكتسبة', value: customers.reduce((sum, c) => sum + c.pointsEarned, 0) },
-    { name: 'نقاط مستبدلة', value: customers.reduce((sum, c) => sum + c.pointsRedeemed, 0) }
-  ];
+  const recentInvoices = filteredInvoices.length
+    ? [...filteredInvoices]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+    : [];
 
   // Calculate payment trend data
   const getPaymentTrendData = () => {
+    if (!filteredPayments.length) return [];
+    
     const paymentsByDay: Record<string, { date: string, total: number }> = {};
     
     filteredPayments.forEach(payment => {
@@ -145,40 +215,48 @@ const Dashboard = () => {
   const paymentTrendData = getPaymentTrendData();
 
   // Calculate overdue amount data
-  const overdueData = filteredInvoices
-    .filter(inv => inv.status === InvoiceStatus.OVERDUE)
-    .map(inv => ({
-      id: inv.id,
-      customer: customers.find(c => c.id === inv.customerId)?.name || 'غير معروف',
-      customerId: inv.customerId,
-      amount: inv.totalAmount,
-      date: new Date(inv.date).toLocaleDateString('ar-EG'),
-      dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('ar-EG') : 'غير محدد',
-      daysOverdue: inv.dueDate ? Math.floor((new Date().getTime() - new Date(inv.dueDate).getTime()) / (1000 * 3600 * 24)) : 0
-    }))
-    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+  const overdueData = filteredInvoices.length
+    ? filteredInvoices
+        .filter(inv => inv.status === InvoiceStatus.OVERDUE)
+        .map(inv => ({
+          id: inv.id,
+          customer: customers.find(c => c.id === inv.customerId)?.name || 'غير معروف',
+          customerId: inv.customerId,
+          amount: inv.totalAmount,
+          date: new Date(inv.date).toLocaleDateString('ar-EG'),
+          dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('ar-EG') : 'غير محدد',
+          daysOverdue: inv.dueDate ? Math.floor((new Date().getTime() - new Date(inv.dueDate).getTime()) / (1000 * 3600 * 24)) : 0
+        }))
+        .sort((a, b) => b.daysOverdue - a.daysOverdue)
+    : [];
 
   useEffect(() => {
     // Calculate dashboard summary based on filtered data
-    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-    const totalPaid = filteredInvoices
-      .filter(inv => inv.status === InvoiceStatus.PAID)
-      .reduce((sum, inv) => sum + inv.totalAmount, 0);
-    const totalOverdue = filteredInvoices
-      .filter(inv => inv.status === InvoiceStatus.OVERDUE)
-      .reduce((sum, inv) => sum + inv.totalAmount, 0);
-    
-    setSummary({
-      totalProducts: products.length,
-      totalCustomers: customers.length,
-      totalInvoices: filteredInvoices.length,
-      totalRevenue,
-      totalPaid,
-      totalOverdue,
-      totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + inv.pointsEarned, 0),
-      totalPointsRedeemed: filteredInvoices.reduce((sum, inv) => sum + inv.pointsRedeemed, 0)
-    });
-  }, [filteredInvoices]);
+    if (isMounted) {
+      const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+      const totalPaid = filteredInvoices
+        .filter(inv => inv.status === InvoiceStatus.PAID)
+        .reduce((sum, inv) => sum + inv.totalAmount, 0);
+      const totalOverdue = filteredInvoices
+        .filter(inv => inv.status === InvoiceStatus.OVERDUE)
+        .reduce((sum, inv) => sum + inv.totalAmount, 0);
+      
+      setSummary({
+        totalProducts: products.length,
+        totalCustomers: customers.length,
+        totalInvoices: filteredInvoices.length,
+        totalRevenue,
+        totalPaid,
+        totalOverdue,
+        totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0),
+        totalPointsRedeemed: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsRedeemed || 0), 0)
+      });
+    }
+  }, [filteredInvoices, products, customers, isMounted]);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <PageContainer title="لوحة التحكم" subtitle="نظرة عامة على أداء النظام">

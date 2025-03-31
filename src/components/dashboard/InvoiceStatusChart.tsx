@@ -19,12 +19,29 @@ import { useQuery } from '@tanstack/react-query';
 import { invoicesService } from '@/services/database';
 import { InvoiceStatus } from '@/lib/types';
 import { InvoiceStatusChartProps } from './DashboardCardProps';
+import { useEffect, useState } from 'react';
 
 const InvoiceStatusChart = (props?: InvoiceStatusChartProps) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  
   // استخراج بيانات الفواتير من قاعدة البيانات
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => invoicesService.getAll()
+    queryFn: async () => {
+      try {
+        return await invoicesService.getAll();
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
+        return [];
+      }
+    },
+    enabled: isMounted && !props?.data,
+    staleTime: 60000
   });
 
   // حساب توزيع حالة الفواتير
@@ -44,6 +61,10 @@ const InvoiceStatusChart = (props?: InvoiceStatusChartProps) => {
   };
 
   const statusData = getInvoiceStatusData();
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <Card className="col-span-1">

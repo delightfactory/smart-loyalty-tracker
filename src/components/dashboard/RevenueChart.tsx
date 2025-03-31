@@ -19,6 +19,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { useTheme } from '@/components/ui/theme-provider';
 import { RevenueChartProps } from './DashboardCardProps';
+import { useEffect, useState } from 'react';
 
 const RevenueChart = ({ 
   data, 
@@ -28,6 +29,16 @@ const RevenueChart = ({
   description = 'تحليل الإيرادات الشهرية' 
 }: RevenueChartProps) => {
   const { theme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  
+  if (!isMounted) {
+    return null;
+  }
   
   return (
     <Card className="col-span-1 lg:col-span-1">
@@ -65,7 +76,7 @@ const RevenueChart = ({
                 stroke={theme === 'dark' ? '#888' : '#333'}
               />
               <Tooltip 
-                formatter={(value: number) => formatCurrency(value)} 
+                formatter={(value: number) => [formatCurrency(value), 'الإيرادات']} 
                 contentStyle={{
                   backgroundColor: theme === 'dark' ? '#1f2937' : '#fff',
                   color: theme === 'dark' ? '#fff' : '#333',
