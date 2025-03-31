@@ -1,4 +1,5 @@
 
+// User Roles Enum
 export enum UserRole {
   ADMIN = "admin",
   MANAGER = "manager",
@@ -7,18 +8,10 @@ export enum UserRole {
   USER = "user"
 }
 
-export interface UserProfile {
-  id: string;
-  fullName: string;
-  avatarUrl?: string | null;
-  phone?: string | null;
-  position?: string | null;
-  roles: UserRole[];
-}
-
+// Auth State Interface
 export interface AuthState {
+  user: any | null;
+  profile: any | null;
   isLoading: boolean;
-  isAuthenticated: boolean;
-  user: UserProfile | null;
   error: string | null;
 }

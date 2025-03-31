@@ -1,9 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
-import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/providers/AuthProvider';
-import { UserRole, UserProfile } from '@/lib/auth-types';
+import { useAuth } from '@/hooks/useAuth';
+import { UserRole } from '@/lib/auth-types';
 import { 
   getAllUsers, 
   addRoleToUser, 
@@ -17,22 +17,29 @@ import {
 import { 
   Table, 
   TableBody, 
-  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { 
   Dialog,
   DialogContent,
@@ -51,18 +58,21 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  ChevronDown, 
+  Avatar, 
+  AvatarFallback, 
+  AvatarImage 
+} from '@/components/ui/avatar';
+import { 
+  User, 
+  Users, 
+  Search, 
+  Edit, 
+  Trash, 
   Shield, 
-  ShieldAlert, 
-  ShieldCheck, 
-  ShieldX, 
-  UserCog,
-  Loader2,
   UserPlus,
   AlertTriangle
 } from 'lucide-react';
@@ -71,14 +81,20 @@ import { supabase } from '@/integrations/supabase/client';
 const Users = () => {
   const { user, hasRole, isAuthenticated, roles } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   
+  // State for user management
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdminCheckDone, setIsAdminCheckDone] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminCheckDone, setIsAdminCheckDone] = useState(false);
   
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  // State for user dialog
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  
+  // Form state
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -86,10 +102,22 @@ const Users = () => {
     role: UserRole.USER
   });
   
+  const [editUser, setEditUser] = useState({
+    fullName: '',
+    role: UserRole.USER
+  });
+  
+  // Check if user has admin access
   useEffect(() => {
-    console.log("Auth state:", { isAuthenticated, roles, user });
     checkAdminAccess();
-  }, [isAuthenticated, roles, user]);
+  }, [isAuthenticated, roles]);
+  
+  // Fetch users if admin
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [isAdmin]);
   
   const checkAdminAccess = async () => {
     try {
@@ -99,27 +127,13 @@ const Users = () => {
         console.log("Current roles:", roles);
         
         setIsAdmin(adminCheck);
-        setIsAdminCheckDone(true);
-        
-        if (!adminCheck) {
-          toast({
-            title: "غير مصرح",
-            description: "ليس لديك صلاحيات كافية للوصول إلى هذه الصفحة",
-            variant: "destructive"
-          });
-          navigate('/dashboard');
-          return;
-        }
-        
-        await fetchUsers();
+      } else {
+        setIsAdmin(false);
       }
-    } catch (error: any) {
-      console.error('Error checking admin access:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء التحقق من الصلاحيات",
-        variant: "destructive"
-      });
+    } catch (error) {
+      console.error("Error checking admin access:", error);
+      setIsAdmin(false);
+    } finally {
       setIsAdminCheckDone(true);
     }
   };
@@ -127,33 +141,20 @@ const Users = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const data = await getAllUsers();
-      console.log("Fetched users:", data);
-      setUsers(data);
-    } catch (error: any) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء جلب المستخدمين",
-        variant: "destructive"
-      });
+      const usersData = await getAllUsers();
+      setUsers(usersData);
+    } catch (error) {
+      console.error("Error fetching users:", error);
     } finally {
       setIsLoading(false);
     }
   };
   
   const handleAddUser = async () => {
-    if (!newUser.email || !newUser.password || !newUser.fullName) {
-      toast({
-        title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     try {
-      setIsLoading(true);
+      if (!newUser.email || !newUser.password || !newUser.fullName) {
+        throw new Error("جميع الحقول مطلوبة");
+      }
       
       await createUser({
         email: newUser.email,
@@ -162,9 +163,6 @@ const Users = () => {
         role: newUser.role
       });
       
-      await fetchUsers();
-      
-      setIsAddUserOpen(false);
       setNewUser({
         email: '',
         password: '',
@@ -172,43 +170,19 @@ const Users = () => {
         role: UserRole.USER
       });
       
-      toast({
-        title: "تم بنجاح",
-        description: "تم إضافة المستخدم بنجاح",
-      });
+      setIsAddDialogOpen(false);
+      fetchUsers();
     } catch (error: any) {
-      console.error('Error adding user:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء إضافة المستخدم",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Error adding user:", error);
+      alert(`خطأ: ${error.message}`);
     }
   };
   
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
-  const [editUser, setEditUser] = useState({
-    fullName: '',
-    role: UserRole.USER
-  });
-  
-  const openEditUser = (user: UserProfile) => {
-    setCurrentUser(user);
-    setEditUser({
-      fullName: user.fullName,
-      role: user.roles[0] || UserRole.USER,
-    });
-    setIsEditUserOpen(true);
-  };
-  
   const handleEditUser = async () => {
-    if (!currentUser) return;
-    
     try {
-      setIsLoading(true);
+      if (!currentUser || !editUser.fullName) {
+        throw new Error("يرجى إدخال الاسم الكامل");
+      }
       
       await updateUserProfile({
         id: currentUser.id,
@@ -219,144 +193,74 @@ const Users = () => {
         await updateUserRoles(currentUser.id, [editUser.role]);
       }
       
-      await fetchUsers();
-      
-      setIsEditUserOpen(false);
-      
-      toast({
-        title: "تم بنجاح",
-        description: "تم تحديث المستخدم بنجاح",
-      });
+      setIsEditDialogOpen(false);
+      setCurrentUser(null);
+      fetchUsers();
     } catch (error: any) {
-      console.error('Error updating user:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء تحديث المستخدم",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Error updating user:", error);
+      alert(`خطأ: ${error.message}`);
     }
   };
   
-  const handleAddRole = async (userId: string, role: UserRole) => {
+  const handleDeleteUser = async (userId: string) => {
     try {
-      await addRoleToUser(userId, role);
-      
-      setUsers(users.map(user => {
-        if (user.id === userId) {
-          if (!user.roles.includes(role)) {
-            return { ...user, roles: [...user.roles, role] };
-          }
-        }
-        return user;
-      }));
-      
-      toast({
-        title: "تم بنجاح",
-        description: `تم إضافة دور ${role} للمستخدم`,
-      });
+      await deleteUser(userId);
+      fetchUsers();
     } catch (error: any) {
-      console.error('Error adding role:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء إضافة الدور",
-        variant: "destructive"
-      });
+      console.error("Error deleting user:", error);
+      alert(`خطأ: ${error.message}`);
     }
   };
   
-  const handleRemoveRole = async (userId: string, role: UserRole) => {
-    try {
-      await removeRoleFromUser(userId, role);
-      
-      setUsers(users.map(user => {
-        if (user.id === userId) {
-          return { ...user, roles: user.roles.filter(r => r !== role) };
-        }
-        return user;
-      }));
-      
-      toast({
-        title: "تم بنجاح",
-        description: `تم إزالة دور ${role} من المستخدم`,
-      });
-    } catch (error: any) {
-      console.error('Error removing role:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء إزالة الدور",
-        variant: "destructive"
-      });
-    }
+  const openEditDialog = (user: UserProfile) => {
+    setCurrentUser(user);
+    setEditUser({
+      fullName: user.fullName,
+      role: user.roles[0] || UserRole.USER
+    });
+    setIsEditDialogOpen(true);
   };
   
-  const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // Filter users based on search term
+  const filteredUsers = users.filter(user => 
+    user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   
-  const confirmDeleteUser = async () => {
-    if (!userToDelete) return;
-    
-    try {
-      setIsLoading(true);
-      
-      await deleteUser(userToDelete);
-      
-      setUsers(users.filter(user => user.id !== userToDelete));
-      
-      setIsDeleteDialogOpen(false);
-      setUserToDelete(null);
-      
-      toast({
-        title: "تم بنجاح",
-        description: "تم حذف المستخدم بنجاح",
-      });
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      toast({
-        title: "خطأ",
-        description: error.message || "حدث خطأ أثناء حذف المستخدم",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const getRoleBadgeColor = (role: UserRole) => {
+  const getRoleBadgeClass = (role: UserRole) => {
     switch (role) {
       case UserRole.ADMIN:
-        return "bg-red-500";
+        return "bg-red-100 text-red-800 border-red-300";
       case UserRole.MANAGER:
-        return "bg-blue-500";
+        return "bg-blue-100 text-blue-800 border-blue-300";
       case UserRole.ACCOUNTANT:
-        return "bg-green-500";
+        return "bg-green-100 text-green-800 border-green-300";
       case UserRole.SALES:
-        return "bg-amber-500";
+        return "bg-amber-100 text-amber-800 border-amber-300";
       default:
-        return "bg-gray-500";
+        return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
   
-  const getRoleIcon = (role: UserRole) => {
+  const getRoleDisplay = (role: UserRole) => {
     switch (role) {
       case UserRole.ADMIN:
-        return <ShieldAlert className="h-4 w-4 mr-2" />;
+        return "مدير";
       case UserRole.MANAGER:
-        return <ShieldCheck className="h-4 w-4 mr-2" />;
+        return "مشرف";
       case UserRole.ACCOUNTANT:
-        return <Shield className="h-4 w-4 mr-2" />;
+        return "محاسب";
       case UserRole.SALES:
-        return <UserCog className="h-4 w-4 mr-2" />;
+        return "مبيعات";
       default:
-        return <ShieldX className="h-4 w-4 mr-2" />;
+        return "مستخدم";
     }
   };
   
-  const getNameInitials = (name: string) => {
-    return name
+  const getUserInitials = (fullName: string) => {
+    return fullName
       .split(' ')
-      .map(n => n[0])
+      .map(name => name[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -364,12 +268,13 @@ const Users = () => {
   
   if (!isAdminCheckDone) {
     return (
-      <PageContainer 
-        title="إدارة المستخدمين" 
-        subtitle="جاري التحميل..."
-      >
-        <div className="h-[400px] flex items-center justify-center">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      <PageContainer title="إدارة المستخدمين" subtitle="إدارة حسابات المستخدمين والصلاحيات">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex flex-col items-center">
+            <Skeleton className="h-16 w-16 rounded-full mb-4" />
+            <Skeleton className="h-6 w-48 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
         </div>
       </PageContainer>
     );
@@ -377,322 +282,265 @@ const Users = () => {
   
   if (!isAdmin) {
     return (
-      <PageContainer 
-        title="إدارة المستخدمين" 
-        subtitle="غير مصرح بالوصول"
-      >
-        <div className="h-[400px] flex flex-col items-center justify-center gap-4">
-          <AlertTriangle className="w-16 h-16 text-amber-500" />
-          <h2 className="text-2xl font-bold">ليس لديك صلاحيات كافية</h2>
-          <p className="text-muted-foreground">
-            يتطلب الوصول إلى هذه الصفحة صلاحيات المسؤول.
-          </p>
-          <Button onClick={() => navigate('/dashboard')}>
-            العودة إلى لوحة التحكم
-          </Button>
-        </div>
+      <PageContainer title="إدارة المستخدمين" subtitle="إدارة حسابات المستخدمين والصلاحيات">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="rounded-full bg-yellow-100 p-3 mb-4">
+                <AlertTriangle className="h-8 w-8 text-yellow-600" />
+              </div>
+              <h3 className="text-xl font-medium mb-2">صلاحيات غير كافية</h3>
+              <p className="text-muted-foreground text-center max-w-md mb-6">
+                لا تملك الصلاحيات الكافية للوصول إلى صفحة إدارة المستخدمين.
+                يرجى التواصل مع مدير النظام للحصول على الصلاحيات المطلوبة.
+              </p>
+              <Button onClick={() => navigate(-1)}>الرجوع للصفحة السابقة</Button>
+            </div>
+          </CardContent>
+        </Card>
       </PageContainer>
     );
   }
   
   return (
-    <PageContainer 
-      title="إدارة المستخدمين" 
-      subtitle="إدارة المستخدمين وصلاحياتهم"
-    >
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center">
-            <UserCog className="h-5 w-5 mr-2" />
-            المستخدمين
-          </h2>
-          
-          <div className="flex gap-2">
-            <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" />
-                  إضافة مستخدم جديد
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>إضافة مستخدم جديد</DialogTitle>
-                  <DialogDescription>
-                    أضف مستخدم جديد وحدد صلاحياته
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">الاسم الكامل</Label>
-                      <Input
-                        id="fullName"
-                        value={newUser.fullName}
-                        onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="email">البريد الإلكتروني</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={newUser.email}
-                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="password">كلمة المرور</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={newUser.password}
-                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="role">الصلاحية</Label>
-                      <Select
-                        value={newUser.role}
-                        onValueChange={(value) => setNewUser({ ...newUser, role: value as UserRole })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="اختر الصلاحية" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
-                          <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
-                          <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
-                          <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
-                          <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button onClick={handleAddUser} disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        جاري الإضافة...
-                      </>
-                    ) : (
-                      'إضافة المستخدم'
-                    )}
+    <PageContainer title="إدارة المستخدمين" subtitle="إدارة حسابات المستخدمين والصلاحيات">
+      <div className="flex flex-col space-y-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input 
+                  placeholder="بحث عن مستخدم..." 
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    إضافة مستخدم
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            <Button onClick={fetchUsers} variant="outline" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  جاري التحديث...
-                </>
-              ) : (
-                'تحديث القائمة'
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        <Table>
-          <TableCaption>قائمة بجميع المستخدمين في النظام</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead>المستخدم</TableHead>
-              <TableHead>المسمى الوظيفي</TableHead>
-              <TableHead>رقم الهاتف</TableHead>
-              <TableHead>الأدوار</TableHead>
-              <TableHead className="text-left">الإجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-                  <p className="mt-2">جاري تحميل البيانات...</p>
-                </TableCell>
-              </TableRow>
-            ) : users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  <p>لا يوجد مستخدمين</p>
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map(user => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={user.avatarUrl || ''} />
-                        <AvatarFallback>{getNameInitials(user.fullName)}</AvatarFallback>
-                      </Avatar>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>إضافة مستخدم جديد</DialogTitle>
+                    <DialogDescription>
+                      أدخل بيانات المستخدم الجديد والصلاحيات المطلوبة
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-1 gap-3">
                       <div>
-                        <p className="font-medium">{user.fullName}</p>
+                        <Label htmlFor="fullName">الاسم الكامل</Label>
+                        <Input
+                          id="fullName"
+                          value={newUser.fullName}
+                          onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="email">البريد الإلكتروني</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="password">كلمة المرور</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={newUser.password}
+                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="role">الصلاحية</Label>
+                        <Select
+                          value={newUser.role}
+                          onValueChange={(value) => setNewUser({ ...newUser, role: value as UserRole })}
+                        >
+                          <SelectTrigger id="role">
+                            <SelectValue placeholder="اختر الصلاحية" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                            <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                            <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                            <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                            <SelectItem value={UserRole.USER}>مستخدم</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell>{user.position || '-'}</TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map(role => (
-                        <Badge key={role} variant="outline" className={getRoleBadgeColor(role)}>
-                          {role}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          إدارة الأدوار
-                          <ChevronDown className="h-4 w-4 mr-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => openEditUser(user)}>
-                          تعديل المستخدم
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem disabled className="font-semibold">
-                          إضافة دور
-                        </DropdownMenuItem>
-                        {Object.values(UserRole).map(role => (
-                          <DropdownMenuItem
-                            key={`add-${role}`}
-                            disabled={user.roles.includes(role)}
-                            onClick={() => handleAddRole(user.id, role)}
-                          >
-                            {getRoleIcon(role)}
-                            إضافة دور {role}
-                          </DropdownMenuItem>
-                        ))}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem disabled className="font-semibold">
-                          إزالة دور
-                        </DropdownMenuItem>
-                        {Object.values(UserRole).map(role => (
-                          <DropdownMenuItem
-                            key={`remove-${role}`}
-                            disabled={!user.roles.includes(role)}
-                            onClick={() => handleRemoveRole(user.id, role)}
-                            className="text-red-500"
-                          >
-                            {getRoleIcon(role)}
-                            إزالة دور {role}
-                          </DropdownMenuItem>
-                        ))}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem 
-                          onClick={() => {
-                            setUserToDelete(user.id);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                          className="text-red-500"
-                        >
-                          حذف المستخدم
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
-        <DialogContent>
-          {currentUser && (
-            <>
-              <DialogHeader>
-                <DialogTitle>تعديل المستخدم</DialogTitle>
-                <DialogDescription>
-                  تعديل بيانات المستخدم {currentUser.fullName}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-fullName">الاسم الكامل</Label>
-                  <Input
-                    id="edit-fullName"
-                    value={editUser.fullName}
-                    onChange={(e) => setEditUser({ ...editUser, fullName: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-role">الصلاحية الرئيسية</Label>
-                  <Select
-                    value={editUser.role}
-                    onValueChange={(value) => setEditUser({ ...editUser, role: value as UserRole })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر الصلاحية" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
-                      <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
-                      <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
-                      <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
-                      <SelectItem value={UserRole.USER}>مستخدم عادي</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleAddUser}>إضافة المستخدم</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+            
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <Skeleton className="h-12 w-12 rounded-full mb-4" />
+                <Skeleton className="h-5 w-32 mb-2" />
+                <Skeleton className="h-4 w-48" />
               </div>
-              <DialogFooter>
-                <Button onClick={handleEditUser} disabled={isLoading}>
-                  {isLoading ? 'جاري التحديث...' : 'حفظ التغييرات'}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من حذف المستخدم؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              هذا الإجراء لا يمكن التراجع عنه. سيتم حذف المستخدم نهائياً من النظام.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDeleteUser}
-              disabled={isLoading}
-            >
-              {isLoading ? 'جاري الحذف...' : 'تأكيد الحذف'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>المستخدم</TableHead>
+                      <TableHead>المعرف</TableHead>
+                      <TableHead>الصلاحية</TableHead>
+                      <TableHead>البريد الإلكتروني</TableHead>
+                      <TableHead>خيارات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-6">
+                          <div className="flex flex-col items-center justify-center text-muted-foreground">
+                            <Users className="h-8 w-8 mb-2" />
+                            <p>لا يوجد مستخدمين</p>
+                            {searchTerm && <p className="text-sm">جرب البحث بكلمة أخرى</p>}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3 space-x-reverse">
+                              <Avatar>
+                                <AvatarFallback>{getUserInitials(user.fullName)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{user.fullName}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">{user.id}</TableCell>
+                          <TableCell>
+                            {user.roles.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {user.roles.map((role, i) => (
+                                  <div
+                                    key={i}
+                                    className={`text-xs px-2 py-1 rounded-full border ${getRoleBadgeClass(role)}`}
+                                  >
+                                    {getRoleDisplay(role)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs px-2 py-1 rounded-full border bg-gray-100 text-gray-800 border-gray-300 inline-block">
+                                مستخدم
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell dir="ltr" className="font-mono text-xs">
+                            {user.email || 'غير متوفر'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2 space-x-reverse">
+                              <Dialog open={isEditDialogOpen && currentUser?.id === user.id} onOpenChange={(open) => {
+                                if (!open) setCurrentUser(null);
+                                setIsEditDialogOpen(open);
+                              }}>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)}>
+                                    <Edit className="h-4 w-4" />
+                                    <span className="sr-only">تعديل</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>تعديل المستخدم</DialogTitle>
+                                    <DialogDescription>
+                                      تعديل بيانات وصلاحيات المستخدم
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="grid gap-4 py-4">
+                                    <div>
+                                      <Label htmlFor="edit-fullName">الاسم الكامل</Label>
+                                      <Input
+                                        id="edit-fullName"
+                                        value={editUser.fullName}
+                                        onChange={(e) => setEditUser({ ...editUser, fullName: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="edit-role">الصلاحية</Label>
+                                      <Select
+                                        value={editUser.role}
+                                        onValueChange={(value) => setEditUser({ ...editUser, role: value as UserRole })}
+                                      >
+                                        <SelectTrigger id="edit-role">
+                                          <SelectValue placeholder="اختر الصلاحية" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                                          <SelectItem value={UserRole.MANAGER}>مشرف</SelectItem>
+                                          <SelectItem value={UserRole.ACCOUNTANT}>محاسب</SelectItem>
+                                          <SelectItem value={UserRole.SALES}>مبيعات</SelectItem>
+                                          <SelectItem value={UserRole.USER}>مستخدم</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button onClick={handleEditUser}>حفظ التغييرات</Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <Trash className="h-4 w-4 text-red-500" />
+                                    <span className="sr-only">حذف</span>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      سيتم حذف حساب المستخدم بشكل نهائي ولا يمكن التراجع عن هذا الإجراء.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-red-500 hover:bg-red-600"
+                                      onClick={() => handleDeleteUser(user.id)}
+                                    >
+                                      تأكيد الحذف
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </PageContainer>
   );
 };

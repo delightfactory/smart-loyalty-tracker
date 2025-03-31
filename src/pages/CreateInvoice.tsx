@@ -1,217 +1,198 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useInvoices } from '@/hooks/useInvoices';
-import { useProducts } from '@/hooks/useProducts';
-import { useCustomers } from '@/hooks/useCustomers';
-import { 
-  Invoice, 
-  InvoiceItem, 
-  InvoiceStatus, 
-  PaymentMethod, 
-  Product,
-  Customer
-} from '@/lib/types';
+
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 import PageContainer from '@/components/layout/PageContainer';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
-import { 
-  Popover, 
-  PopoverTrigger, 
-  PopoverContent
-} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  SelectValue
+} from '@/components/ui/select';
 import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from '@/components/ui/use-toast';
-import CustomerSelector from '@/components/invoice/CustomerSelector';
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { 
+  Calendar as CalendarIcon, 
+  CalendarCheck, 
+  Save, 
+  Trash, 
+  ArrowLeft,
+  Loader2
+} from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { 
+  InvoiceStatus, 
+  PaymentMethod, 
+  Product, 
+  InvoiceItem,
+  Invoice
+} from '@/lib/types';
 import ProductSelector from '@/components/invoice/ProductSelector';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
-import { CalendarIcon, ChevronLeft, Trash, Loader2 } from 'lucide-react';
+import CustomerSelector from '@/components/invoice/CustomerSelector';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useProducts } from '@/hooks/useProducts';
+import { useNavigationConfirm } from '@/hooks/useNavigationConfirm';
+import { useToast } from '@/components/ui/use-toast';
 
 const CreateInvoice = () => {
   const navigate = useNavigate();
-  const { customerId } = useParams();
-  const location = useLocation();
+  const { customerId, editInvoiceId } = useParams();
   const { toast } = useToast();
+  const { addInvoice, getById } = useInvoices();
+  const { getAll } = useProducts();
+  const { data: products = [] } = getAll;
+  const [isMounted, setIsMounted] = useState(false);
   
-  const editInvoice = location.state?.editInvoice as Invoice | undefined;
-  
-  const { addInvoice, updateInvoice } = useInvoices();
-  const { getAll: getAllProducts } = useProducts();
-  const { getAll: getAllCustomers, getById: getCustomerById } = useCustomers();
-  
-  const { data: products = [], isLoading: isLoadingProducts } = getAllProducts;
-  const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
-  const { data: selectedCustomer, isLoading: isLoadingCustomer } = getCustomerById(customerId || '');
-  
+  useEffect(() => {
+    console.log("Component mounted. customerId:", customerId, "editInvoice:", editInvoiceId);
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, [customerId, editInvoiceId]);
+
+  // Form state
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [status, setStatus] = useState<InvoiceStatus>(InvoiceStatus.UNPAID);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
-  const [newItemProductId, setNewItemProductId] = useState<string>('');
-  const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   
+  // Get the editing invoice if in edit mode
+  const { data: editInvoice, isLoading: isLoadingInvoice } = getById(editInvoiceId || '');
+  
+  // Set up navigation confirmation if form is dirty
+  useNavigationConfirm(isDirty);
+  
+  // Initialize form with customerId from params
   useEffect(() => {
-    console.log('Component mounted. customerId:', customerId, 'editInvoice:', editInvoice);
-    
-    if (customerId) {
+    if (customerId && isMounted) {
       setSelectedCustomerId(customerId);
     }
-    
-    if (editInvoice) {
-      console.log('Editing existing invoice:', editInvoice);
-      
-      setInvoiceDate(new Date(editInvoice.date));
-      setDueDate(editInvoice.dueDate ? new Date(editInvoice.dueDate) : undefined);
-      setStatus(editInvoice.status);
-      setPaymentMethod(editInvoice.paymentMethod);
-      setSelectedCustomerId(editInvoice.customerId);
-      setInvoiceItems(editInvoice.items || []);
-    }
-  }, [customerId, editInvoice]);
+  }, [customerId, isMounted]);
   
+  // Initialize form with invoice data if in edit mode
   useEffect(() => {
-    if (paymentMethod === PaymentMethod.CASH) {
-      setStatus(InvoiceStatus.PAID);
-    } else if (paymentMethod === PaymentMethod.CREDIT && status === InvoiceStatus.PAID) {
-      setStatus(InvoiceStatus.UNPAID);
+    if (editInvoice && isMounted) {
+      setSelectedCustomerId(editInvoice.customerId);
+      setInvoiceDate(new Date(editInvoice.date));
+      if (editInvoice.dueDate) {
+        setDueDate(new Date(editInvoice.dueDate));
+      }
+      setPaymentMethod(editInvoice.paymentMethod);
+      setItems(editInvoice.items || []);
     }
-  }, [paymentMethod]);
+  }, [editInvoice, isMounted]);
   
+  // Calculate totals
+  const totalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const totalPointsEarned = items.reduce((sum, item) => sum + item.pointsEarned, 0);
+  
+  // Determine categories count for points calculation
+  const uniqueCategories = new Set(
+    items.map(item => {
+      const product = products.find(p => p.id === item.productId);
+      return product?.category;
+    }).filter(Boolean)
+  );
+  const categoriesCount = uniqueCategories.size;
+  
+  // Calculate adjusted points based on categories count
+  const getPointsMultiplier = (count: number) => {
+    if (count >= 4) return 1.0; // 100% of points
+    if (count === 3) return 0.75; // 75% of points
+    if (count === 2) return 0.5; // 50% of points
+    return 0.25; // 25% of points for 1 category
+  };
+  
+  const adjustedPointsEarned = Math.round(totalPointsEarned * getPointsMultiplier(categoriesCount));
+  
+  // Handle adding a product to the invoice
   const handleAddItem = () => {
-    if (!newItemProductId || newItemQuantity <= 0) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار منتج وتحديد كمية صحيحة",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!selectedProductId) return;
     
-    const selectedProduct = products.find(p => p.id === newItemProductId);
+    const product = products.find(p => p.id === selectedProductId);
+    if (!product) return;
     
-    if (!selectedProduct) {
-      toast({
-        title: "خطأ",
-        description: "لم يتم العثور على المنتج المحدد",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const existingItemIndex = invoiceItems.findIndex(item => item.productId === newItemProductId);
+    // Check if product already exists in items
+    const existingItemIndex = items.findIndex(item => item.productId === selectedProductId);
     
     if (existingItemIndex >= 0) {
-      const updatedItems = [...invoiceItems];
+      // Update existing item
+      const updatedItems = [...items];
       const existingItem = updatedItems[existingItemIndex];
-      
-      const newQuantity = existingItem.quantity + newItemQuantity;
-      const newTotalPrice = selectedProduct.price * newQuantity;
-      const newPointsEarned = selectedProduct.pointsEarned * newQuantity;
+      const newQuantity = existingItem.quantity + quantity;
       
       updatedItems[existingItemIndex] = {
         ...existingItem,
         quantity: newQuantity,
-        totalPrice: newTotalPrice,
-        pointsEarned: newPointsEarned
+        totalPrice: product.price * newQuantity,
+        pointsEarned: product.pointsEarned * newQuantity
       };
       
-      setInvoiceItems(updatedItems);
+      setItems(updatedItems);
     } else {
+      // Add new item
       const newItem: InvoiceItem = {
-        productId: selectedProduct.id,
-        quantity: newItemQuantity,
-        price: selectedProduct.price,
-        totalPrice: selectedProduct.price * newItemQuantity,
-        pointsEarned: selectedProduct.pointsEarned * newItemQuantity
+        productId: selectedProductId,
+        quantity: quantity,
+        price: product.price,
+        totalPrice: product.price * quantity,
+        pointsEarned: product.pointsEarned * quantity
       };
       
-      setInvoiceItems([...invoiceItems, newItem]);
+      setItems([...items, newItem]);
     }
     
-    setNewItemProductId('');
-    setNewItemQuantity(1);
-    
-    toast({
-      title: "تم الإضافة",
-      description: "تمت إضافة المنتج إلى الفاتورة",
-    });
+    // Reset product selection
+    setSelectedProductId('');
+    setQuantity(1);
+    setIsDirty(true);
   };
   
+  // Handle removing an item from the invoice
   const handleRemoveItem = (index: number) => {
-    const updatedItems = [...invoiceItems];
+    const updatedItems = [...items];
     updatedItems.splice(index, 1);
-    setInvoiceItems(updatedItems);
+    setItems(updatedItems);
+    setIsDirty(true);
   };
   
-  const calculateTotals = () => {
-    const totalAmount = invoiceItems.reduce((sum, item) => sum + item.totalPrice, 0);
-    const totalPointsEarned = invoiceItems.reduce((sum, item) => sum + item.pointsEarned, 0);
-    
-    return {
-      totalAmount,
-      totalPointsEarned
-    };
-  };
-  
-  const getUniqueCategoriesCount = () => {
-    const categories = new Set();
-    
-    invoiceItems.forEach(item => {
-      const product = products.find(p => p.id === item.productId);
-      if (product) {
-        categories.add(product.category);
-      }
-    });
-    
-    return categories.size;
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedCustomerId || invoiceItems.length === 0) {
+  // Handle saving the invoice
+  const handleSaveInvoice = async () => {
+    if (!selectedCustomerId) {
       toast({
-        title: "خطأ",
-        description: "يرجى اختيار عميل وإضافة منتج واحد على الأقل",
-        variant: "destructive",
+        title: "تنبيه",
+        description: "يرجى اختيار العميل",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (items.length === 0) {
+      toast({
+        title: "تنبيه",
+        description: "يرجى إضافة منتج واحد على الأقل",
+        variant: "destructive"
       });
       return;
     }
@@ -219,164 +200,78 @@ const CreateInvoice = () => {
     try {
       setIsSubmitting(true);
       
-      const { totalAmount, totalPointsEarned } = calculateTotals();
-      const categoriesCount = getUniqueCategoriesCount();
+      // Prepare invoice data
+      const newInvoice: Omit<Invoice, 'id'> = {
+        customerId: selectedCustomerId,
+        date: invoiceDate,
+        dueDate: dueDate,
+        items: items,
+        totalAmount: totalAmount,
+        pointsEarned: adjustedPointsEarned,
+        pointsRedeemed: 0,
+        status: paymentMethod === PaymentMethod.CASH ? InvoiceStatus.PAID : InvoiceStatus.UNPAID,
+        paymentMethod: paymentMethod,
+        categoriesCount: categoriesCount
+      };
       
-      if (editInvoice) {
-        const updatedInvoice: Invoice = {
-          ...editInvoice,
-          date: invoiceDate,
-          dueDate,
-          customerId: selectedCustomerId,
-          status,
-          paymentMethod,
-          items: invoiceItems,
-          totalAmount,
-          pointsEarned: totalPointsEarned,
-          pointsRedeemed: editInvoice.pointsRedeemed || 0,
-          categoriesCount
-        };
-        
-        await updateInvoice.mutateAsync(updatedInvoice);
-        
-        toast({
-          title: "تم التحديث",
-          description: "تم ت��ديث الفاتورة بنجاح",
-        });
-      } else {
-        const newInvoice: Omit<Invoice, 'id'> = {
-          customerId: selectedCustomerId,
-          date: invoiceDate,
-          dueDate,
-          totalAmount,
-          pointsEarned: totalPointsEarned,
-          pointsRedeemed: 0,
-          status,
-          paymentMethod,
-          categoriesCount,
-          items: invoiceItems
-        };
-        
-        await addInvoice.mutateAsync({ invoice: newInvoice, items: invoiceItems });
-        
-        toast({
-          title: "تم الإنشاء",
-          description: "تم إنشاء الفاتورة بنجاح",
-        });
-      }
+      // Send request to create invoice
+      await addInvoice.mutateAsync({ invoice: newInvoice, items });
       
+      // Navigate to invoice list
       navigate('/invoices');
     } catch (error) {
-      console.error('Error submitting invoice:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حفظ الفاتورة. يرجى المحاولة مرة أخرى.",
-        variant: "destructive",
-      });
+      console.error('Error saving invoice:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  const handleDiscard = () => {
-    setDiscardDialogOpen(true);
-  };
-  
-  const confirmDiscard = () => {
-    setDiscardDialogOpen(false);
-    navigate('/invoices');
-  };
-  
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
-  };
-  
+  // Get product details by ID
   const getProductById = (productId: string): Product | undefined => {
     return products.find(product => product.id === productId);
   };
   
-  const totals = calculateTotals();
+  // Format currency helper
+  const formatCurrency = (amount: number) => {
+    return amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+  };
   
   return (
-    <PageContainer 
-      title={editInvoice ? "تعديل فاتورة" : "إنشاء فاتورة جديدة"} 
-      subtitle={editInvoice ? "تعديل بيانات الفاتورة" : "إضافة فاتورة جديدة للعميل"}
-    >
-      <div className="flex mb-4">
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/invoices')}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          العودة إلى الفواتير
-        </Button>
-      </div>
-      
-      <form onSubmit={handleSubmit} className="space-y-8">
+    <PageContainer title="إنشاء فاتورة جديدة" subtitle="إضافة فاتورة جديدة للعميل">
+      <div className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle>بيانات الفاتورة</CardTitle>
-            <CardDescription>أدخل البيانات الرئيسية للفاتورة</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="customer">العميل</Label>
-                {isLoadingCustomers || isLoadingCustomer ? (
-                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>جاري تحميل العملاء...</span>
-                  </div>
-                ) : (
-                  <CustomerSelector 
-                    selectedCustomerId={selectedCustomerId}
-                    onSelectCustomer={(customerId) => setSelectedCustomerId(customerId)}
-                  />
-                )}
-              </div>
+              <CustomerSelector 
+                selectedCustomerId={selectedCustomerId}
+                onSelectCustomer={setSelectedCustomerId}
+                disabled={!!editInvoiceId}
+              />
               
               <div className="space-y-2">
-                <Label>تاريخ الفاتورة</Label>
+                <Label htmlFor="invoiceDate">تاريخ الفاتورة</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className="w-full justify-start text-right"
+                      disabled={isSubmitting}
                     >
                       <CalendarIcon className="ml-2 h-4 w-4" />
-                      {invoiceDate ? format(invoiceDate, 'PPP', { locale: ar }) : 'اختر التاريخ'}
+                      {invoiceDate ? format(invoiceDate, 'yyyy/MM/dd') : 'اختر التاريخ'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
                       selected={invoiceDate}
-                      onSelect={(date) => date && setInvoiceDate(date)}
-                      locale={ar}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>تاريخ الاستحقاق</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-right"
-                    >
-                      <CalendarIcon className="ml-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, 'PPP', { locale: ar }) : 'اختياري'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
-                      locale={ar}
-                      disabled={(date) => date < invoiceDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          setInvoiceDate(date);
+                          setIsDirty(true);
+                        }
+                      }}
+                      disabled={(date) => date > new Date()}
                     />
                   </PopoverContent>
                 </Popover>
@@ -386,145 +281,174 @@ const CreateInvoice = () => {
                 <Label htmlFor="paymentMethod">طريقة الدفع</Label>
                 <Select 
                   value={paymentMethod} 
-                  onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+                  onValueChange={(value) => {
+                    setPaymentMethod(value as PaymentMethod);
+                    
+                    // إذا تغيرت طريقة الدفع إلى آجل، نضيف موعد استحقاق بعد شهر
+                    if (value === PaymentMethod.CREDIT) {
+                      const nextMonth = new Date();
+                      nextMonth.setMonth(nextMonth.getMonth() + 1);
+                      setDueDate(nextMonth);
+                    }
+                    
+                    setIsDirty(true);
+                  }}
+                  disabled={isSubmitting}
                 >
                   <SelectTrigger id="paymentMethod">
                     <SelectValue placeholder="اختر طريقة الدفع" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={PaymentMethod.CASH}>نقداً</SelectItem>
-                    <SelectItem value={PaymentMethod.CREDIT}>آجل</SelectItem>
+                    <SelectItem value={PaymentMethod.CASH}>{PaymentMethod.CASH}</SelectItem>
+                    <SelectItem value={PaymentMethod.CREDIT}>{PaymentMethod.CREDIT}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="status">حالة الفاتورة</Label>
-                <Select 
-                  value={status} 
-                  onValueChange={(value) => setStatus(value as InvoiceStatus)}
-                  disabled={paymentMethod === PaymentMethod.CASH}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="اختر حالة الفاتورة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={InvoiceStatus.PAID} disabled={paymentMethod === PaymentMethod.CREDIT}>مدفوع</SelectItem>
-                    <SelectItem value={InvoiceStatus.UNPAID}>غير مدفوع</SelectItem>
-                    <SelectItem value={InvoiceStatus.PARTIALLY_PAID}>مدفوع جزئياً</SelectItem>
-                    <SelectItem value={InvoiceStatus.OVERDUE}>متأخر</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {paymentMethod === PaymentMethod.CREDIT && (
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">تاريخ الاستحقاق</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-right"
+                        disabled={isSubmitting}
+                      >
+                        <CalendarCheck className="ml-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, 'yyyy/MM/dd') : 'اختر تاريخ الاستحقاق'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            setDueDate(date);
+                            setIsDirty(true);
+                          }
+                        }}
+                        disabled={(date) => date < new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle>المنتجات</CardTitle>
-            <CardDescription>أضف المنتجات إلى الفاتورة</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <ProductSelector 
-              productId={newItemProductId}
-              quantity={newItemQuantity}
-              onProductChange={setNewItemProductId}
-              onQuantityChange={setNewItemQuantity}
+          <CardContent className="p-6">
+            <ProductSelector
+              productId={selectedProductId}
+              quantity={quantity}
+              onProductChange={setSelectedProductId}
+              onQuantityChange={setQuantity}
               onAddItem={handleAddItem}
             />
             
-            <div className="border rounded-lg overflow-hidden">
+            <div className="mt-6">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>المنتج</TableHead>
-                    <TableHead>السعر</TableHead>
+                    <TableHead>الوحدة</TableHead>
                     <TableHead>الكمية</TableHead>
+                    <TableHead>السعر</TableHead>
                     <TableHead>الإجمالي</TableHead>
                     <TableHead>النقاط</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoiceItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        لم تتم إضافة منتجات بعد
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    invoiceItems.map((item, index) => {
+                  {items.length > 0 ? (
+                    items.map((item, index) => {
                       const product = getProductById(item.productId);
                       return (
                         <TableRow key={index}>
-                          <TableCell>{product?.name || 'منتج غير معروف'}</TableCell>
-                          <TableCell>{formatCurrency(item.price)}</TableCell>
+                          <TableCell>{product?.name || 'غير معروف'}</TableCell>
+                          <TableCell>{product?.unit || ''}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{formatCurrency(item.price)}</TableCell>
                           <TableCell>{formatCurrency(item.totalPrice)}</TableCell>
                           <TableCell>{item.pointsEarned}</TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
                               onClick={() => handleRemoveItem(index)}
+                              disabled={isSubmitting}
                             >
-                              <Trash className="h-4 w-4" />
+                              <Trash className="h-4 w-4 text-red-500" />
+                              <span className="sr-only">حذف</span>
                             </Button>
                           </TableCell>
                         </TableRow>
                       );
                     })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        لم يتم إضافة أي منتجات بعد
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row justify-between border-t p-4">
-            <div className="space-y-1 mb-4 sm:mb-0">
-              <div className="text-sm">إجمالي النقاط المكتسبة: <span className="font-bold">{totals.totalPointsEarned}</span></div>
-              <div className="text-xl">الإجمالي: <span className="font-bold">{formatCurrency(totals.totalAmount)}</span></div>
+            
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-muted rounded-md p-4">
+                <div className="text-muted-foreground text-sm">إجمالي الفاتورة</div>
+                <div className="text-2xl font-bold mt-1">{formatCurrency(totalAmount)}</div>
+              </div>
+              
+              <div className="bg-muted rounded-md p-4">
+                <div className="text-muted-foreground text-sm">عدد الأقسام</div>
+                <div className="text-xl font-bold mt-1">{categoriesCount} أقسام</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {getPointsMultiplier(categoriesCount) * 100}% من النقاط
+                </div>
+              </div>
+              
+              <div className="bg-muted rounded-md p-4">
+                <div className="text-muted-foreground text-sm">النقاط المكتسبة</div>
+                <div className="text-2xl font-bold mt-1">{adjustedPointsEarned} نقطة</div>
+              </div>
             </div>
-            <div className="flex gap-2">
+            
+            <div className="mt-6 flex justify-between">
               <Button
-                type="button"
                 variant="outline"
-                onClick={handleDiscard}
+                onClick={() => navigate(-1)}
+                disabled={isSubmitting}
               >
-                إلغاء
+                <ArrowLeft className="ml-2 h-4 w-4" />
+                رجوع
               </Button>
+              
               <Button
-                type="submit"
-                disabled={isSubmitting || invoiceItems.length === 0 || !selectedCustomerId}
+                onClick={handleSaveInvoice}
+                disabled={items.length === 0 || !selectedCustomerId || isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                     جاري الحفظ...
                   </>
                 ) : (
-                  editInvoice ? 'تحديث الفاتورة' : 'إنشاء الفاتورة'
+                  <>
+                    <Save className="ml-2 h-4 w-4" />
+                    حفظ الفاتورة
+                  </>
                 )}
               </Button>
             </div>
-          </CardFooter>
+          </CardContent>
         </Card>
-      </form>
-      
-      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من إلغاء الفاتورة؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم تجاهل جميع التغييرات التي قمت بها.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDiscard}>تأكيد</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      </div>
     </PageContainer>
   );
 };

@@ -49,6 +49,7 @@ export function useInvoiceMutations() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
       toast({
         title: 'تم إنشاء الفاتورة بنجاح',
         description: `تم إنشاء الفاتورة رقم ${data.id} بنجاح`,
@@ -70,6 +71,7 @@ export function useInvoiceMutations() {
       queryClient.invalidateQueries({ queryKey: ['invoices', data.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
       toast({
         title: 'تم تحديث الفاتورة بنجاح',
         description: `تم تحديث الفاتورة رقم ${data.id} بنجاح`,
@@ -93,6 +95,7 @@ export function useInvoiceMutations() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
       toast({
         title: 'تم حذف الفاتورة بنجاح',
         description: `تم حذف الفاتورة رقم ${data.id} بنجاح`,
