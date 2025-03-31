@@ -14,9 +14,10 @@ export function useProducts() {
   
   const getAll = useQuery({
     queryKey: ['products'],
-    queryFn: () => productsService.getAll(),
-    onSettled: (data, error) => {
-      if (error) {
+    queryFn: async () => {
+      try {
+        return await productsService.getAll();
+      } catch (error: any) {
         console.error('Error fetching products:', error);
         toast({
           title: 'خطأ',
@@ -30,10 +31,10 @@ export function useProducts() {
   
   const getById = (id: string) => useQuery({
     queryKey: ['products', id],
-    queryFn: () => productsService.getById(id),
-    enabled: !!id,
-    onSettled: (data, error) => {
-      if (error) {
+    queryFn: async () => {
+      try {
+        return await productsService.getById(id);
+      } catch (error: any) {
         console.error(`Error fetching product ${id}:`, error);
         toast({
           title: 'خطأ',
@@ -42,7 +43,8 @@ export function useProducts() {
         });
         return null;
       }
-    }
+    },
+    enabled: !!id
   });
   
   const addProduct = useMutation({

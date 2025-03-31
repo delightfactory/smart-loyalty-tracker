@@ -14,9 +14,10 @@ export function useCustomers() {
   
   const getAll = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersService.getAll(),
-    onSettled: (data, error) => {
-      if (error) {
+    queryFn: async () => {
+      try {
+        return await customersService.getAll();
+      } catch (error: any) {
         console.error('Error fetching customers:', error);
         toast({
           title: 'خطأ',
@@ -30,10 +31,10 @@ export function useCustomers() {
   
   const getById = (id: string) => useQuery({
     queryKey: ['customers', id],
-    queryFn: () => customersService.getById(id),
-    enabled: !!id,
-    onSettled: (data, error) => {
-      if (error) {
+    queryFn: async () => {
+      try {
+        return await customersService.getById(id);
+      } catch (error: any) {
         console.error(`Error fetching customer ${id}:`, error);
         toast({
           title: 'خطأ',
@@ -42,7 +43,8 @@ export function useCustomers() {
         });
         return null;
       }
-    }
+    },
+    enabled: !!id
   });
   
   const addCustomer = useMutation({
