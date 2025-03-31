@@ -119,7 +119,55 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile(userProfile);
         setRoles(userRoles);
       } else {
-        console.warn("No profile found for user", userId);
+        // إذا لم يكن هناك ملف شخصي، ننشئ واحدًا باستخدام بيانات الـ metadata
+        if (user && user.user_metadata) {
+          const fullName = user.user_metadata.full_name || '';
+          
+          // إنشاء ملف شخصي جديد
+          const { data: newProfileData, error: newProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              full_name: fullName
+            })
+            .select('*')
+            .single();
+            
+          if (newProfileError) {
+            console.error("Error creating new profile:", newProfileError);
+            throw newProfileError;
+          }
+          
+          // إضافة دور "user" افتراضي إذا لم يكن هناك أدوار
+          if (userRoles.length === 0) {
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .insert({
+                user_id: userId,
+                role: UserRole.USER
+              });
+              
+            if (roleError) {
+              console.error("Error adding default role:", roleError);
+              throw roleError;
+            }
+            
+            userRoles.push(UserRole.USER);
+          }
+          
+          const userProfile: UserProfile = {
+            id: newProfileData.id,
+            fullName: newProfileData.full_name,
+            avatarUrl: newProfileData.avatar_url,
+            phone: newProfileData.phone,
+            position: newProfileData.position,
+            roles: userRoles
+          };
+          
+          console.log("Created new user profile:", userProfile);
+          setProfile(userProfile);
+          setRoles(userRoles);
+        }
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);

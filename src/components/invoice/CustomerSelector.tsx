@@ -10,7 +10,8 @@ import {
 import { Label } from '@/components/ui/label';
 import SmartSearch from '@/components/search/SmartSearch';
 import { Customer } from '@/lib/types';
-import { customers } from '@/lib/data';
+import { useCustomers } from '@/hooks/useCustomers';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CustomerSelectorProps {
   value: string;
@@ -19,6 +20,29 @@ interface CustomerSelectorProps {
 }
 
 const CustomerSelector = ({ value, onChange, disabled = false }: CustomerSelectorProps) => {
+  const { getAll: getCustomers } = useCustomers();
+  const { data: customers, isLoading, error } = getCustomers;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Label>العميل</Label>
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !customers) {
+    return (
+      <div className="space-y-2">
+        <Label>العميل</Label>
+        <div className="text-red-500 text-sm">
+          حدث خطأ أثناء تحميل العملاء، يرجى المحاولة مرة أخرى
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <Label htmlFor="customer">العميل</Label>

@@ -2,24 +2,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
 export function useCustomers() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   // إعداد التحديثات في الوقت الفعلي للعملاء
   useRealtime('customers');
   
   const getAll = useQuery({
     queryKey: ['customers'],
-    queryFn: () => customersService.getAll()
+    queryFn: () => customersService.getAll(),
+    onError: (error: Error) => {
+      console.error('Error fetching customers:', error);
+      toast({
+        title: 'خطأ',
+        description: `حدث خطأ أثناء جلب العملاء: ${error.message}`,
+        variant: 'destructive',
+      });
+      return [];
+    }
   });
   
   const getById = (id: string) => useQuery({
     queryKey: ['customers', id],
     queryFn: () => customersService.getById(id),
-    enabled: !!id
+    enabled: !!id,
+    onError: (error: Error) => {
+      console.error(`Error fetching customer ${id}:`, error);
+      toast({
+        title: 'خطأ',
+        description: `حدث خطأ أثناء جلب العميل: ${error.message}`,
+        variant: 'destructive',
+      });
+      return null;
+    }
   });
   
   const addCustomer = useMutation({

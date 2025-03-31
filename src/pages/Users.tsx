@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
@@ -11,7 +12,6 @@ import {
   getUserById,
   createUser
 } from '@/services/users';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   Table, 
   TableBody, 
@@ -110,6 +110,7 @@ const Users = () => {
     try {
       setIsLoading(true);
       const data = await getAllUsers();
+      console.log("Fetched users:", data);
       setUsers(data);
     } catch (error: any) {
       console.error('Error fetching users:', error);

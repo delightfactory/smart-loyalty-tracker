@@ -2,24 +2,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
 import { Product } from '@/lib/types';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
 export function useProducts() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   // Set up realtime updates for products
   useRealtime('products');
   
   const getAll = useQuery({
     queryKey: ['products'],
-    queryFn: () => productsService.getAll()
+    queryFn: () => productsService.getAll(),
+    onError: (error: Error) => {
+      console.error('Error fetching products:', error);
+      toast({
+        title: 'خطأ',
+        description: `حدث خطأ أثناء جلب المنتجات: ${error.message}`,
+        variant: 'destructive',
+      });
+      return [];
+    }
   });
   
   const getById = (id: string) => useQuery({
     queryKey: ['products', id],
     queryFn: () => productsService.getById(id),
-    enabled: !!id
+    enabled: !!id,
+    onError: (error: Error) => {
+      console.error(`Error fetching product ${id}:`, error);
+      toast({
+        title: 'خطأ',
+        description: `حدث خطأ أثناء جلب المنتج: ${error.message}`,
+        variant: 'destructive',
+      });
+      return null;
+    }
   });
   
   const addProduct = useMutation({
@@ -32,6 +51,7 @@ export function useProducts() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding product:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء إضافة المنتج: ${error.message}`,
@@ -51,6 +71,7 @@ export function useProducts() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating product:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تحديث المنتج: ${error.message}`,
@@ -69,6 +90,7 @@ export function useProducts() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error deleting product:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء حذف المنتج: ${error.message}`,
