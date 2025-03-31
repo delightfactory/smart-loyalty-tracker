@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
 import { Product } from '@/lib/types';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useRealtime } from './use-realtime';
 
 export function useProducts() {
@@ -15,14 +15,16 @@ export function useProducts() {
   const getAll = useQuery({
     queryKey: ['products'],
     queryFn: () => productsService.getAll(),
-    onError: (error: Error) => {
-      console.error('Error fetching products:', error);
-      toast({
-        title: 'خطأ',
-        description: `حدث خطأ أثناء جلب المنتجات: ${error.message}`,
-        variant: 'destructive',
-      });
-      return [];
+    onSettled: (data, error) => {
+      if (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: 'خطأ',
+          description: `حدث خطأ أثناء جلب المنتجات: ${error.message}`,
+          variant: 'destructive',
+        });
+        return [];
+      }
     }
   });
   
@@ -30,14 +32,16 @@ export function useProducts() {
     queryKey: ['products', id],
     queryFn: () => productsService.getById(id),
     enabled: !!id,
-    onError: (error: Error) => {
-      console.error(`Error fetching product ${id}:`, error);
-      toast({
-        title: 'خطأ',
-        description: `حدث خطأ أثناء جلب المنتج: ${error.message}`,
-        variant: 'destructive',
-      });
-      return null;
+    onSettled: (data, error) => {
+      if (error) {
+        console.error(`Error fetching product ${id}:`, error);
+        toast({
+          title: 'خطأ',
+          description: `حدث خطأ أثناء جلب المنتج: ${error.message}`,
+          variant: 'destructive',
+        });
+        return null;
+      }
     }
   });
   

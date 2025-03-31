@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useRealtime } from './use-realtime';
 
 export function useCustomers() {
@@ -15,14 +15,16 @@ export function useCustomers() {
   const getAll = useQuery({
     queryKey: ['customers'],
     queryFn: () => customersService.getAll(),
-    onError: (error: Error) => {
-      console.error('Error fetching customers:', error);
-      toast({
-        title: 'خطأ',
-        description: `حدث خطأ أثناء جلب العملاء: ${error.message}`,
-        variant: 'destructive',
-      });
-      return [];
+    onSettled: (data, error) => {
+      if (error) {
+        console.error('Error fetching customers:', error);
+        toast({
+          title: 'خطأ',
+          description: `حدث خطأ أثناء جلب العملاء: ${error.message}`,
+          variant: 'destructive',
+        });
+        return [];
+      }
     }
   });
   
@@ -30,14 +32,16 @@ export function useCustomers() {
     queryKey: ['customers', id],
     queryFn: () => customersService.getById(id),
     enabled: !!id,
-    onError: (error: Error) => {
-      console.error(`Error fetching customer ${id}:`, error);
-      toast({
-        title: 'خطأ',
-        description: `حدث خطأ أثناء جلب العميل: ${error.message}`,
-        variant: 'destructive',
-      });
-      return null;
+    onSettled: (data, error) => {
+      if (error) {
+        console.error(`Error fetching customer ${id}:`, error);
+        toast({
+          title: 'خطأ',
+          description: `حدث خطأ أثناء جلب العميل: ${error.message}`,
+          variant: 'destructive',
+        });
+        return null;
+      }
     }
   });
   
