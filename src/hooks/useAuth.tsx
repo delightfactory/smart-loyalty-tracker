@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*, user_roles(role)')
+          .select('*, user_roles!inner(role)')
           .eq('id', userId)
           .single();
         
@@ -70,13 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         // تنسيق كائن الملف الشخصي
+        const userRoles = Array.isArray(data.user_roles) 
+          ? data.user_roles.map((r: any) => r.role as UserRole) 
+          : [];
+        
         const userProfile: UserProfile = {
           id: data.id,
           fullName: data.full_name,
           phone: data.phone,
           position: data.position,
           avatarUrl: data.avatar_url,
-          roles: data.user_roles ? data.user_roles.map((r: any) => r.role) : []
+          roles: userRoles
         };
         
         setProfile(userProfile);
@@ -109,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
   
   // تسجيل الدخول
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -133,8 +137,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: 'تم تسجيل الدخول بنجاح',
         description: `مرحبًا ${data.user?.email}`,
       });
-      
-      return data;
     } catch (error: any) {
       console.error('Error signing in:', error);
       throw error;
@@ -144,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   // إنشاء حساب جديد
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string): Promise<void> => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase.auth.signUp({
@@ -170,8 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: 'تم إنشاء الحساب بنجاح',
         description: 'تم إنشاء حسابك بنجاح، الرجاء التحقق من بريدك الإلكتروني للتأكيد.',
       });
-      
-      return data;
     } catch (error: any) {
       console.error('Error signing up:', error);
       throw error;

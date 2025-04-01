@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from '@/lib/auth-types';
 
@@ -305,6 +304,33 @@ export const deleteUser = async (userId: string): Promise<void> => {
     if (error) throw error;
   } catch (error) {
     console.error('Error deleting user:', error);
+    throw error;
+  }
+};
+
+// تحديث كلمة مرور المستخدم
+export const updateUserPassword = async (userId: string, currentPassword: string, newPassword: string): Promise<void> => {
+  try {
+    // التحقق من كلمة المرور الحالية
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: '', // نحتاج إلى البريد الإلكتروني للتحقق من كلمة المرور
+      password: currentPassword
+    });
+    
+    if (authError) {
+      throw new Error('كلمة المرور الحالية غير صحيحة');
+    }
+    
+    // تحديث كلمة المرور
+    const { error } = await supabase.auth.admin.updateUserById(
+      userId,
+      { password: newPassword }
+    );
+    
+    if (error) throw error;
+    
+  } catch (error) {
+    console.error('Error updating user password:', error);
     throw error;
   }
 };

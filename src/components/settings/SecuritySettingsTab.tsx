@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { updateUserPassword } from '@/services/users';
 import { UserRole } from '@/lib/auth-types';
 import { useAuth } from '@/hooks/useAuth';
 
-interface SecuritySettingsTabProps {
+export interface SecuritySettingsTabProps {
   
 }
 

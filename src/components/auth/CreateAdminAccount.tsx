@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { createAdminAccount } from '@/services/admin';
+import { UserRole } from '@/lib/auth-types';
 
 interface CreateAdminAccountProps {
   onSuccess?: () => void;
@@ -25,7 +27,7 @@ export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSucces
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (!hasRole('admin')) {
+    if (!hasRole(UserRole.ADMIN)) {
       navigate('/profile');
     }
   }, [hasRole, navigate]);

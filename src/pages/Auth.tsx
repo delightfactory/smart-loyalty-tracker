@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { CreateAdminAccount } from '@/components/auth/CreateAdminAccount';
 import { useAuth } from '@/hooks/useAuth';
 import PageContainer from '@/components/layout/PageContainer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Auth = () => {
   const { isAuthenticated, isLoading } = useAuth();

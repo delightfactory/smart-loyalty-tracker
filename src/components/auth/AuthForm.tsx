@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -40,7 +41,7 @@ export const AuthForm = () => {
       toast({
         title: 'حسابك تم إنشاؤه بنجاح',
         description: 'يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب',
-        variant: 'success',
+        variant: 'default',
       });
     } catch (error) {
       toast({
@@ -55,7 +56,6 @@ export const AuthForm = () => {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">نظام الولاء</CardTitle>
-        <CardDescription>تسجيل الدخول أو إنشاء حساب جديد</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="login" className="w-full">
