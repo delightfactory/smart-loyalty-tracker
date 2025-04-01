@@ -1,17 +1,19 @@
-
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/providers/AuthProvider';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export const AuthForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signUp, isLoading } = useAuth();
+  const { toast } = useToast();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +25,11 @@ export const AuthForm = () => {
       await signIn(email, password);
       navigate('/dashboard');
     } catch (error) {
-      // تم معالجة الخطأ في مزود المصادقة
+      toast({
+        title: 'خطأ في تسجيل الدخول',
+        description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+        variant: 'destructive',
+      });
     }
   };
   
@@ -31,9 +37,17 @@ export const AuthForm = () => {
     e.preventDefault();
     try {
       await signUp(email, password, fullName);
-      // لا نقوم بتوجيه المستخدم لأنه يحتاج إلى تأكيد البريد الإلكتروني أولاً
+      toast({
+        title: 'حسابك تم إنشاؤه بنجاح',
+        description: 'يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب',
+        variant: 'success',
+      });
     } catch (error) {
-      // تم معالجة الخطأ في مزود المصادقة
+      toast({
+        title: 'خطأ في إنشاء الحساب',
+        description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+        variant: 'destructive',
+      });
     }
   };
   

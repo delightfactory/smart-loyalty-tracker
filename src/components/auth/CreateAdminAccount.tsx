@@ -1,178 +1,115 @@
+import { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { createAdminAccount } from '@/services/admin';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { adminCredentials } from '@/services/admin';
-import { useAuth } from '@/providers/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
-import { UserRole } from '@/lib/auth-types';
-import { useToast } from '@/components/ui/use-toast';
+interface CreateAdminAccountProps {
+  onSuccess?: () => void;
+}
 
-export const CreateAdminAccount = () => {
-  const [isCreating, setIsCreating] = useState(false);
-  const [isCreated, setIsCreated] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const { toast } = useToast();
+  const { hasRole } = useAuth();
+  const navigate = useNavigate();
   
-  const handleCreateAdmin = async () => {
-    setIsCreating(true);
-    setError(null);
+  useEffect(() => {
+    if (!hasRole('admin')) {
+      navigate('/profile');
+    }
+  }, [hasRole, navigate]);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
     
     try {
-      const { email, password, fullName } = adminCredentials;
-      
-      // Check if admin already exists by attempting to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      // If admin exists and credentials are correct, just set created state to true
-      if (!signInError) {
-        setIsCreated(true);
-        setIsCreating(false);
-        return;
-      }
-      
-      // If admin doesn't exist or has wrong password, create a new admin
-      const { data: userData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          }
-        }
-      });
-      
-      if (signUpError) throw signUpError;
-      
-      if (!userData.user) throw new Error('فشل في إنشاء المستخدم');
-      
-      // The admin is now created but email might not be confirmed
-      // Let's try to directly set roles despite this
-      const roles = [UserRole.ADMIN, UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.SALES];
-      
-      for (const role of roles) {
-        try {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: userData.user.id,
-              role: role,
-            });
-            
-          if (roleError) console.error(`Error adding role ${role}:`, roleError);
-        } catch (err) {
-          console.error(`Exception adding role ${role}:`, err);
-        }
-      }
-      
-      // Display success message with toast
+      await createAdminAccount(email, password, fullName);
+      setSuccess(true);
       toast({
-        title: "تم إنشاء حساب المدير",
-        description: "يرجى ملاحظة أنه قد تحتاج إلى تأكيد البريد الإلكتروني إذا كان ذلك مفعلاً في لوحة تحكم Supabase",
-        variant: "default"
+        title: "تم إنشاء حساب المسؤول بنجاح",
+        description: "تم إرسال بريد إلكتروني لتفعيل الحساب إلى المستخدم.",
       });
-      
-      setIsCreated(true);
-    } catch (err: any) {
-      setError(err.message || 'حدث خطأ أثناء إنشاء الحساب');
+      onSuccess?.();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "فشل إنشاء حساب المسؤول",
+        description: error.message,
+      });
     } finally {
-      setIsCreating(false);
-    }
-  };
-  
-  const handleLogin = async () => {
-    try {
-      const { email, password } = adminCredentials;
-      await signIn(email, password);
-    } catch (err: any) {
-      setError(err.message || 'حدث خطأ أثناء تسجيل الدخول');
-      
-      // Add special message for email confirmation issues
-      if (err.message && (err.message.includes('Email not confirmed') || err.message.includes('Invalid login credentials'))) {
-        toast({
-          title: "تنبيه: تحتاج إلى تفعيل الإيميل",
-          description: "يرجى تأكيد البريد الإلكتروني في لوحة تحكم Supabase أو تعطيل خاصية تأكيد البريد الإلكتروني",
-          variant: "destructive"
-        });
-      }
+      setIsLoading(false);
     }
   };
   
   return (
-    <Card className="max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle>إنشاء حساب المدير</CardTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle>إنشاء حساب مسؤول جديد</CardTitle>
         <CardDescription>
-          إنشاء حساب إداري يملك جميع الصلاحيات للنظام
+          أدخل بيانات المستخدم لإنشاء حساب مسؤول جديد.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>خطأ</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+      <CardContent className="grid gap-4">
+        {success && (
+          <Alert>
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>تم إنشاء الحساب!</AlertTitle>
+            <AlertDescription>
+              تم إنشاء حساب المسؤول بنجاح. تم إرسال بريد إلكتروني لتفعيل الحساب إلى المستخدم.
+            </AlertDescription>
           </Alert>
         )}
-        
-        {isCreated ? (
-          <div className="space-y-4">
-            <Alert className="bg-green-50 border-green-200">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <AlertTitle className="text-green-700">تم إنشاء الحساب بنجاح</AlertTitle>
-              <AlertDescription>
-                تم إنشاء حساب المدير بنجاح. يمكنك استخدام بيانات تسجيل الدخول التالية:
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 border rounded">
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <div className="font-semibold">البريد الإلكتروني:</div>
-                <div className="col-span-2 font-mono bg-gray-100 p-1 rounded">{adminCredentials.email}</div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <div className="font-semibold">كلمة المرور:</div>
-                <div className="col-span-2 font-mono bg-gray-100 p-1 rounded">{adminCredentials.password}</div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="font-semibold">الاسم الكامل:</div>
-                <div className="col-span-2">{adminCredentials.fullName}</div>
-              </div>
-            </div>
-            
-            <Button onClick={handleLogin} className="w-full">
-              تسجيل الدخول
-            </Button>
-            
-            <Alert className="bg-yellow-50 border-yellow-200">
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-              <AlertTitle className="text-yellow-700">هام</AlertTitle>
-              <AlertDescription>
-                إذا واجهت مشكلة في تسجيل الدخول بسبب عدم تأكيد البريد الإلكتروني، يرجى الانتقال إلى لوحة تحكم Supabase وتعطيل خاصية تأكيد البريد الإلكتروني من قسم Authentication.
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : (
-          <Button 
-            onClick={handleCreateAdmin} 
-            className="w-full" 
-            disabled={isCreating}
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                جارٍ إنشاء الحساب...
-              </>
-            ) : 'إنشاء حساب المدير'}
-          </Button>
-        )}
+        <div className="grid gap-2">
+          <Label htmlFor="email">البريد الإلكتروني</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="admin@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="password">كلمة المرور</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="fullName">الاسم الكامل</Label>
+          <Input
+            id="fullName"
+            type="text"
+            placeholder="اسم المسؤول"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
+        </div>
       </CardContent>
+      <CardFooter>
+        <Button disabled={isLoading} onClick={handleSubmit}>
+          {isLoading && (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          )}
+          إنشاء حساب
+          <ArrowRight className="mr-2 h-4 w-4" />
+        </Button>
+      </CardFooter>
     </Card>
   );
 };

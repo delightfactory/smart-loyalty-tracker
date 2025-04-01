@@ -1,15 +1,14 @@
-
-import PageContainer from '@/components/layout/PageContainer';
+import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { CreateAdminAccount } from '@/components/auth/CreateAdminAccount';
-import { useAuth } from '@/providers/AuthProvider';
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
+import PageContainer from '@/components/layout/PageContainer';
 
 const Auth = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>('login');
   
   useEffect(() => {

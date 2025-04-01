@@ -1,272 +1,211 @@
-
-import { useForm } from "react-hook-form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { SecuritySettings } from "@/lib/settings-types";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from '@/hooks/use-toast';
-import { useState } from "react";
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/providers/AuthProvider';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2, Shield, Lock, Key, EyeOff, Eye } from 'lucide-react';
+import { updateUserPassword } from '@/services/users';
+import { UserRole } from '@/lib/auth-types';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SecuritySettingsTabProps {
-  settings: SecuritySettings;
-  onSave: (settings: SecuritySettings) => void;
-  isLoading?: boolean;
+  
 }
 
-interface PasswordChangeForm {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
-export function SecuritySettingsTab({ settings, onSave, isLoading = false }: SecuritySettingsTabProps) {
-  const { user } = useAuth();
+export const SecuritySettingsTab: React.FC<SecuritySettingsTabProps> = () => {
   const { toast } = useToast();
-  const [passwordChanging, setPasswordChanging] = useState(false);
-
-  const securityForm = useForm<SecuritySettings>({
-    defaultValues: settings
+  const { user, hasRole } = useAuth();
+  const [isTwoFactorAuthEnabled, setIsTwoFactorAuthEnabled] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordFields, setPasswordFields] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
-
-  const passwordForm = useForm<PasswordChangeForm>({
-    defaultValues: {
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    }
-  });
-
-  const handleSecuritySubmit = (data: SecuritySettings) => {
-    onSave(data);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const handleToggleTwoFactorAuth = () => {
+    setIsTwoFactorAuthEnabled(!isTwoFactorAuthEnabled);
+    // Implement logic to enable/disable 2FA
   };
-
-  const handlePasswordSubmit = async (data: PasswordChangeForm) => {
-    if (data.newPassword !== data.confirmPassword) {
+  
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordFields({ ...passwordFields, [name]: value });
+  };
+  
+  const handleSubmitPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordFields.newPassword !== passwordFields.confirmPassword) {
       toast({
-        title: "خطأ في تغيير كلمة المرور",
-        description: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين",
-        variant: "destructive"
+        title: "خطأ",
+        description: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقتين",
+        variant: "destructive",
       });
       return;
     }
-
-    if (data.newPassword.length < 8) {
-      toast({
-        title: "خطأ في تغيير كلمة المرور",
-        description: "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setPasswordChanging(true);
-
+    
+    setIsUpdatingPassword(true);
+    
     try {
-      // أولاً، تسجيل الدخول باستخدام كلمة المرور الحالية للتحقق منها
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: data.currentPassword
-      });
-
-      if (signInError) {
-        throw new Error("كلمة المرور الحالية غير صحيحة");
+      if (!user) {
+        throw new Error("المستخدم غير مسجل الدخول");
       }
-
-      // تغيير كلمة المرور
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: data.newPassword
-      });
-
-      if (updateError) {
-        throw updateError;
-      }
-
+      
+      await updateUserPassword(user.id, passwordFields.currentPassword, passwordFields.newPassword);
+      
       toast({
-        title: "تم تغيير كلمة المرور",
-        description: "تم تغيير كلمة المرور بنجاح"
+        title: "تم التحديث",
+        description: "تم تحديث كلمة المرور بنجاح",
       });
-
-      passwordForm.reset();
+      
+      setPasswordFields({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
     } catch (error: any) {
       toast({
-        title: "خطأ في تغيير كلمة المرور",
-        description: error.message || "حدث خطأ أثناء تغيير كلمة المرور",
+        title: "خطأ",
+        description: error.message,
         variant: "destructive"
       });
     } finally {
-      setPasswordChanging(false);
+      setIsUpdatingPassword(false);
     }
   };
-
-  // سجل تسجيل الدخول الوهمي
-  const loginLogs = [
-    {
-      id: 1,
-      date: "2023-06-15 14:30:00",
-      user: "أحمد محمد",
-      ip: "192.168.1.1",
-      status: "ناجح"
-    },
-    {
-      id: 2,
-      date: "2023-06-15 10:25:00",
-      user: "محمد علي",
-      ip: "192.168.1.2",
-      status: "ناجح"
-    },
-    {
-      id: 3,
-      date: "2023-06-14 16:10:00",
-      user: "غير معروف",
-      ip: "192.168.1.100",
-      status: "فاشل"
-    }
-  ];
-
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>إعدادات الأمان</CardTitle>
-        <CardDescription>ضبط إعدادات الأمان وحماية الحساب</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label>تغيير كلمة المرور</Label>
-          <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="grid grid-cols-1 gap-4">
+    <div className="grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>تغيير كلمة المرور</CardTitle>
+          <CardDescription>
+            تحديث كلمة المرور الخاصة بك بكلمة مرور قوية وآمنة.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitPasswordChange} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="currentPassword">كلمة المرور الحالية</Label>
-              <Input 
-                id="currentPassword" 
-                type="password" 
-                {...passwordForm.register("currentPassword", { required: true })} 
-              />
-              {passwordForm.formState.errors.currentPassword && (
-                <p className="text-sm text-red-500">كلمة المرور الحالية مطلوبة</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">كلمة المرور الجديدة</Label>
-              <Input 
-                id="newPassword" 
-                type="password" 
-                {...passwordForm.register("newPassword", { required: true, minLength: 8 })} 
-              />
-              {passwordForm.formState.errors.newPassword && (
-                <p className="text-sm text-red-500">كلمة المرور الجديدة مطلوبة (8 أحرف على الأقل)</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">تأكيد كلمة المرور الجديدة</Label>
-              <Input 
-                id="confirmPassword" 
-                type="password" 
-                {...passwordForm.register("confirmPassword", { required: true })} 
-              />
-              {passwordForm.formState.errors.confirmPassword && (
-                <p className="text-sm text-red-500">تأكيد كلمة المرور مطلوب</p>
-              )}
-            </div>
-            <Button 
-              type="submit" 
-              className="mt-2 w-full md:w-auto"
-              disabled={passwordChanging}
-            >
-              {passwordChanging ? "جاري التغيير..." : "تغيير كلمة المرور"}
-            </Button>
-          </form>
-        </div>
-
-        <Separator />
-
-        <form onSubmit={securityForm.handleSubmit(handleSecuritySubmit)}>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="twoFactorEnabled">المصادقة الثنائية</Label>
-                <Switch 
-                  id="twoFactorEnabled" 
-                  checked={securityForm.watch("twoFactorEnabled")} 
-                  onCheckedChange={(checked) => securityForm.setValue("twoFactorEnabled", checked)} 
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  name="currentPassword"
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={passwordFields.currentPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="كلمة المرور الحالية"
+                  required
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span className="sr-only">Show password</span>
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground">
-                تفعيل المصادقة الثنائية لتعزيز أمان الحساب
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="sessionTimeout">انتهاء مهلة الجلسة بعد عدم النشاط</Label>
-                <Switch 
-                  id="sessionTimeout" 
-                  checked={securityForm.watch("sessionTimeout")} 
-                  onCheckedChange={(checked) => securityForm.setValue("sessionTimeout", checked)} 
-                />
-              </div>
-              {securityForm.watch("sessionTimeout") && (
-                <div className="pt-2">
-                  <Label htmlFor="sessionTimeoutMinutes">مدة عدم النشاط (بالدقائق)</Label>
-                  <Input 
-                    id="sessionTimeoutMinutes" 
-                    type="number" 
-                    min="1" 
-                    {...securityForm.register("sessionTimeoutMinutes", { 
-                      valueAsNumber: true,
-                      min: 1
-                    })} 
-                  />
-                  {securityForm.formState.errors.sessionTimeoutMinutes && (
-                    <p className="text-sm text-red-500">يجب أن تكون المدة دقيقة واحدة على الأقل</p>
-                  )}
-                </div>
-              )}
             </div>
             
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isLoading}>
-                حفظ الإعدادات
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">كلمة المرور الجديدة</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  name="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={passwordFields.newPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="كلمة المرور الجديدة"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span className="sr-only">Show password</span>
+                </Button>
+              </div>
             </div>
-          </div>
-        </form>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <Label>سجل تسجيل الدخول</Label>
-          <div className="overflow-x-auto bg-gray-50 rounded-md p-4">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-right p-2">التاريخ</th>
-                  <th className="text-right p-2">المستخدم</th>
-                  <th className="text-right p-2">عنوان IP</th>
-                  <th className="text-right p-2">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loginLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="p-2">{log.date}</td>
-                    <td className="p-2">{log.user}</td>
-                    <td className="p-2">{log.ip}</td>
-                    <td className="p-2">
-                      <span className={`px-2 py-1 ${log.status === "ناجح" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"} rounded-full text-xs`}>
-                        {log.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+            
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">تأكيد كلمة المرور الجديدة</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwordFields.confirmPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="تأكيد كلمة المرور الجديدة"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span className="sr-only">Show password</span>
+                </Button>
+              </div>
+            </div>
+            
+            <Button type="submit" disabled={isUpdatingPassword}>
+              {isUpdatingPassword ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  جاري التحديث...
+                </>
+              ) : (
+                <>
+                  <Key className="mr-2 h-4 w-4" />
+                  تغيير كلمة المرور
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      
+      {hasRole(UserRole.ADMIN) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>المصادقة الثنائية</CardTitle>
+            <CardDescription>
+              إضافة طبقة حماية إضافية لحسابك باستخدام المصادقة الثنائية.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  تفعيل المصادقة الثنائية
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  عند التفعيل، ستحتاج إلى إدخال رمز تحقق إضافي عند تسجيل الدخول.
+                </p>
+              </div>
+              <Switch id="2fa" checked={isTwoFactorAuthEnabled} onCheckedChange={handleToggleTwoFactorAuth} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
-}
+};

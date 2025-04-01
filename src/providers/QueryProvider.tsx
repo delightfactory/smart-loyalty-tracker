@@ -1,25 +1,27 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, useState } from 'react';
 
 interface QueryProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
-export function QueryProvider({ children }: QueryProviderProps) {
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        refetchOnWindowFocus: false,
-        staleTime: 5 * 60 * 1000, // 5 دقائق
-        retry: 1
-      }
-    }
-  }));
+// إنشاء نسخة عميل استعلام جديدة
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // تكوين افتراضي للاستعلامات
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 60 * 5, // 5 دقائق
+      retry: 1
+    },
+  },
+});
 
+// مزود استعلام البيانات
+export const QueryProvider = ({ children }: QueryProviderProps) => {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
   );
-}
+};

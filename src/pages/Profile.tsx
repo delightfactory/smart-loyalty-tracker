@@ -1,10 +1,10 @@
-
-import PageContainer from '@/components/layout/PageContainer';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserProfile } from '@/components/auth/UserProfile';
 import { Separator } from '@/components/ui/separator';
-import { useAuth } from '@/providers/AuthProvider';
+import { UserProfile } from '@/components/auth/UserProfile';
+import { useAuth } from '@/hooks/useAuth';
+import PageContainer from '@/components/layout/PageContainer';
 import { Badge } from '@/components/ui/badge';
 
 const Profile = () => {

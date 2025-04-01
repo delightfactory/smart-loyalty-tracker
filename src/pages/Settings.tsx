@@ -1,18 +1,18 @@
-
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import PageContainer from '@/components/layout/PageContainer';
+import { Separator } from '@/components/ui/separator';
 import { GeneralSettingsForm } from '@/components/settings/GeneralSettingsForm';
-import { CompanySettingsForm } from '@/components/settings/CompanySettingsForm';
 import { InvoiceSettingsForm } from '@/components/settings/InvoiceSettingsForm';
-import { PaymentSettingsForm } from '@/components/settings/PaymentSettingsForm';
 import { LoyaltySettingsForm } from '@/components/settings/LoyaltySettingsForm';
-import { BackupSettingsTab } from '@/components/settings/BackupSettingsTab';
 import { SecuritySettingsTab } from '@/components/settings/SecuritySettingsTab';
+import { PaymentSettingsForm } from '@/components/settings/PaymentSettingsForm';
+import { CompanySettingsForm } from '@/components/settings/CompanySettingsForm';
+import { BackupSettingsTab } from '@/components/settings/BackupSettingsTab';
 import { UsersSettingsTab } from '@/components/settings/UsersSettingsTab';
 import { useSettings } from '@/hooks/useSettings';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { UserRole } from '@/lib/auth-types';
+import PageContainer from '@/components/layout/PageContainer';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('general');
