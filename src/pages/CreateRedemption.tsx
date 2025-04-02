@@ -3,18 +3,22 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Rocket, AlertCircle, CheckCircle2, Clock, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Rocket, AlertCircle, CheckCircle2, Clock, ShoppingCart, Star, Gift, Receipt } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import PageContainer from '@/components/layout/PageContainer';
-import { RedemptionItem, InvoiceStatus, RedemptionStatus } from '@/lib/types';
+import { RedemptionItem, InvoiceStatus, RedemptionStatus, Customer } from '@/lib/types';
 import { canRedeemPoints } from '@/lib/calculations';
 import RedemptionForm from '@/components/redemption/RedemptionForm';
 import RedemptionSummary from '@/components/redemption/RedemptionSummary';
+import RedemptionDetailsCard from '@/components/redemption/RedemptionDetailsCard';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useRedemptions } from '@/hooks/useRedemptions';
+import { Progress } from '@/components/ui/progress';
+import { motion } from 'framer-motion';
+import confetti from 'canvas-confetti';
 
 const CreateRedemption = () => {
   const { customerId } = useParams<{ customerId?: string }>();
@@ -25,11 +29,13 @@ const CreateRedemption = () => {
   const [redemptionItems, setRedemptionItems] = useState<RedemptionItem[]>([]);
   const [totalRedemptionPoints, setTotalRedemptionPoints] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [newRedemptionId, setNewRedemptionId] = useState<string | null>(null);
   
   // React Query hooks
   const { getById, updateCustomer } = useCustomers();
   const { getByCustomerId } = useInvoices();
-  const { addRedemption, getByCustomerId: getCustomerRedemptions } = useRedemptions();
+  const { addRedemption, getByCustomerId: getCustomerRedemptions, getById: getRedemptionById } = useRedemptions();
 
   // Get customer data
   const customerQuery = getById(selectedCustomerId);
@@ -42,6 +48,10 @@ const CreateRedemption = () => {
   // Get customer redemption history
   const redemptionsQuery = getCustomerRedemptions(selectedCustomerId);
   const customerRedemptions = redemptionsQuery.data || [];
+  
+  // Get new redemption if available
+  const newRedemptionQuery = getRedemptionById(newRedemptionId || '');
+  const newRedemption = newRedemptionQuery.data;
   
   useEffect(() => {
     if (redemptionItems.length > 0) {
@@ -61,6 +71,15 @@ const CreateRedemption = () => {
       invoice.status === InvoiceStatus.PARTIALLY_PAID || 
       invoice.status === InvoiceStatus.OVERDUE
     );
+  };
+  
+  // تشغيل تأثير الاحتفال عند نجاح العملية
+  const triggerSuccessConfetti = () => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
   };
   
   const handleCreateRedemption = () => {
@@ -101,12 +120,12 @@ const CreateRedemption = () => {
         date: currentDate,
         totalPointsRedeemed: totalRedemptionPoints,
         status: RedemptionStatus.COMPLETED,
-        items: redemptionItems // Adding the items property to fix the type error
+        items: redemptionItems
       },
       items: redemptionItems
     }, {
-      onSuccess: () => {
-        // Update the customer's points if needed
+      onSuccess: (data) => {
+        // Update the customer's points
         if (customer) {
           const updatedCustomer = { ...customer };
           updatedCustomer.pointsRedeemed += totalRedemptionPoints;
@@ -115,13 +134,22 @@ const CreateRedemption = () => {
           updateCustomer.mutate(updatedCustomer);
         }
         
+        // تسجيل معرف الاستبدال الجديد لعرضه
+        setNewRedemptionId(data.id);
+        
+        // إظهار شاشة النجاح
+        setSuccess(true);
+        
+        // تشغيل تأثير الاحتفال
+        setTimeout(() => {
+          triggerSuccessConfetti();
+        }, 500);
+        
         toast({
           title: "تم الاستبدال بنجاح",
           description: `تم استبدال ${totalRedemptionPoints} نقطة بنجاح`,
           variant: "default"
         });
-        
-        navigate(customerId ? `/customer/${customerId}` : '/customers');
       },
       onError: (error) => {
         setSubmitting(false);
@@ -133,6 +161,104 @@ const CreateRedemption = () => {
       }
     });
   };
+  
+  // عرض شاشة النجاح بعد إتمام العملية
+  if (success && newRedemption) {
+    return (
+      <PageContainer title="تم الاستبدال بنجاح" subtitle="تمت عملية استبدال النقاط بنجاح">
+        <div className="mb-6 flex items-center justify-between">
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            العودة
+          </Button>
+          
+          {customer && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-blue-100 text-blue-800 px-3 py-1">
+                العميل: {customer.name}
+              </Badge>
+              <Badge variant="outline" className="bg-green-100 text-green-800 px-3 py-1">
+                النقاط المتبقية: {customer.currentPoints}
+              </Badge>
+            </div>
+          )}
+        </div>
+        
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8 text-center"
+          >
+            <div className="flex justify-center mb-4">
+              <motion.div
+                initial={{ scale: 0.1, rotate: 180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", duration: 0.7 }}
+              >
+                <CheckCircle2 className="h-20 w-20 text-green-500" />
+              </motion.div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">تمت عملية الاستبدال بنجاح!</h2>
+            <p className="text-muted-foreground mb-2">تم استبدال {totalRedemptionPoints} نقطة من رصيد العميل</p>
+            
+            <div className="w-full max-w-md mx-auto mt-6">
+              <div className="flex justify-between mb-1 text-sm">
+                <span>رصيد النقاط قبل الاستبدال</span>
+                <span>{customer ? customer.currentPoints + totalRedemptionPoints : 0}</span>
+              </div>
+              <Progress value={100} className="h-2 mb-4" />
+              
+              <div className="flex justify-between mb-1 text-sm">
+                <span>رصيد النقاط بعد الاستبدال</span>
+                <span>{customer?.currentPoints}</span>
+              </div>
+              <Progress 
+                value={customer && (customer.currentPoints / (customer.pointsEarned || 1)) * 100} 
+                className="h-2" 
+              />
+            </div>
+          </motion.div>
+          
+          <RedemptionDetailsCard 
+            redemption={newRedemption} 
+            onPrint={() => {
+              toast({
+                title: "طباعة الإيصال",
+                description: "جاري طباعة إيصال الاستبدال...",
+                variant: "default"
+              });
+              // هنا يمكن إضافة رمز الطباعة الفعلي
+            }} 
+          />
+          
+          <div className="flex justify-center mt-8 gap-4">
+            <Button 
+              onClick={() => {
+                setSuccess(false);
+                setSubmitting(false);
+                setRedemptionItems([]);
+                setTotalRedemptionPoints(0);
+              }}
+              variant="outline"
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              استبدال جديد
+            </Button>
+            
+            <Button 
+              onClick={() => navigate(`/customer/${customer?.id}`)}
+              variant="default"
+            >
+              <Receipt className="h-4 w-4 mr-2" />
+              عرض سجل العميل
+            </Button>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
   
   return (
     <PageContainer title="استبدال النقاط" subtitle="استبدال نقاط الولاء بمنتجات">
@@ -162,6 +288,52 @@ const CreateRedemption = () => {
             لدى العميل فواتير غير مدفوعة. يجب تسوية الفواتير المستحقة قبل استبدال النقاط.
           </AlertDescription>
         </Alert>
+      )}
+      
+      {/* عرض شريط التقدم بنقاط العميل إذا تم اختيار عميل */}
+      {customer && (
+        <Card className="mb-6 bg-slate-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              <h3 className="font-medium">رصيد نقاط العميل</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">النقاط المكتسبة</span>
+                  <span className="font-medium">{customer.pointsEarned}</span>
+                </div>
+                <Progress value={100} className="h-2 bg-blue-100" indicatorClassName="bg-blue-500" />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">النقاط المستبدلة</span>
+                  <span className="font-medium">{customer.pointsRedeemed}</span>
+                </div>
+                <Progress 
+                  value={(customer.pointsRedeemed / Math.max(customer.pointsEarned, 1)) * 100} 
+                  className="h-2 bg-green-100" 
+                  indicatorClassName="bg-green-500" 
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">النقاط المطلوبة حالياً</span>
+                  <span className="font-medium">{totalRedemptionPoints}</span>
+                </div>
+                <Progress 
+                  value={(totalRedemptionPoints / Math.max(customer.currentPoints, 1)) * 100} 
+                  className="h-2 bg-amber-100" 
+                  indicatorClassName="bg-amber-500" 
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -198,12 +370,18 @@ const CreateRedemption = () => {
               <CardContent>
                 <div className="space-y-4">
                   {customerRedemptions.slice(0, 3).map((redemption) => (
-                    <div key={redemption.id} className="border rounded-lg p-3 flex justify-between items-center">
+                    <div key={redemption.id} className="border rounded-lg p-3 flex justify-between items-center hover:bg-slate-50 cursor-pointer"
+                      onClick={() => navigate(`/redemption/${redemption.id}`)}
+                    >
                       <div>
                         <p className="font-medium">تاريخ: {new Date(redemption.date).toLocaleDateString('ar-EG')}</p>
                         <p>النقاط المستبدلة: {redemption.totalPointsRedeemed}</p>
                       </div>
-                      <Badge className={redemption.status === RedemptionStatus.COMPLETED ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                      <Badge className={
+                        redemption.status === RedemptionStatus.COMPLETED ? 'bg-green-100 text-green-800' : 
+                        redemption.status === RedemptionStatus.PENDING ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      }>
                         {redemption.status === RedemptionStatus.COMPLETED ? 'مكتمل' : 
                          redemption.status === RedemptionStatus.PENDING ? 'قيد الانتظار' : 'ملغي'}
                       </Badge>

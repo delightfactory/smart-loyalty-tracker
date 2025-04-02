@@ -1,9 +1,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService } from '@/services/database';
-import { Invoice, InvoiceItem } from '@/lib/types';
+import { Invoice, InvoiceItem, InvoiceStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
+import { useCustomers } from './useCustomers';
 
 // Custom hook for fetching all invoices
 export function useAllInvoices() {
@@ -38,6 +39,56 @@ export function useCustomerInvoices(customerId: string) {
   });
 }
 
+// تحقق من حالة الفواتير وتحديث بيانات العميل
+const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient: any) => {
+  // الحصول على جميع فواتير العميل
+  const invoices = await invoicesService.getByCustomerId(customerId);
+  
+  // حساب النقاط الإجمالية المكتسبة والمستبدلة
+  let totalPointsEarned = 0;
+  let totalPointsRedeemed = 0;
+  let totalCreditBalance = 0;
+  
+  // حساب الرصيد المستحق (الآجل)
+  invoices.forEach(invoice => {
+    totalPointsEarned += invoice.pointsEarned;
+    totalPointsRedeemed += invoice.pointsRedeemed;
+    
+    // حساب الرصيد الآجل للفواتير غير المدفوعة أو المدفوعة جزئياً
+    if (invoice.status === InvoiceStatus.UNPAID || 
+        invoice.status === InvoiceStatus.PARTIALLY_PAID || 
+        invoice.status === InvoiceStatus.OVERDUE) {
+      
+      // حساب المبلغ المدفوع
+      const paidAmount = invoice.payments?.reduce((sum, payment) => {
+        return payment.type === 'payment' ? sum + payment.amount : sum - payment.amount;
+      }, 0) || 0;
+      
+      // إضافة المبلغ المتبقي إلى الرصيد الآجل
+      totalCreditBalance += (invoice.totalAmount - paidAmount);
+    }
+  });
+  
+  // تحديث بيانات العميل
+  const { getById } = useCustomers();
+  const customerQuery = getById(customerId);
+  
+  if (customerQuery.data) {
+    const customer = customerQuery.data;
+    customer.pointsEarned = totalPointsEarned;
+    customer.pointsRedeemed = totalPointsRedeemed;
+    customer.currentPoints = totalPointsEarned - totalPointsRedeemed;
+    customer.creditBalance = totalCreditBalance;
+    
+    // تحديث بيانات العميل في قاعدة البيانات
+    await invoicesService.updateCustomerData(customer);
+    
+    // تحديث الذاكرة المؤقتة
+    queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  }
+};
+
 // Mutation hooks for invoice operations
 export function useInvoiceMutations() {
   const queryClient = useQueryClient();
@@ -45,14 +96,17 @@ export function useInvoiceMutations() {
   const addInvoice = useMutation({
     mutationFn: ({ invoice, items }: { invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[] }) => 
       invoicesService.create(invoice, items),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
+      
+      // تحديث بيانات العميل بعد إضافة فاتورة جديدة
+      await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
+      
       toast({
         title: 'تم إنشاء الفاتورة بنجاح',
         description: `تم إنشاء الفاتورة رقم ${data.id} بنجاح`,
+        variant: 'default',
       });
     },
     onError: (error: Error) => {
@@ -66,15 +120,18 @@ export function useInvoiceMutations() {
   
   const updateInvoice = useMutation({
     mutationFn: (invoice: Invoice) => invoicesService.update(invoice),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', data.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
+      
+      // تحديث بيانات العميل بعد تحديث الفاتورة
+      await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
+      
       toast({
         title: 'تم تحديث الفاتورة بنجاح',
         description: `تم تحديث الفاتورة رقم ${data.id} بنجاح`,
+        variant: 'default',
       });
     },
     onError: (error: Error) => {
@@ -91,14 +148,17 @@ export function useInvoiceMutations() {
       await invoicesService.delete(invoice.id);
       return invoice;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] }); // 重要: 确保刷新所有客户数据
+      
+      // تحديث بيانات العميل بعد حذف الفاتورة
+      await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
+      
       toast({
         title: 'تم حذف الفاتورة بنجاح',
         description: `تم حذف الفاتورة رقم ${data.id} بنجاح`,
+        variant: 'default',
       });
     },
     onError: (error: Error) => {

@@ -196,6 +196,25 @@ export const customersService = {
       console.error(`Error deleting customer with id ${id}:`, error);
       throw error;
     }
+  },
+  
+  // طريقة لتحديث بيانات العميل
+  async updateCustomerData(customer: Customer): Promise<Customer> {
+    const dbCustomer = appCustomerToDbCustomer(customer);
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .update(dbCustomer)
+      .eq('id', customer.id)
+      .select('*')
+      .single();
+      
+    if (error) {
+      console.error(`Error updating customer with id ${customer.id}:`, error);
+      throw error;
+    }
+    
+    return dbCustomerToAppCustomer(data);
   }
 };
 
