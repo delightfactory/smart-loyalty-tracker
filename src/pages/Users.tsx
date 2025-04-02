@@ -1,12 +1,14 @@
+
 import { UsersSettingsTab } from '@/components/settings/UsersSettingsTab';
 import PageContainer from '@/components/layout/PageContainer';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { UserRole } from '@/lib/auth-types';
 
 const UsersPage = () => {
   const { hasRole } = useAuth();
 
-  if (!hasRole('admin')) {
+  if (!hasRole(UserRole.ADMIN)) {
     return <Navigate to="/profile" replace />;
   }
 
@@ -18,4 +20,3 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
-

@@ -1,288 +1,350 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/auth-types';
 import { useToast } from '@/components/ui/use-toast';
-import { User } from '@supabase/supabase-js';
 
-// تعريف نوع سياق المصادقة
-interface AuthContextType {
+interface AuthState {
   user: User | null;
   profile: UserProfile | null;
-  isAuthenticated: boolean;
+  session: Session | null;
   isLoading: boolean;
+  isAuthenticated: boolean;
+  roles: UserRole[];
+  error: string | null;
+}
+
+interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
 }
 
-// إنشاء سياق المصادقة
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// مزود المصادقة
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    profile: null,
+    session: null,
+    roles: [],
+    isLoading: true,
+    isAuthenticated: false,
+    error: null,
+  });
 
-  // التحقق من جلسة المستخدم عند تحميل التطبيق
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        setIsLoading(true);
-        
-        // التحقق من الجلسة الحالية
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error fetching session:', error);
-          return;
-        }
-        
-        console.info('Initial session check:', data.session ? 'Session exists' : 'No session');
-        
-        if (data.session) {
-          setUser(data.session.user);
-          await fetchUserProfile(data.session.user.id);
-        }
-      } catch (error) {
-        console.error('Error during session check:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    // جلب معلومات الملف الشخصي للمستخدم
-    const fetchUserProfile = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*, user_roles!inner(role)')
-          .eq('id', userId)
-          .single();
-        
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          return;
-        }
-        
-        // تنسيق كائن الملف الشخصي
-        const userRoles = Array.isArray(data.user_roles) 
-          ? data.user_roles.map((r: any) => r.role as UserRole) 
-          : [];
-        
-        const userProfile: UserProfile = {
-          id: data.id,
-          fullName: data.full_name,
-          phone: data.phone,
-          position: data.position,
-          avatarUrl: data.avatar_url,
-          roles: userRoles
-        };
-        
-        setProfile(userProfile);
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      }
-    };
-    
-    fetchSession();
-    
-    // إعداد الاستماع للتغييرات في حالة المصادقة
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
-      
-      if (session) {
-        setUser(session.user);
-        await fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
-      }
-      
-      setIsLoading(false);
-    });
-    
-    // تنظيف المشترك عند إلغاء التحميل
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-  
-  // تسجيل الدخول
-  const signIn = async (email: string, password: string): Promise<void> => {
+  // مزامنة بيانات الملف الشخصي مع حالة المستخدم
+  const fetchUserProfile = async (userId: string) => {
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      // جلب بيانات الملف الشخصي
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
       
-      if (error) {
-        toast({
-          title: 'خطأ في تسجيل الدخول',
-          description: error.message,
-          variant: 'destructive'
-        });
-        throw error;
-      }
+      if (profileError) throw profileError;
       
-      // تعيين بيانات المستخدم وجلب الملف الشخصي
-      setUser(data.user);
+      // جلب أدوار المستخدم
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
       
-      toast({
-        title: 'تم تسجيل الدخول بنجاح',
-        description: `مرحبًا ${data.user?.email}`,
-      });
-    } catch (error: any) {
-      console.error('Error signing in:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      if (rolesError) throw rolesError;
+      
+      // تنسيق بيانات الملف الشخصي
+      const userRoles = rolesData.map(r => r.role as UserRole);
+      
+      const userProfile: UserProfile = {
+        id: profileData.id,
+        fullName: profileData.full_name,
+        email: state.user?.email,
+        avatarUrl: profileData.avatar_url,
+        phone: profileData.phone,
+        position: profileData.position,
+        roles: userRoles,
+      };
+      
+      setState(prev => ({
+        ...prev,
+        profile: userProfile,
+        roles: userRoles,
+        isLoading: false,
+        isAuthenticated: true,
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: 'حدث خطأ أثناء جلب الملف الشخصي',
+      }));
     }
   };
-  
-  // إنشاء حساب جديد
-  const signUp = async (email: string, password: string, fullName: string): Promise<void> => {
+
+  // استمع للتغييرات في حالة المصادقة
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setState(prevState => ({
+          ...prevState,
+          session,
+          user: session?.user || null,
+          isAuthenticated: !!session?.user,
+        }));
+        
+        console.info('Auth state changed:', event, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            // استخدم setTimeout لتجنب أي مشكلات في عمليات supabase المتداخلة
+            setTimeout(() => {
+              fetchUserProfile(session.user.id);
+            }, 0);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setState(prevState => ({
+            ...prevState,
+            profile: null,
+            roles: [],
+            isAuthenticated: false,
+          }));
+        }
+      }
+    );
+
+    // تحقق من وجود جلسة موجودة
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setState(prevState => ({
+        ...prevState,
+        session,
+        user: session?.user || null,
+        isAuthenticated: !!session?.user,
+        isLoading: !!session?.user, // فقط استمر في تحميل إذا كان هناك مستخدم
+      }));
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setState(prevState => ({
+          ...prevState,
+          isLoading: false,
+        }));
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // تسجيل الدخول باستخدام البريد الإلكتروني وكلمة المرور
+  const signIn = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      setState(prev => ({
+        ...prev,
+        user: data.user,
+        session: data.session,
+        isAuthenticated: true,
+        isLoading: false,
+      }));
+      
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: `مرحباً بك ${data.user?.email}`,
+      });
+    } catch (error: any) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      
+      toast({
+        variant: "destructive",
+        title: "فشل تسجيل الدخول",
+        description: error.message,
+      });
+      
+      throw error;
+    }
+  };
+
+  // إنشاء حساب جديد
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName
-          }
-        }
+            full_name: fullName,
+          },
+        },
       });
       
-      if (error) {
-        toast({
-          title: 'خطأ في إنشاء الحساب',
-          description: error.message,
-          variant: 'destructive'
-        });
-        throw error;
-      }
+      if (error) throw error;
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+      }));
       
       toast({
-        title: 'تم إنشاء الحساب بنجاح',
-        description: 'تم إنشاء حسابك بنجاح، الرجاء التحقق من بريدك الإلكتروني للتأكيد.',
+        title: "تم إنشاء الحساب بنجاح",
+        description: "تم إرسال بريد تأكيد الحساب إلى بريدك الإلكتروني",
       });
+      
     } catch (error: any) {
-      console.error('Error signing up:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+      
+      toast({
+        variant: "destructive",
+        title: "فشل إنشاء الحساب",
+        description: error.message,
+      });
+      
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
-  
+
   // تسجيل الخروج
   const signOut = async () => {
     try {
-      setIsLoading(true);
       const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       
-      if (error) {
-        toast({
-          title: 'خطأ في تسجيل الخروج',
-          description: error.message,
-          variant: 'destructive'
-        });
-        throw error;
-      }
-      
-      // إعادة تعيين حالة المستخدم
-      setUser(null);
-      setProfile(null);
+      setState({
+        user: null,
+        profile: null,
+        session: null,
+        roles: [],
+        isLoading: false,
+        isAuthenticated: false,
+        error: null,
+      });
       
       toast({
-        title: 'تم تسجيل الخروج بنجاح',
+        title: "تم تسجيل الخروج بنجاح",
       });
     } catch (error: any) {
-      console.error('Error signing out:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      toast({
+        variant: "destructive",
+        title: "فشل تسجيل الخروج",
+        description: error.message,
+      });
     }
   };
-  
+
   // تحديث الملف الشخصي
-  const updateProfile = async (updatedProfile: Partial<UserProfile>) => {
-    if (!user) {
-      toast({
-        title: 'خطأ',
-        description: 'المستخدم غير مسجل الدخول',
-        variant: 'destructive'
-      });
-      throw new Error('المستخدم غير مسجل الدخول');
-    }
-    
+  const updateProfile = async (profileData: Partial<UserProfile>) => {
     try {
+      if (!state.user) {
+        throw new Error('غير مصرح به');
+      }
+      
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: updatedProfile.fullName,
-          phone: updatedProfile.phone,
-          position: updatedProfile.position,
-          avatar_url: updatedProfile.avatarUrl,
-          updated_at: new Date().toISOString()
+          full_name: profileData.fullName,
+          phone: profileData.phone,
+          position: profileData.position,
+          avatar_url: profileData.avatarUrl,
         })
-        .eq('id', user.id);
+        .eq('id', state.user.id);
       
-      if (error) {
-        toast({
-          title: 'خطأ في تحديث الملف الشخصي',
-          description: error.message,
-          variant: 'destructive'
-        });
-        throw error;
-      }
+      if (error) throw error;
       
-      // تحديث الملف الشخصي المحلي
-      setProfile(prev => prev ? { ...prev, ...updatedProfile } : null);
+      // تحديث الملف الشخصي في الحالة
+      setState(prev => ({
+        ...prev,
+        profile: {
+          ...prev.profile!,
+          ...profileData,
+        },
+      }));
       
       toast({
-        title: 'تم تحديث الملف الشخصي بنجاح',
+        title: "تم تحديث الملف الشخصي بنجاح",
       });
     } catch (error: any) {
-      console.error('Error updating profile:', error);
+      toast({
+        variant: "destructive",
+        title: "فشل تحديث الملف الشخصي",
+        description: error.message,
+      });
+      
       throw error;
     }
   };
-  
+
+  // تحديث كلمة المرور
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "تم تحديث كلمة المرور بنجاح",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "فشل تحديث كلمة المرور",
+        description: error.message,
+      });
+      
+      throw error;
+    }
+  };
+
   // التحقق من صلاحيات المستخدم
   const hasRole = (role: UserRole): boolean => {
-    if (!profile || !profile.roles) return false;
-    return profile.roles.includes(role);
+    return state.roles.includes(role);
   };
-  
-  // قيمة سياق المصادقة
-  const value: AuthContextType = {
-    user,
-    profile,
-    isAuthenticated: !!user,
-    isLoading,
+
+  const authContextValue: AuthContextType = {
+    ...state,
     signIn,
     signUp,
     signOut,
     updateProfile,
-    hasRole
+    updatePassword,
+    hasRole,
   };
-  
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+  return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
 };
 
-// Hook لاستخدام سياق المصادقة
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
   return context;
 };

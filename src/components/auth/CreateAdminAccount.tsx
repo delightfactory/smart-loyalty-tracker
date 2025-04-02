@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
-import { createAdminAccount } from '@/services/admin';
+import { adminCredentials } from '@/services/admin';
 import { UserRole } from '@/lib/auth-types';
 
 interface CreateAdminAccountProps {
@@ -23,7 +23,7 @@ export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSucces
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
-  const { hasRole } = useAuth();
+  const { hasRole, signUp } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -37,7 +37,9 @@ export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSucces
     setIsLoading(true);
     
     try {
-      await createAdminAccount(email, password, fullName);
+      // استخدام وظيفة التسجيل من useAuth
+      await signUp(email, password, fullName);
+      
       setSuccess(true);
       toast({
         title: "تم إنشاء حساب المسؤول بنجاح",
