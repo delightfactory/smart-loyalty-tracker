@@ -1,8 +1,9 @@
+
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, ClipboardCheck, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Printer, Trash2, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import PageContainer from '@/components/layout/PageContainer';
 import { RedemptionStatus } from '@/lib/types';
@@ -59,15 +60,6 @@ const RedemptionDetails = () => {
           description: "تم إلغاء عملية الاستبدال بنجاح",
           variant: "default",
         });
-        
-        // إعادة النقاط للعميل
-        if (customer) {
-          const updatedCustomer = { ...customer };
-          updatedCustomer.pointsRedeemed -= redemption.totalPointsRedeemed;
-          updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
-          
-          // TODO: تحديث بيانات العميل
-        }
       },
       onError: (error) => {
         toast({
@@ -120,6 +112,7 @@ const RedemptionDetails = () => {
       <PageContainer title="تحميل..." subtitle="">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
+            <Loader2 className="h-10 w-10 mb-2 mx-auto animate-spin text-primary" />
             <p className="text-muted-foreground">جاري تحميل بيانات الاستبدال...</p>
           </div>
         </div>
@@ -184,8 +177,13 @@ const RedemptionDetails = () => {
               variant="outline" 
               size="sm"
               onClick={handleCancelRedemption}
+              disabled={updateRedemption.isPending}
             >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
+              {updateRedemption.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+              )}
               تغيير الحالة
             </Button>
           )}
@@ -195,8 +193,13 @@ const RedemptionDetails = () => {
             size="sm"
             className="text-red-600"
             onClick={() => setShowDeleteDialog(true)}
+            disabled={deleteRedemption.isPending}
           >
-            <Trash2 className="h-4 w-4 mr-2" />
+            {deleteRedemption.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
             حذف
           </Button>
         </div>

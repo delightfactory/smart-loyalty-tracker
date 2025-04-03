@@ -1,90 +1,100 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService, customersService } from '@/services/database';
-import { Redemption, RedemptionItem, RedemptionStatus } from '@/lib/types';
+import { Redemption, RedemptionItem, RedemptionStatus, Customer } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
-import { useCustomers } from './useCustomers';
+
+// تحديث نقاط العميل بناءً على عمليات الاستبدال
+const updateCustomerPoints = async (customerId: string, queryClient: any) => {
+  try {
+    console.log(`Updating customer points for ${customerId}`);
+    
+    // الحصول على بيانات العميل
+    const customer = await customersService.getById(customerId);
+    
+    if (!customer) {
+      console.error(`Customer with ID ${customerId} not found`);
+      return;
+    }
+    
+    // الحصول على جميع عمليات الاستبدال للعميل
+    const redemptions = await redemptionsService.getByCustomerId(customerId);
+    
+    // حساب النقاط المستبدلة فقط للعمليات غير الملغية
+    let totalPointsRedeemed = 0;
+    
+    redemptions.forEach(redemption => {
+      if (redemption.status !== RedemptionStatus.CANCELLED) {
+        totalPointsRedeemed += redemption.totalPointsRedeemed;
+      }
+    });
+    
+    // تحديث بيانات العميل
+    const updatedCustomer: Customer = {
+      ...customer,
+      pointsRedeemed: totalPointsRedeemed,
+      currentPoints: customer.pointsEarned - totalPointsRedeemed
+    };
+    
+    // تحديث بيانات العميل في قاعدة البيانات
+    await customersService.update(updatedCustomer);
+    
+    // تحديث الذاكرة المؤقتة
+    queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    
+    console.log(`Updated customer points for ${customerId}:`, {
+      pointsRedeemed: totalPointsRedeemed,
+      currentPoints: customer.pointsEarned - totalPointsRedeemed
+    });
+  } catch (error) {
+    console.error('Error updating customer points:', error);
+  }
+};
 
 export function useRedemptions() {
   const queryClient = useQueryClient();
-  const { getById: getCustomerById, updateCustomer } = useCustomers();
   
   // Set up realtime updates for redemptions
   useRealtime('redemptions');
   
+  // إسترجاع كل عمليات الاستبدال
   const getAll = useQuery({
     queryKey: ['redemptions'],
     queryFn: () => redemptionsService.getAll()
   });
   
-  const getById = (id: string) => useQuery({
-    queryKey: ['redemptions', id],
-    queryFn: () => redemptionsService.getById(id),
-    enabled: !!id
-  });
-  
+  // إسترجاع عمليات الاستبدال لعميل محدد
   const getByCustomerId = (customerId: string) => useQuery({
     queryKey: ['redemptions', 'customer', customerId],
     queryFn: () => redemptionsService.getByCustomerId(customerId),
     enabled: !!customerId
   });
   
-  // دالة لتحديث نقاط العميل بعد عمليات الاستبدال
-  const updateCustomerPoints = async (customerId: string) => {
-    try {
-      // الحصول على بيانات العميل
-      const customer = await customersService.getById(customerId);
-      
-      if (!customer) {
-        console.error(`Customer with ID ${customerId} not found`);
-        return;
-      }
-      
-      // الحصول على جميع عمليات الاستبدال المكتملة للعميل
-      const redemptions = await redemptionsService.getByCustomerId(customerId);
-      const completedRedemptions = redemptions.filter(r => r.status === RedemptionStatus.COMPLETED);
-      
-      // حساب إجمالي النقاط المستبدلة
-      const totalPointsRedeemed = completedRedemptions.reduce(
-        (sum, redemption) => sum + redemption.totalPointsRedeemed, 0
-      );
-      
-      // تحديث بيانات العميل
-      customer.pointsRedeemed = totalPointsRedeemed;
-      customer.currentPoints = customer.pointsEarned - totalPointsRedeemed;
-      
-      // تحديث بيانات العميل في قاعدة البيانات
-      await customersService.updateCustomerData(customer);
-      
-      // تحديث الذاكرة المؤقتة
-      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      
-      console.log(`Updated customer points for ${customerId}:`, {
-        pointsRedeemed: totalPointsRedeemed,
-        currentPoints: customer.pointsEarned - totalPointsRedeemed
-      });
-    } catch (error) {
-      console.error('Error updating customer points:', error);
-    }
-  };
+  // إسترجاع عملية استبدال محددة بالمعرف
+  const getById = (id: string) => useQuery({
+    queryKey: ['redemptions', id],
+    queryFn: () => redemptionsService.getById(id),
+    enabled: !!id
+  });
   
+  // إضافة عملية استبدال جديدة
   const addRedemption = useMutation({
-    mutationFn: ({ redemption, items }: { redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id'>[] }) => 
-      redemptionsService.create(redemption, items),
+    mutationFn: ({ redemption, items }: { 
+      redemption: Omit<Redemption, 'id'>, 
+      items: Omit<RedemptionItem, 'id'>[] 
+    }) => redemptionsService.create(redemption, items),
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', data.customerId] });
       
-      // تحديث نقاط العميل بعد إضافة عملية استبدال
-      if (data.status === RedemptionStatus.COMPLETED) {
-        await updateCustomerPoints(data.customerId);
-      }
+      // تحديث نقاط العميل بعد إضافة الاستبدال
+      await updateCustomerPoints(data.customerId, queryClient);
       
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       toast({
         title: 'تم تسجيل عملية الاستبدال بنجاح',
-        description: 'تم تسجيل عملية استبدال النقاط بنجاح',
+        description: `تم تسجيل استبدال النقاط برقم ${data.id}`,
         variant: 'default',
       });
     },
@@ -97,6 +107,7 @@ export function useRedemptions() {
     }
   });
   
+  // تحديث عملية استبدال
   const updateRedemption = useMutation({
     mutationFn: (redemption: Redemption) => redemptionsService.update(redemption),
     onSuccess: async (data) => {
@@ -104,42 +115,12 @@ export function useRedemptions() {
       queryClient.invalidateQueries({ queryKey: ['redemptions', data.id] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', data.customerId] });
       
-      // تحديث نقاط العميل عند تغيير حالة الاستبدال
-      const customerQuery = getCustomerById(data.customerId);
-      const customer = customerQuery.data;
+      // تحديث نقاط العميل بعد تعديل الاستبدال
+      await updateCustomerPoints(data.customerId, queryClient);
       
-      if (customer) {
-        const oldRedemptionQuery = getById(data.id);
-        const oldRedemption = oldRedemptionQuery.data;
-        
-        if (oldRedemption && oldRedemption.status !== data.status) {
-          let updatedCustomer = { ...customer };
-          
-          // إذا تم تغيير الحالة من "مكتمل" إلى حالة أخرى، يتم إعادة النقاط للعميل
-          if (oldRedemption.status === RedemptionStatus.COMPLETED && 
-              data.status !== RedemptionStatus.COMPLETED) {
-            updatedCustomer.pointsRedeemed -= data.totalPointsRedeemed;
-            updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
-          } 
-          // إذا تم تغيير الحالة من حالة أخرى إلى "مكتمل"، يتم خصم النقاط من العميل
-          else if (oldRedemption.status !== RedemptionStatus.COMPLETED && 
-                  data.status === RedemptionStatus.COMPLETED) {
-            updatedCustomer.pointsRedeemed += data.totalPointsRedeemed;
-            updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
-          }
-          
-          // تحديث بيانات العميل
-          updateCustomer.mutate(updatedCustomer);
-        }
-      } else {
-        // إذا لم يكن هناك بيانات للعميل في الذاكرة المؤقتة، نستخدم الطريقة العامة لتحديث النقاط
-        await updateCustomerPoints(data.customerId);
-      }
-      
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       toast({
         title: 'تم تحديث عملية الاستبدال بنجاح',
-        description: 'تم تحديث معلومات عملية استبدال النقاط بنجاح',
+        description: `تم تحديث عملية الاستبدال برقم ${data.id}`,
         variant: 'default',
       });
     },
@@ -152,23 +133,20 @@ export function useRedemptions() {
     }
   });
   
+  // حذف عملية استبدال
   const deleteRedemption = useMutation({
-    mutationFn: (redemption: { id: string; customerId: string; status: RedemptionStatus }) => 
-      redemptionsService.delete(redemption.id).then(() => redemption),
-    onSuccess: async (data) => {
+    mutationFn: (params: { id: string; customerId: string; status: RedemptionStatus }) => 
+      redemptionsService.delete(params.id).then(() => params),
+    onSuccess: async (params) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
+      queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', params.customerId] });
       
-      // إذا كانت عملية الاستبدال مكتملة، يجب تحديث نقاط العميل بعد الحذف
-      if (data.status === RedemptionStatus.COMPLETED) {
-        await updateCustomerPoints(data.customerId);
-      }
-      
-      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      // تحديث نقاط العميل بعد حذف الاستبدال
+      await updateCustomerPoints(params.customerId, queryClient);
       
       toast({
         title: 'تم حذف عملية الاستبدال بنجاح',
-        description: 'تم حذف عملية استبدال النقاط بنجاح من النظام',
+        description: 'تم حذف عملية الاستبدال من النظام',
         variant: 'default',
       });
     },
@@ -183,8 +161,8 @@ export function useRedemptions() {
   
   return {
     getAll,
-    getById,
     getByCustomerId,
+    getById,
     addRedemption,
     updateRedemption,
     deleteRedemption

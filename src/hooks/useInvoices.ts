@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService } from '@/services/database';
-import { Invoice, InvoiceItem, InvoiceStatus } from '@/lib/types';
+import { Invoice, InvoiceItem, InvoiceStatus, Customer } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
@@ -41,6 +41,8 @@ export function useCustomerInvoices(customerId: string) {
 // تحقق من حالة الفواتير وتحديث بيانات العميل
 const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient: any) => {
   try {
+    console.log(`Updating customer data for ${customerId} based on invoices`);
+    
     // الحصول على جميع فواتير العميل
     const invoices = await invoicesService.getByCustomerId(customerId);
     
@@ -78,13 +80,16 @@ const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient
     });
     
     // تحديث بيانات العميل
-    customer.pointsEarned = totalPointsEarned;
-    customer.pointsRedeemed = totalPointsRedeemed;
-    customer.currentPoints = totalPointsEarned - totalPointsRedeemed;
-    customer.creditBalance = totalCreditBalance;
+    const updatedCustomer: Customer = {
+      ...customer,
+      pointsEarned: totalPointsEarned,
+      pointsRedeemed: totalPointsRedeemed,
+      currentPoints: totalPointsEarned - totalPointsRedeemed,
+      creditBalance: totalCreditBalance
+    };
     
     // تحديث بيانات العميل في قاعدة البيانات
-    await customersService.updateCustomerData(customer);
+    await customersService.update(updatedCustomer);
     
     // تحديث الذاكرة المؤقتة
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
@@ -122,6 +127,7 @@ export function useInvoiceMutations() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error creating invoice:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء إنشاء الفاتورة: ${error.message}`,
@@ -147,6 +153,7 @@ export function useInvoiceMutations() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating invoice:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تحديث الفاتورة: ${error.message}`,
@@ -174,6 +181,7 @@ export function useInvoiceMutations() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error deleting invoice:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء حذف الفاتورة: ${error.message}`,

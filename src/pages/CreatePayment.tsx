@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -23,12 +24,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, CreditCard, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import PageContainer from '@/components/layout/PageContainer';
-import { customers, invoices, getCustomerById, updateInvoice, addPayment } from '@/lib/data';
 import { InvoiceStatus, Payment, PaymentMethod, PaymentType } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { usePayments } from '@/hooks/usePayments';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useInvoices } from '@/hooks/useInvoices';
 
 const paymentSchema = z.object({
   customerId: z.string({ required_error: "يجب اختيار العميل" }),
@@ -43,12 +46,27 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 const CreatePayment = () => {
   const { customerId } = useParams<{ customerId?: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // استخدام حالة المكان للاستلام من صفحة المسار
+  const { state } = location;
+  const preselectedInvoiceId = state?.invoiceId;
   
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(customerId);
   const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  
+  // React Query hooks
+  const { getAll: getAllCustomers } = useCustomers();
+  const { getByCustomerId: getCustomerInvoices, getById: getInvoiceById } = useInvoices();
+  const { addPayment } = usePayments();
+  
+  // استرجاع بيانات العملاء والفواتير
+  const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
+  const { data: customerInvoices = [], isLoading: isLoadingInvoices } = getCustomerInvoices(selectedCustomerId || '');
+  const { data: invoiceData, isLoading: isLoadingInvoice } = getInvoiceById(selectedInvoice?.id || '');
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -62,26 +80,47 @@ const CreatePayment = () => {
     },
   });
   
+  // عند تحميل الصفحة، تحقق من وجود معرف عميل وفاتورة مسبقا
   useEffect(() => {
-    if (selectedCustomerId) {
-      const customerUnpaidInvoices = invoices.filter(
-        invoice => invoice.customerId === selectedCustomerId && 
-        (invoice.status === InvoiceStatus.UNPAID || 
-         invoice.status === InvoiceStatus.PARTIALLY_PAID || 
-         invoice.status === InvoiceStatus.OVERDUE)
+    console.log('Component mounted. customerId:', customerId, 'preselectedInvoiceId:', preselectedInvoiceId);
+    
+    if (customerId) {
+      form.setValue('customerId', customerId);
+      setSelectedCustomerId(customerId);
+    }
+    
+    if (preselectedInvoiceId && selectedCustomerId) {
+      form.setValue('invoiceId', preselectedInvoiceId);
+      onInvoiceChange(preselectedInvoiceId);
+    }
+  }, [customerId, preselectedInvoiceId]);
+  
+  // عند تغيير العميل المختار، تحديث قائمة الفواتير غير المدفوعة
+  useEffect(() => {
+    if (selectedCustomerId && customerInvoices) {
+      const filteredInvoices = customerInvoices.filter(
+        invoice => invoice.status === InvoiceStatus.UNPAID || 
+                  invoice.status === InvoiceStatus.PARTIALLY_PAID || 
+                  invoice.status === InvoiceStatus.OVERDUE
       );
       
-      setUnpaidInvoices(customerUnpaidInvoices);
+      setUnpaidInvoices(filteredInvoices);
       
-      if (customerUnpaidInvoices.length > 0 && !form.getValues('invoiceId')) {
-        onInvoiceChange(customerUnpaidInvoices[0].id);
-      } else if (customerUnpaidInvoices.length === 0) {
+      if (filteredInvoices.length > 0 && !form.getValues('invoiceId')) {
+        // إذا كان هناك فاتورة محددة مسبقا من المسار، استخدمها
+        if (preselectedInvoiceId) {
+          onInvoiceChange(preselectedInvoiceId);
+        } else {
+          // وإلا استخدم أول فاتورة غير مدفوعة
+          onInvoiceChange(filteredInvoices[0].id);
+        }
+      } else if (filteredInvoices.length === 0) {
         setSelectedInvoice(null);
         form.setValue('invoiceId', '');
         form.setValue('amount', 0);
       }
     }
-  }, [selectedCustomerId]);
+  }, [selectedCustomerId, customerInvoices]);
   
   const onCustomerChange = (value: string) => {
     setSelectedCustomerId(value);
@@ -92,40 +131,30 @@ const CreatePayment = () => {
   
   const onInvoiceChange = (value: string) => {
     form.setValue('invoiceId', value);
-    const invoice = invoices.find(inv => inv.id === value);
+    
+    // البحث عن الفاتورة المحددة من قائمة الفواتير
+    const invoice = unpaidInvoices.find(inv => inv.id === value);
     setSelectedInvoice(invoice);
     
     if (invoice) {
-      const paidAmount = invoice.payments?.reduce((sum, payment) => {
-        if (payment.type === 'payment') {
+      // حساب المبلغ المدفوع مسبقا
+      const paidAmount = invoice.payments?.reduce((sum: number, payment: Payment) => {
+        if (payment.type === PaymentType.PAYMENT) {
           return sum + payment.amount;
-        } else if (payment.type === 'refund') {
+        } else if (payment.type === PaymentType.REFUND) {
           return sum - payment.amount;
         }
         return sum;
       }, 0) || 0;
       
+      // تحديث مبلغ الدفعة بالمبلغ المتبقي
       const remainingAmount = invoice.totalAmount - paidAmount;
       form.setValue('amount', remainingAmount > 0 ? remainingAmount : 0);
     }
   };
   
   const onSubmit = (data: PaymentFormValues) => {
-    const invoice = invoices.find(inv => inv.id === data.invoiceId);
-    
-    if (!invoice) {
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "الفاتورة غير موجودة",
-      });
-      return;
-    }
-    
-    const paymentId = `PAY${Date.now().toString().slice(-6)}`;
-    
-    const payment: Payment = {
-      id: paymentId,
+    const payment: Omit<Payment, 'id'> = {
       customerId: data.customerId,
       invoiceId: data.invoiceId,
       amount: data.amount,
@@ -135,14 +164,31 @@ const CreatePayment = () => {
       type: PaymentType.PAYMENT
     };
     
-    addPayment(payment);
-    
-    toast({
-      title: "تم إضافة الدفعة بنجاح",
-      description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}`,
+    // استخدام mutation لإضافة الدفعة
+    addPayment.mutate(payment, {
+      onSuccess: (newPayment) => {
+        toast({
+          title: "تم إضافة الدفعة بنجاح",
+          description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}`,
+        });
+        
+        navigate(customerId ? `/customer/${customerId}` : '/invoices');
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "خطأ",
+          description: `حدث خطأ أثناء تسجيل الدفعة: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     });
-    
-    navigate(customerId ? `/customer/${customerId}` : '/invoices');
+  };
+  
+  // تحقق من حالة التحميل
+  const isLoading = isLoadingCustomers || isLoadingInvoices || addPayment.isPending;
+  
+  const getCustomerById = (id: string) => {
+    return customers.find(customer => customer.id === id);
   };
   
   return (
@@ -154,272 +200,291 @@ const CreatePayment = () => {
         </Button>
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>تفاصيل الدفعة</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="customerId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>العميل</FormLabel>
-                        <Select
-                          onValueChange={(value) => onCustomerChange(value)}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="اختر العميل" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {customers.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                {customer.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {selectedCustomerId && (
+      {isLoading && (
+        <div className="flex justify-center items-center my-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>جاري تحميل البيانات...</p>
+        </div>
+      )}
+      
+      {!isLoading && (
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>تفاصيل الدفعة</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="invoiceId"
+                      name="customerId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>الفاتورة</FormLabel>
+                          <FormLabel>العميل</FormLabel>
                           <Select
-                            onValueChange={(value) => onInvoiceChange(value)}
+                            onValueChange={(value) => onCustomerChange(value)}
+                            defaultValue={field.value}
                             value={field.value}
+                            disabled={!!customerId} // تعطيل إذا تم تمرير معرف العميل
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="اختر الفاتورة" />
+                                <SelectValue placeholder="اختر العميل" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {unpaidInvoices.length > 0 ? (
-                                unpaidInvoices.map((invoice) => (
-                                  <SelectItem key={invoice.id} value={invoice.id}>
-                                    {invoice.id} - {invoice.totalAmount.toLocaleString('ar-EG')} ج.م
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem disabled value="none">
-                                  لا توجد فواتير غير مدفوعة
+                              {customers.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id}>
+                                  {customer.name}
                                 </SelectItem>
-                              )}
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  )}
-                  
-                  {selectedInvoice && (
-                    <>
+                    
+                    {selectedCustomerId && (
                       <FormField
                         control={form.control}
-                        name="amount"
+                        name="invoiceId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>مبلغ الدفعة</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="paymentDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>تاريخ الدفع</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="method"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>طريقة الدفع</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormLabel>الفاتورة</FormLabel>
+                            <Select
+                              onValueChange={(value) => onInvoiceChange(value)}
+                              value={field.value}
+                            >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="اختر طريقة الدفع" />
+                                  <SelectValue placeholder="اختر الفاتورة" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="نقداً">نقداً</SelectItem>
-                                <SelectItem value="تحويل بنكي">تحويل بنكي</SelectItem>
-                                <SelectItem value="شيك">شيك</SelectItem>
-                                <SelectItem value="بطاقة ائتمان">بطاقة ائتمان</SelectItem>
+                                {unpaidInvoices.length > 0 ? (
+                                  unpaidInvoices.map((invoice) => (
+                                    <SelectItem key={invoice.id} value={invoice.id}>
+                                      {invoice.id} - {invoice.totalAmount.toLocaleString('ar-EG')} ج.م
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem disabled value="none">
+                                    لا توجد فواتير غير مدفوعة
+                                  </SelectItem>
+                                )}
                               </SelectContent>
                             </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>ملاحظات</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="أي ملاحظات إضافية..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-              
-              {unpaidInvoices.length === 0 && selectedCustomerId && (
-                <Alert variant="destructive" className="my-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>لا توجد فواتير غير مدفوعة</AlertTitle>
-                  <AlertDescription>
-                    هذا العميل ليس لديه أي فواتير مستحقة الدفع حالياً.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={!selectedInvoice || unpaidInvoices.length === 0}
-              >
-                <CreditCard className="ml-2 h-4 w-4" />
-                تسجيل الدفعة
-              </Button>
-            </form>
-          </Form>
-        </div>
-        
-        {selectedCustomerId && (
-          <Card>
-            <CardHeader>
-              <CardTitle>تفاصيل العميل</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const customer = getCustomerById(selectedCustomerId);
-                if (!customer) return <p>لا توجد بيانات</p>;
-                
-                return (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">اسم العميل</p>
-                        <p className="text-lg font-bold">{customer.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">المسؤول</p>
-                        <p className="text-lg font-bold">{customer.contactPerson}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">رقم الهاتف</p>
-                        <p className="text-lg font-bold">{customer.phone}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">نوع النشاط</p>
-                        <p className="text-lg font-bold">{customer.businessType}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">رصيد النقاط</p>
-                        <p className="text-lg font-bold">{customer.currentPoints}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">رصيد الآجل</p>
-                        <p className="text-lg font-bold">{customer.creditBalance.toLocaleString('ar-EG')} ج.م</p>
-                      </div>
-                    </div>
+                    )}
                     
                     {selectedInvoice && (
-                      <div className="mt-6">
-                        <p className="text-base font-medium text-muted-foreground mb-2">تفاصيل الفاتورة</p>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">رقم الفاتورة</p>
-                            <p className="text-lg font-bold">{selectedInvoice.id}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">التاريخ</p>
-                            <p className="text-lg font-bold">
-                              {new Date(selectedInvoice.date).toLocaleDateString('ar-EG')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">الإجمالي</p>
-                            <p className="text-lg font-bold">{selectedInvoice.totalAmount.toLocaleString('ar-EG')} ج.م</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">الحالة</p>
-                            <p className={cn(
-                              "text-lg font-bold",
-                              selectedInvoice.status === InvoiceStatus.PAID ? "text-green-600" :
-                              selectedInvoice.status === InvoiceStatus.UNPAID ? "text-amber-600" :
-                              selectedInvoice.status === InvoiceStatus.OVERDUE ? "text-red-600" :
-                              "text-blue-600"
-                            )}>{selectedInvoice.status}</p>
-                          </div>
-                          
-                          {selectedInvoice.payments && selectedInvoice.payments.length > 0 && (
-                            <div className="col-span-2">
-                              <p className="text-sm font-medium text-muted-foreground">الدفعات السابقة</p>
-                              <div className="mt-2 space-y-2">
-                                {selectedInvoice.payments.map((payment: Payment) => (
-                                  <div key={payment.id} className="flex justify-between p-2 bg-gray-50 rounded-md">
-                                    <div className="flex items-center">
-                                      <span className={payment.type === 'payment' ? "text-green-600" : "text-red-600"}>
-                                        {payment.type === 'payment' ? '+ ' : '- '}
-                                        {payment.amount.toLocaleString('ar-EG')} ج.م
-                                      </span>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground">
-                                      {new Date(payment.date).toLocaleDateString('ar-EG')}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="amount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>مبلغ الدفعة</FormLabel>
+                              <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="paymentDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>تاريخ الدفع</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="method"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>طريقة الدفع</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="اختر طريقة الدفع" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="نقداً">نقداً</SelectItem>
+                                  <SelectItem value="تحويل بنكي">تحويل بنكي</SelectItem>
+                                  <SelectItem value="شيك">شيك</SelectItem>
+                                  <SelectItem value="بطاقة ائتمان">بطاقة ائتمان</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="notes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ملاحظات</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="أي ملاحظات إضافية..." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {unpaidInvoices.length === 0 && selectedCustomerId && (
+                  <Alert variant="destructive" className="my-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>لا توجد فواتير غير مدفوعة</AlertTitle>
+                    <AlertDescription>
+                      هذا العميل ليس لديه أي فواتير مستحقة الدفع حالياً.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={!selectedInvoice || unpaidInvoices.length === 0 || addPayment.isPending}
+                >
+                  {addPayment.isPending ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      جاري التسجيل...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="ml-2 h-4 w-4" />
+                      تسجيل الدفعة
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </div>
+          
+          {selectedCustomerId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>تفاصيل العميل</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const customer = getCustomerById(selectedCustomerId);
+                  if (!customer) return <p>لا توجد بيانات</p>;
+                  
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">اسم العميل</p>
+                          <p className="text-lg font-bold">{customer.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">المسؤول</p>
+                          <p className="text-lg font-bold">{customer.contactPerson}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">رقم الهاتف</p>
+                          <p className="text-lg font-bold">{customer.phone}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">نوع النشاط</p>
+                          <p className="text-lg font-bold">{customer.businessType}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">رصيد النقاط</p>
+                          <p className="text-lg font-bold">{customer.currentPoints}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">رصيد الآجل</p>
+                          <p className="text-lg font-bold">{customer.creditBalance.toLocaleString('ar-EG')} ج.م</p>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                      
+                      {selectedInvoice && (
+                        <div className="mt-6">
+                          <p className="text-base font-medium text-muted-foreground mb-2">تفاصيل الفاتورة</p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">رقم الفاتورة</p>
+                              <p className="text-lg font-bold">{selectedInvoice.id}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">التاريخ</p>
+                              <p className="text-lg font-bold">
+                                {new Date(selectedInvoice.date).toLocaleDateString('ar-EG')}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">الإجمالي</p>
+                              <p className="text-lg font-bold">{selectedInvoice.totalAmount.toLocaleString('ar-EG')} ج.م</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">الحالة</p>
+                              <p className={cn(
+                                "text-lg font-bold",
+                                selectedInvoice.status === InvoiceStatus.PAID ? "text-green-600" :
+                                selectedInvoice.status === InvoiceStatus.UNPAID ? "text-amber-600" :
+                                selectedInvoice.status === InvoiceStatus.OVERDUE ? "text-red-600" :
+                                "text-blue-600"
+                              )}>{selectedInvoice.status}</p>
+                            </div>
+                            
+                            {selectedInvoice.payments && selectedInvoice.payments.length > 0 && (
+                              <div className="col-span-2">
+                                <p className="text-sm font-medium text-muted-foreground">الدفعات السابقة</p>
+                                <div className="mt-2 space-y-2">
+                                  {selectedInvoice.payments.map((payment: Payment) => (
+                                    <div key={payment.id} className="flex justify-between p-2 bg-gray-50 rounded-md">
+                                      <div className="flex items-center">
+                                        <span className={payment.type === PaymentType.PAYMENT ? "text-green-600" : "text-red-600"}>
+                                          {payment.type === PaymentType.PAYMENT ? '+ ' : '- '}
+                                          {payment.amount.toLocaleString('ar-EG')} ج.م
+                                        </span>
+                                      </div>
+                                      <span className="text-sm text-muted-foreground">
+                                        {new Date(payment.date).toLocaleDateString('ar-EG')}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </PageContainer>
   );
 };

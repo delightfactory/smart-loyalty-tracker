@@ -1,13 +1,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
-import { Product } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
+import { Product, ProductCategory } from '@/lib/types';
+import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
 export function useProducts() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   
   // Set up realtime updates for products
   useRealtime('products');
@@ -55,9 +54,13 @@ export function useProducts() {
     mutationFn: async (product: Omit<Product, 'id'>) => {
       console.log('Adding product (before processing):', product);
       
-      // تحويل القيم الرقمية بشكل صريح
+      // تحويل القيم الرقمية بشكل صريح وضمان أن جميع الحقول الضرورية موجودة
       const processedProduct = {
         ...product,
+        name: product.name || '',
+        category: product.category || ProductCategory.ENGINE_CARE,
+        unit: product.unit || '',
+        brand: product.brand || '',
         price: Number(product.price || 0),
         pointsEarned: Number(product.pointsEarned || 0),
         pointsRequired: Number(product.pointsRequired || 0)
