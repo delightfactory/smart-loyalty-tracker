@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoicesService } from '@/services/database';
+import { invoicesService, customersService } from '@/services/database';
 import { Invoice, InvoiceItem, InvoiceStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
@@ -80,8 +80,8 @@ const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient
     customer.currentPoints = totalPointsEarned - totalPointsRedeemed;
     customer.creditBalance = totalCreditBalance;
     
-    // تحديث بيانات العميل في قاعدة البيانات
-    await invoicesService.updateCustomerData(customer);
+    // تحديث بيانات العميل في قاعدة البيانات - هنا نستخدم customersService بدلاً من invoicesService
+    await customersService.updateCustomerData(customer);
     
     // تحديث الذاكرة المؤقتة
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
