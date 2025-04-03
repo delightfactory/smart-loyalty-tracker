@@ -1,9 +1,9 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService } from '@/services/database';
 import { Invoice, InvoiceItem, InvoiceStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
-import { useCustomers } from './useCustomers';
 
 // Custom hook for fetching all invoices
 export function useAllInvoices() {
@@ -45,7 +45,7 @@ const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient
     const invoices = await invoicesService.getByCustomerId(customerId);
     
     // الحصول على بيانات العميل
-    const { data: customer } = await customersService.getById(customerId);
+    const customer = await customersService.getById(customerId);
     
     if (!customer) {
       console.error(`Customer with ID ${customerId} not found`);

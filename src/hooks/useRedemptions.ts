@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService, customersService } from '@/services/database';
 import { Redemption, RedemptionItem, RedemptionStatus } from '@/lib/types';
@@ -34,7 +33,7 @@ export function useRedemptions() {
   const updateCustomerPoints = async (customerId: string) => {
     try {
       // الحصول على بيانات العميل
-      const { data: customer } = await customersService.getById(customerId);
+      const customer = await customersService.getById(customerId);
       
       if (!customer) {
         console.error(`Customer with ID ${customerId} not found`);

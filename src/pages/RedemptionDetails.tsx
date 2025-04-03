@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -83,7 +82,11 @@ const RedemptionDetails = () => {
   const handleDeleteRedemption = () => {
     if (!redemption) return;
     
-    deleteRedemption.mutate(redemption.id, {
+    deleteRedemption.mutate({
+      id: redemption.id,
+      customerId: redemption.customerId,
+      status: redemption.status
+    }, {
       onSuccess: () => {
         toast({
           title: "تم الحذف",
