@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { redemptionsService } from '@/services/database';
+import { redemptionsService, customersService } from '@/services/database';
 import { Redemption, RedemptionItem, RedemptionStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
@@ -30,12 +30,58 @@ export function useRedemptions() {
     enabled: !!customerId
   });
   
+  // دالة لتحديث نقاط العميل بعد عمليات الاستبدال
+  const updateCustomerPoints = async (customerId: string) => {
+    try {
+      // الحصول على بيانات العميل
+      const { data: customer } = await customersService.getById(customerId);
+      
+      if (!customer) {
+        console.error(`Customer with ID ${customerId} not found`);
+        return;
+      }
+      
+      // الحصول على جميع عمليات الاستبدال المكتملة للعميل
+      const redemptions = await redemptionsService.getByCustomerId(customerId);
+      const completedRedemptions = redemptions.filter(r => r.status === RedemptionStatus.COMPLETED);
+      
+      // حساب إجمالي النقاط المستبدلة
+      const totalPointsRedeemed = completedRedemptions.reduce(
+        (sum, redemption) => sum + redemption.totalPointsRedeemed, 0
+      );
+      
+      // تحديث بيانات العميل
+      customer.pointsRedeemed = totalPointsRedeemed;
+      customer.currentPoints = customer.pointsEarned - totalPointsRedeemed;
+      
+      // تحديث بيانات العميل في قاعدة البيانات
+      await customersService.updateCustomerData(customer);
+      
+      // تحديث الذاكرة المؤقتة
+      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
+      console.log(`Updated customer points for ${customerId}:`, {
+        pointsRedeemed: totalPointsRedeemed,
+        currentPoints: customer.pointsEarned - totalPointsRedeemed
+      });
+    } catch (error) {
+      console.error('Error updating customer points:', error);
+    }
+  };
+  
   const addRedemption = useMutation({
     mutationFn: ({ redemption, items }: { redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id'>[] }) => 
       redemptionsService.create(redemption, items),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', data.customerId] });
+      
+      // تحديث نقاط العميل بعد إضافة عملية استبدال
+      if (data.status === RedemptionStatus.COMPLETED) {
+        await updateCustomerPoints(data.customerId);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       toast({
         title: 'تم تسجيل عملية الاستبدال بنجاح',
@@ -86,6 +132,9 @@ export function useRedemptions() {
           // تحديث بيانات العميل
           updateCustomer.mutate(updatedCustomer);
         }
+      } else {
+        // إذا لم يكن هناك بيانات للعميل في الذاكرة المؤقتة، نستخدم الطريقة العامة لتحديث النقاط
+        await updateCustomerPoints(data.customerId);
       }
       
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
@@ -105,10 +154,19 @@ export function useRedemptions() {
   });
   
   const deleteRedemption = useMutation({
-    mutationFn: (id: string) => redemptionsService.delete(id),
-    onSuccess: () => {
+    mutationFn: (redemption: { id: string; customerId: string; status: RedemptionStatus }) => 
+      redemptionsService.delete(redemption.id).then(() => redemption),
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
+      
+      // إذا كانت عملية الاستبدال مكتملة، يجب تحديث نقاط العميل بعد الحذف
+      if (data.status === RedemptionStatus.COMPLETED) {
+        await updateCustomerPoints(data.customerId);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
       toast({
         title: 'تم حذف عملية الاستبدال بنجاح',
         description: 'تم حذف عملية استبدال النقاط بنجاح من النظام',

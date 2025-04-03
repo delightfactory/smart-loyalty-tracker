@@ -53,14 +53,17 @@ export function useProducts() {
   
   const addProduct = useMutation({
     mutationFn: async (product: Omit<Product, 'id'>) => {
-      console.log('Adding product:', product);
+      console.log('Adding product (before processing):', product);
+      
       // تحويل القيم الرقمية بشكل صريح
       const processedProduct = {
         ...product,
-        price: Number(product.price),
-        pointsEarned: Number(product.pointsEarned),
-        pointsRequired: Number(product.pointsRequired)
+        price: Number(product.price || 0),
+        pointsEarned: Number(product.pointsEarned || 0),
+        pointsRequired: Number(product.pointsRequired || 0)
       };
+      
+      console.log('Adding product (after processing):', processedProduct);
       return await productsService.create(processedProduct);
     },
     onSuccess: (data) => {
@@ -83,14 +86,17 @@ export function useProducts() {
   
   const updateProduct = useMutation({
     mutationFn: async (product: Product) => {
-      console.log('Updating product:', product);
+      console.log('Updating product (before processing):', product);
+      
       // تحويل القيم الرقمية بشكل صريح
       const processedProduct = {
         ...product,
-        price: Number(product.price),
-        pointsEarned: Number(product.pointsEarned),
-        pointsRequired: Number(product.pointsRequired)
+        price: Number(product.price || 0),
+        pointsEarned: Number(product.pointsEarned || 0),
+        pointsRequired: Number(product.pointsRequired || 0)
       };
+      
+      console.log('Updating product (after processing):', processedProduct);
       return await productsService.update(processedProduct);
     },
     onSuccess: (data) => {

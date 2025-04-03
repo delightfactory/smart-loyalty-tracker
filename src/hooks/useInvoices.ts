@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService } from '@/services/database';
 import { Invoice, InvoiceItem, InvoiceStatus } from '@/lib/types';
@@ -41,51 +40,64 @@ export function useCustomerInvoices(customerId: string) {
 
 // تحقق من حالة الفواتير وتحديث بيانات العميل
 const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient: any) => {
-  // الحصول على جميع فواتير العميل
-  const invoices = await invoicesService.getByCustomerId(customerId);
-  
-  // حساب النقاط الإجمالية المكتسبة والمستبدلة
-  let totalPointsEarned = 0;
-  let totalPointsRedeemed = 0;
-  let totalCreditBalance = 0;
-  
-  // حساب الرصيد المستحق (الآجل)
-  invoices.forEach(invoice => {
-    totalPointsEarned += invoice.pointsEarned;
-    totalPointsRedeemed += invoice.pointsRedeemed;
+  try {
+    // الحصول على جميع فواتير العميل
+    const invoices = await invoicesService.getByCustomerId(customerId);
     
-    // حساب الرصيد الآجل للفواتير غير المدفوعة أو المدفوعة جزئياً
-    if (invoice.status === InvoiceStatus.UNPAID || 
-        invoice.status === InvoiceStatus.PARTIALLY_PAID || 
-        invoice.status === InvoiceStatus.OVERDUE) {
-      
-      // حساب المبلغ المدفوع
-      const paidAmount = invoice.payments?.reduce((sum, payment) => {
-        return payment.type === 'payment' ? sum + payment.amount : sum - payment.amount;
-      }, 0) || 0;
-      
-      // إضافة المبلغ المتبقي إلى الرصيد الآجل
-      totalCreditBalance += (invoice.totalAmount - paidAmount);
+    // الحصول على بيانات العميل
+    const { data: customer } = await customersService.getById(customerId);
+    
+    if (!customer) {
+      console.error(`Customer with ID ${customerId} not found`);
+      return;
     }
-  });
-  
-  // تحديث بيانات العميل
-  const { getById } = useCustomers();
-  const customerQuery = getById(customerId);
-  
-  if (customerQuery.data) {
-    const customer = customerQuery.data;
+    
+    // حساب النقاط الإجمالية المكتسبة والمستبدلة
+    let totalPointsEarned = 0;
+    let totalPointsRedeemed = 0;
+    let totalCreditBalance = 0;
+    
+    // حساب الرصيد المستحق (الآجل)
+    invoices.forEach(invoice => {
+      totalPointsEarned += invoice.pointsEarned;
+      totalPointsRedeemed += invoice.pointsRedeemed;
+      
+      // حساب الرصيد الآجل للفواتير غير المدفوعة أو المدفوعة جزئياً
+      if (invoice.status === InvoiceStatus.UNPAID || 
+          invoice.status === InvoiceStatus.PARTIALLY_PAID || 
+          invoice.status === InvoiceStatus.OVERDUE) {
+        
+        // حساب المبلغ المدفوع
+        const paidAmount = invoice.payments?.reduce((sum, payment) => {
+          return payment.type === 'payment' ? sum + payment.amount : sum - payment.amount;
+        }, 0) || 0;
+        
+        // إضافة المبلغ المتبقي إلى الرصيد الآجل
+        totalCreditBalance += (invoice.totalAmount - paidAmount);
+      }
+    });
+    
+    // تحديث بيانات العميل
     customer.pointsEarned = totalPointsEarned;
     customer.pointsRedeemed = totalPointsRedeemed;
     customer.currentPoints = totalPointsEarned - totalPointsRedeemed;
     customer.creditBalance = totalCreditBalance;
     
-    // تحديث بيانات العميل في قاعدة البيانات - هنا نستخدم customersService بدلاً من invoicesService
+    // تحديث بيانات العميل في قاعدة البيانات
     await customersService.updateCustomerData(customer);
     
     // تحديث الذاكرة المؤقتة
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
+    
+    console.log(`Updated customer data for ${customerId}:`, {
+      pointsEarned: totalPointsEarned,
+      pointsRedeemed: totalPointsRedeemed,
+      currentPoints: totalPointsEarned - totalPointsRedeemed,
+      creditBalance: totalCreditBalance
+    });
+  } catch (error) {
+    console.error('Error updating customer data based on invoices:', error);
   }
 };
 
