@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { Customer } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { canRedeemPoints } from '@/lib/calculations';
 
 interface RedemptionSummaryProps {
   customer: Customer | null;
@@ -37,6 +36,14 @@ const RedemptionSummary = ({
     );
   }
 
+  // تأكد من أن جميع القيم رقمية
+  const currentPoints = Number(customer.currentPoints) || 0;
+  const pointsEarned = Number(customer.pointsEarned) || 0;
+  const pointsRedeemed = Number(customer.pointsRedeemed) || 0;
+  
+  // تحقق من إمكانية الاستبدال
+  const canRedeem = currentPoints >= totalRedemptionPoints && totalRedemptionPoints > 0;
+
   return (
     <Card className="animate-fade-in">
       <CardHeader>
@@ -58,18 +65,18 @@ const RedemptionSummary = ({
           <div className="pt-4 border-t">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">النقاط المكتسبة:</span>
-              <span className="font-medium">{customer.pointsEarned}</span>
+              <span className="font-medium">{pointsEarned}</span>
             </div>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">النقاط المستبدلة:</span>
-            <span className="font-medium">{customer.pointsRedeemed}</span>
+            <span className="font-medium">{pointsRedeemed}</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">الرصيد الحالي:</span>
-            <span className="font-bold text-lg">{customer.currentPoints}</span>
+            <span className="font-bold text-lg">{currentPoints}</span>
           </div>
           
           <div className="flex justify-between items-center pt-4 border-t">
@@ -81,19 +88,19 @@ const RedemptionSummary = ({
             <span className="font-medium">الرصيد المتبقي:</span>
             <span className={cn(
               "text-lg font-bold",
-              customer.currentPoints - totalRedemptionPoints >= 0 ? "text-green-600" : "text-red-600"
+              currentPoints - totalRedemptionPoints >= 0 ? "text-green-600" : "text-red-600"
             )}>
-              {customer.currentPoints - totalRedemptionPoints}
+              {currentPoints - totalRedemptionPoints}
             </span>
           </div>
           
           <div className={cn(
             "p-3 rounded-lg text-sm flex items-center mt-4",
-            canRedeemPoints(customer.id, totalRedemptionPoints) 
+            canRedeem
               ? "bg-green-100 text-green-800" 
               : "bg-red-100 text-red-800"
           )}>
-            {canRedeemPoints(customer.id, totalRedemptionPoints) ? (
+            {canRedeem ? (
               <>
                 <Check className="h-4 w-4 mr-2" />
                 <span>يمكن إتمام عملية الاستبدال</span>
@@ -102,9 +109,9 @@ const RedemptionSummary = ({
               <>
                 <X className="h-4 w-4 mr-2" />
                 <span>
-                  {customer.currentPoints < totalRedemptionPoints 
+                  {currentPoints < totalRedemptionPoints 
                     ? "رصيد النقاط غير كافٍ"
-                    : "يوجد فواتير غير مدفوعة"
+                    : (totalRedemptionPoints <= 0 ? "يجب إضافة منتجات للاستبدال" : "لا يمكن إتمام عملية الاستبدال")
                   }
                 </span>
               </>
@@ -117,7 +124,7 @@ const RedemptionSummary = ({
           className="w-full" 
           size="lg"
           onClick={onConfirm}
-          disabled={disableConfirm}
+          disabled={disableConfirm || !canRedeem}
         >
           تأكيد الاستبدال
         </Button>

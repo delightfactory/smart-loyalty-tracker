@@ -66,6 +66,7 @@ export function useProducts() {
         pointsRequired: Number(product.pointsRequired || 0)
       };
       
+      // التأكد من أن جميع القيم العددية هي أرقام حقيقية وليست سلاسل نصية
       console.log('Adding product (after processing):', processedProduct);
       return await productsService.create(processedProduct);
     },

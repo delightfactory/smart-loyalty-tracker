@@ -9,7 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import PageContainer from '@/components/layout/PageContainer';
 import { RedemptionItem, InvoiceStatus, RedemptionStatus, Customer } from '@/lib/types';
-import { canRedeemPoints } from '@/lib/calculations';
 import RedemptionForm from '@/components/redemption/RedemptionForm';
 import RedemptionSummary from '@/components/redemption/RedemptionSummary';
 import RedemptionDetailsCard from '@/components/redemption/RedemptionDetailsCard';
@@ -55,7 +54,11 @@ const CreateRedemption = () => {
   
   useEffect(() => {
     if (redemptionItems.length > 0) {
-      const calculatedTotalPoints = redemptionItems.reduce((sum, item) => sum + (item.totalPointsRequired || 0), 0);
+      const calculatedTotalPoints = redemptionItems.reduce((sum, item) => {
+        // تأكد من أن القيمة رقمية
+        const itemPoints = Number(item.totalPointsRequired) || 0;
+        return sum + itemPoints;
+      }, 0);
       setTotalRedemptionPoints(calculatedTotalPoints);
     } else {
       setTotalRedemptionPoints(0);
@@ -64,7 +67,7 @@ const CreateRedemption = () => {
   
   // Check if customer has unpaid invoices
   const hasUnpaidInvoices = () => {
-    if (!customerInvoices.length) return false;
+    if (!customerInvoices || !customerInvoices.length) return false;
     
     return customerInvoices.some(invoice => 
       invoice.status === InvoiceStatus.UNPAID || 
@@ -101,10 +104,31 @@ const CreateRedemption = () => {
       return;
     }
     
-    if (customer && !canRedeemPoints(customer.id, totalRedemptionPoints)) {
+    if (!customer) {
       toast({
         title: "خطأ",
-        description: "العميل لا يملك نقاط كافية أو لديه فواتير غير مدفوعة",
+        description: "لم يتم العثور على بيانات العميل",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // تحقق من رصيد نقاط العميل
+    const customerCurrentPoints = Number(customer.currentPoints) || 0;
+    if (customerCurrentPoints < totalRedemptionPoints) {
+      toast({
+        title: "خطأ",
+        description: "العميل لا يملك نقاط كافية للاستبدال",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // تحقق من وجود فواتير غير مدفوعة
+    if (hasUnpaidInvoices()) {
+      toast({
+        title: "خطأ",
+        description: "العميل لديه فواتير غير مدفوعة، يجب تسويتها أولا",
         variant: "destructive"
       });
       return;
@@ -128,8 +152,8 @@ const CreateRedemption = () => {
         // Update the customer's points
         if (customer) {
           const updatedCustomer = { ...customer };
-          updatedCustomer.pointsRedeemed += totalRedemptionPoints;
-          updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
+          updatedCustomer.pointsRedeemed = Number(updatedCustomer.pointsRedeemed || 0) + totalRedemptionPoints;
+          updatedCustomer.currentPoints = Number(updatedCustomer.pointsEarned || 0) - Number(updatedCustomer.pointsRedeemed || 0);
           
           updateCustomer.mutate(updatedCustomer);
         }
@@ -178,7 +202,7 @@ const CreateRedemption = () => {
                 العميل: {customer.name}
               </Badge>
               <Badge variant="outline" className="bg-green-100 text-green-800 px-3 py-1">
-                النقاط المتبقية: {customer.currentPoints}
+                النقاط المتبقية: {customer.currentPoints || 0}
               </Badge>
             </div>
           )}
@@ -274,7 +298,7 @@ const CreateRedemption = () => {
               العميل: {customer.name}
             </Badge>
             <Badge variant="outline" className="bg-green-100 text-green-800 px-3 py-1">
-              النقاط المتاحة: {customer.currentPoints}
+              النقاط المتاحة: {customer.currentPoints || 0}
             </Badge>
           </div>
         )}
@@ -303,7 +327,7 @@ const CreateRedemption = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">النقاط المكتسبة</span>
-                  <span className="font-medium">{customer.pointsEarned}</span>
+                  <span className="font-medium">{Number(customer.pointsEarned) || 0}</span>
                 </div>
                 <Progress value={100} className="h-2 bg-blue-100" indicatorClassName="bg-blue-500" />
               </div>
@@ -311,10 +335,10 @@ const CreateRedemption = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">النقاط المستبدلة</span>
-                  <span className="font-medium">{customer.pointsRedeemed}</span>
+                  <span className="font-medium">{Number(customer.pointsRedeemed) || 0}</span>
                 </div>
                 <Progress 
-                  value={(customer.pointsRedeemed / Math.max(customer.pointsEarned, 1)) * 100} 
+                  value={((Number(customer.pointsRedeemed) || 0) / Math.max(Number(customer.pointsEarned) || 1, 1)) * 100} 
                   className="h-2 bg-green-100" 
                   indicatorClassName="bg-green-500" 
                 />
@@ -326,7 +350,7 @@ const CreateRedemption = () => {
                   <span className="font-medium">{totalRedemptionPoints}</span>
                 </div>
                 <Progress 
-                  value={(totalRedemptionPoints / Math.max(customer.currentPoints, 1)) * 100} 
+                  value={(totalRedemptionPoints / Math.max(Number(customer.currentPoints) || 1, 1)) * 100} 
                   className="h-2 bg-amber-100" 
                   indicatorClassName="bg-amber-500" 
                 />
@@ -416,24 +440,25 @@ const CreateRedemption = () => {
                 disableConfirm={
                   !customer || 
                   redemptionItems.length === 0 || 
-                  !canRedeemPoints(customer?.id || '', totalRedemptionPoints) ||
+                  totalRedemptionPoints > (Number(customer?.currentPoints) || 0) ||
+                  hasUnpaidInvoices() ||
                   submitting
                 }
               />
             </CardContent>
             {redemptionItems.length > 0 && customer && (
               <CardFooter className="flex flex-col items-start">
-                <Alert variant={customer.currentPoints >= totalRedemptionPoints ? "default" : "destructive"} className="w-full mt-4">
-                  {customer.currentPoints >= totalRedemptionPoints ? (
+                <Alert variant={(Number(customer.currentPoints) || 0) >= totalRedemptionPoints ? "default" : "destructive"} className="w-full mt-4">
+                  {(Number(customer.currentPoints) || 0) >= totalRedemptionPoints ? (
                     <CheckCircle2 className="h-4 w-4" />
                   ) : (
                     <AlertCircle className="h-4 w-4" />
                   )}
                   <AlertTitle>حالة النقاط</AlertTitle>
                   <AlertDescription>
-                    {customer.currentPoints >= totalRedemptionPoints 
-                      ? `سيتبقى ${customer.currentPoints - totalRedemptionPoints} نقطة بعد الاستبدال`
-                      : `العميل يحتاج ${totalRedemptionPoints - customer.currentPoints} نقطة إضافية`
+                    {(Number(customer.currentPoints) || 0) >= totalRedemptionPoints 
+                      ? `سيتبقى ${(Number(customer.currentPoints) || 0) - totalRedemptionPoints} نقطة بعد الاستبدال`
+                      : `العميل يحتاج ${totalRedemptionPoints - (Number(customer.currentPoints) || 0)} نقطة إضافية`
                     }
                   </AlertDescription>
                 </Alert>

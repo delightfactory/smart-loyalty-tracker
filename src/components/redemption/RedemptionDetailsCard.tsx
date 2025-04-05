@@ -1,175 +1,152 @@
 
-import { Redemption, Product, RedemptionStatus } from '@/lib/types';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  ShoppingBag, 
-  Star, 
-  AlertTriangle, 
-  XCircle,
-  Link 
-} from 'lucide-react';
-import { getProductById } from '@/lib/data';
-import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Redemption, RedemptionStatus } from '@/lib/types';
+import { Calendar, Printer, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { useProducts } from '@/hooks/useProducts';
 
 interface RedemptionDetailsCardProps {
   redemption: Redemption;
   onCancel?: () => void;
   onPrint?: () => void;
-  showActions?: boolean;
 }
 
-const RedemptionDetailsCard = ({ 
-  redemption,
-  onCancel,
-  onPrint,
-  showActions = true
-}: RedemptionDetailsCardProps) => {
-  const getStatusBadge = (status: RedemptionStatus) => {
-    switch(status) {
+const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDetailsCardProps) => {
+  // Fetch products to get their details
+  const { getAll } = useProducts();
+  const { data: products = [] } = getAll;
+  
+  // Format date to local date string
+  const formattedDate = new Date(redemption.date).toLocaleDateString('ar-EG', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  // Get status display elements
+  const getStatusDisplay = () => {
+    switch(redemption.status) {
       case RedemptionStatus.COMPLETED:
-        return (
-          <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" />
-            مكتمل
-          </Badge>
-        );
+        return {
+          text: 'مكتمل',
+          bgColor: 'bg-green-100 text-green-800',
+          icon: <CheckCircle className="h-4 w-4 mr-2" />
+        };
       case RedemptionStatus.PENDING:
-        return (
-          <Badge className="bg-amber-100 text-amber-800 flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            قيد الانتظار
-          </Badge>
-        );
+        return {
+          text: 'قيد الانتظار',
+          bgColor: 'bg-amber-100 text-amber-800',
+          icon: <Clock className="h-4 w-4 mr-2" />
+        };
       case RedemptionStatus.CANCELLED:
-        return (
-          <Badge className="bg-red-100 text-red-800 flex items-center gap-1">
-            <XCircle className="h-3 w-3" />
-            ملغي
-          </Badge>
-        );
+        return {
+          text: 'ملغي',
+          bgColor: 'bg-red-100 text-red-800',
+          icon: <AlertTriangle className="h-4 w-4 mr-2" />
+        };
       default:
-        return null;
+        return {
+          text: 'غير معروف',
+          bgColor: 'bg-gray-100 text-gray-800',
+          icon: <Clock className="h-4 w-4 mr-2" />
+        };
     }
   };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('ar-EG', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+  
+  const statusDisplay = getStatusDisplay();
+  
+  // Ensure total points is displayed as a number
+  const totalPointsRedeemed = Number(redemption.totalPointsRedeemed) || 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Star className="h-5 w-5 text-amber-500" />
-              تفاصيل عملية الاستبدال
-            </CardTitle>
-            {getStatusBadge(redemption.status)}
-          </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{formatDate(redemption.date)}</span>
-          </div>
-          
-          <div className="border rounded-lg p-3 bg-slate-50">
-            <h4 className="font-medium text-sm text-slate-600 mb-2 flex items-center">
-              <ShoppingBag className="h-4 w-4 mr-1" />
-              المنتجات المستبدلة
-            </h4>
-            <div className="space-y-3">
-              {redemption.items.map((item, index) => {
-                const product = getProductById(item.productId);
-                return (
-                  <div key={index} className="flex justify-between items-center border-b pb-2 last:border-b-0 last:pb-0">
-                    <div>
-                      <p className="font-medium">{product?.name || 'منتج غير معروف'}</p>
-                      <p className="text-xs text-muted-foreground">{product?.brand || ''}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm">الكمية: {item.quantity}</p>
-                      <p className="text-xs flex items-center justify-end">
-                        <Star className="h-3 w-3 text-amber-500 mr-1" />
-                        {item.totalPointsRequired} نقطة
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+    <Card className="overflow-hidden">
+      <CardHeader className="bg-slate-50">
+        <div className="flex justify-between items-center">
+          <CardTitle>تفاصيل الاستبدال</CardTitle>
+          <Badge className={statusDisplay.bgColor}>
+            <div className="flex items-center">
+              {statusDisplay.icon}
+              {statusDisplay.text}
+            </div>
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4 rtl:space-x-reverse">
+            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm text-muted-foreground">تاريخ الاستبدال</p>
+              <p className="font-medium">{formattedDate}</p>
             </div>
           </div>
           
-          <div className="flex justify-between items-center pt-2 border-t">
-            <span className="font-medium">إجمالي النقاط المستبدلة:</span>
-            <span className="text-lg font-bold text-amber-600">{redemption.totalPointsRedeemed} نقطة</span>
+          <Separator />
+          
+          <div className="space-y-1">
+            <h3 className="text-sm font-medium text-muted-foreground">العناصر المستبدلة</h3>
+            {redemption.items.length > 0 ? (
+              <div className="space-y-2 mt-3">
+                {redemption.items.map((item, index) => {
+                  // Find product details
+                  const product = products.find(p => p.id === item.productId);
+                  const productName = product ? product.name : 'منتج غير معروف';
+                  const pointsRequired = Number(item.pointsRequired) || 0;
+                  const totalPointsRequired = Number(item.totalPointsRequired) || 0;
+                  const quantity = Number(item.quantity) || 0;
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className="border rounded-md p-3 bg-slate-50"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-medium">{productName}</span>
+                        <span>{pointsRequired} × {quantity} = {totalPointsRequired} نقطة</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">لا توجد عناصر</p>
+            )}
           </div>
           
-          {redemption.status === RedemptionStatus.PENDING && (
-            <div className={cn(
-              "p-3 rounded-lg text-sm flex items-center mt-2",
-              "bg-amber-50 text-amber-800 border border-amber-200"
-            )}>
-              <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
-              <span>هذه العملية قيد الانتظار. سيتم تجهيز المنتجات وإخطار العميل عند الانتهاء.</span>
+          <div className="border-t pt-4 space-y-2">
+            <div className="flex justify-between text-lg font-semibold">
+              <span>إجمالي النقاط المستبدلة:</span>
+              <span className="text-amber-600">{totalPointsRedeemed} نقطة</span>
             </div>
-          )}
+          </div>
           
           {redemption.status === RedemptionStatus.CANCELLED && (
-            <div className={cn(
-              "p-3 rounded-lg text-sm flex items-center mt-2",
-              "bg-red-50 text-red-800 border border-red-200"
-            )}>
-              <XCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-              <span>تم إلغاء عملية الاستبدال هذه.</span>
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
+              <div className="flex items-center">
+                <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+                <span className="font-medium text-red-800">تم إلغاء عملية الاستبدال</span>
+              </div>
             </div>
           )}
-        </CardContent>
-        
-        {showActions && (
-          <CardFooter className="flex gap-2 justify-between border-t pt-4">
-            <div className="flex gap-2">
-              {redemption.status === RedemptionStatus.PENDING && onCancel && (
-                <Button variant="outline" size="sm" onClick={onCancel} className="text-red-600">
-                  <XCircle className="h-4 w-4 mr-1" />
-                  إلغاء الاستبدال
-                </Button>
-              )}
-              
-              {onPrint && (
-                <Button variant="outline" size="sm" onClick={onPrint}>
-                  <Link className="h-4 w-4 mr-1" />
-                  طباعة الإيصال
-                </Button>
-              )}
-            </div>
-            
-            {redemption.status === RedemptionStatus.COMPLETED && (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                تم الاستلام
-              </Badge>
-            )}
-          </CardFooter>
+        </div>
+      </CardContent>
+      <CardFooter className="bg-slate-50 flex gap-3 justify-end">
+        {onPrint && (
+          <Button variant="outline" size="sm" onClick={onPrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            طباعة الإيصال
+          </Button>
         )}
-      </Card>
-    </motion.div>
+        {onCancel && redemption.status === RedemptionStatus.PENDING && (
+          <Button variant="destructive" size="sm" onClick={onCancel}>
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            إلغاء الاستبدال
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
   );
 };
 
