@@ -8,7 +8,7 @@ import { useRealtime } from './use-realtime';
 export function useProducts() {
   const queryClient = useQueryClient();
   
-  // Set up realtime updates for products
+  // إعداد التحديثات في الوقت الفعلي للمنتجات
   useRealtime('products');
   
   const getAll = useQuery({

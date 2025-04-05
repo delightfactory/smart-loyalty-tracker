@@ -56,7 +56,7 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
 export function useRedemptions() {
   const queryClient = useQueryClient();
   
-  // Set up realtime updates for redemptions
+  // إعداد التحديثات في الوقت الفعلي لعمليات الاستبدال
   useRealtime('redemptions');
   
   // إسترجاع كل عمليات الاستبدال
@@ -84,7 +84,18 @@ export function useRedemptions() {
     mutationFn: ({ redemption, items }: { 
       redemption: Omit<Redemption, 'id'>, 
       items: Omit<RedemptionItem, 'id'>[] 
-    }) => redemptionsService.create(redemption, items),
+    }) => {
+      console.log('Adding redemption:', redemption);
+      console.log('Redemption items:', items);
+      
+      // التأكد من نوع التاريخ
+      let processedRedemption = { ...redemption };
+      if (typeof processedRedemption.date === 'string') {
+        processedRedemption.date = new Date(processedRedemption.date);
+      }
+      
+      return redemptionsService.create(processedRedemption, items);
+    },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', data.customerId] });
@@ -99,6 +110,7 @@ export function useRedemptions() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding redemption:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تسجيل عملية الاستبدال: ${error.message}`,
@@ -109,7 +121,17 @@ export function useRedemptions() {
   
   // تحديث عملية استبدال
   const updateRedemption = useMutation({
-    mutationFn: (redemption: Redemption) => redemptionsService.update(redemption),
+    mutationFn: (redemption: Redemption) => {
+      console.log('Updating redemption:', redemption);
+      
+      // التأكد من نوع التاريخ
+      let processedRedemption = { ...redemption };
+      if (typeof processedRedemption.date === 'string') {
+        processedRedemption.date = new Date(processedRedemption.date);
+      }
+      
+      return redemptionsService.update(processedRedemption);
+    },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', data.id] });
@@ -125,6 +147,7 @@ export function useRedemptions() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating redemption:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تحديث عملية الاستبدال: ${error.message}`,
@@ -135,8 +158,10 @@ export function useRedemptions() {
   
   // حذف عملية استبدال
   const deleteRedemption = useMutation({
-    mutationFn: (params: { id: string; customerId: string; status: RedemptionStatus }) => 
-      redemptionsService.delete(params.id).then(() => params),
+    mutationFn: (params: { id: string; customerId: string; status: RedemptionStatus }) => {
+      console.log('Deleting redemption:', params);
+      return redemptionsService.delete(params.id).then(() => params);
+    },
     onSuccess: async (params) => {
       queryClient.invalidateQueries({ queryKey: ['redemptions'] });
       queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', params.customerId] });
@@ -151,6 +176,7 @@ export function useRedemptions() {
       });
     },
     onError: (error: Error) => {
+      console.error('Error deleting redemption:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء حذف عملية الاستبدال: ${error.message}`,

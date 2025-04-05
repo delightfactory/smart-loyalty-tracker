@@ -8,7 +8,7 @@ import { useRealtime } from './use-realtime';
 export function usePayments() {
   const queryClient = useQueryClient();
   
-  // Set up realtime updates for payments
+  // إعداد التحديثات في الوقت الفعلي للمدفوعات
   useRealtime('payments');
   
   const getAll = useQuery({
@@ -30,15 +30,19 @@ export function usePayments() {
   
   const addPayment = useMutation({
     mutationFn: (payment: Omit<Payment, 'id'>) => {
-      // Ensure we're working with a proper payment object with a Date instance
-      if (typeof payment.date === 'string') {
-        payment.date = new Date(payment.date);
+      console.log('Adding payment (original):', payment);
+      
+      // التأكد من أننا نعمل مع كائن دفعة صحيح مع نوع Date
+      let processedPayment = { ...payment };
+      
+      if (typeof processedPayment.date === 'string') {
+        processedPayment.date = new Date(processedPayment.date);
       }
       
-      // Make sure all numeric values are properly converted
-      const processedPayment = {
-        ...payment,
-        amount: Number(payment.amount || 0)
+      // التأكد من تحويل جميع القيم الرقمية بشكل صحيح
+      processedPayment = {
+        ...processedPayment,
+        amount: Number(processedPayment.amount || 0)
       };
       
       console.log('Adding payment (processed):', processedPayment);
@@ -47,18 +51,23 @@ export function usePayments() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
+      
       if (data.invoiceId) {
         queryClient.invalidateQueries({ queryKey: ['payments', 'invoice', data.invoiceId] });
         queryClient.invalidateQueries({ queryKey: ['invoices', data.invoiceId] });
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
       }
+      
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
       toast({
         title: 'تم تسجيل الدفعة بنجاح',
         description: 'تم تسجيل الدفعة بنجاح وتحديث حالة الفاتورة',
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding payment:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تسجيل الدفعة: ${error.message}`,
@@ -69,29 +78,42 @@ export function usePayments() {
   
   const updatePayment = useMutation({
     mutationFn: (payment: Payment) => {
-      // Ensure all numeric values are properly converted
+      console.log('Updating payment (original):', payment);
+      
+      // التأكد من تحويل جميع القيم الرقمية بشكل صحيح
       const processedPayment = {
         ...payment,
         amount: Number(payment.amount || 0)
       };
       
+      // التأكد من نوع التاريخ
+      if (typeof processedPayment.date === 'string') {
+        processedPayment.date = new Date(processedPayment.date);
+      }
+      
+      console.log('Updating payment (processed):', processedPayment);
       return paymentsService.update(processedPayment);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
+      
       if (data.invoiceId) {
         queryClient.invalidateQueries({ queryKey: ['payments', 'invoice', data.invoiceId] });
         queryClient.invalidateQueries({ queryKey: ['invoices', data.invoiceId] });
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
       }
+      
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
       toast({
         title: 'تم تحديث الدفعة بنجاح',
         description: 'تم تحديث معلومات الدفعة بنجاح',
       });
     },
     onError: (error: Error) => {
+      console.error('Error updating payment:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء تحديث الدفعة: ${error.message}`,
@@ -107,12 +129,14 @@ export function usePayments() {
       // تحديث جميع البيانات المتعلقة بالعملاء والفواتير
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      
       toast({
         title: 'تم حذف الدفعة بنجاح',
         description: 'تم حذف الدفعة بنجاح من النظام',
       });
     },
     onError: (error: Error) => {
+      console.error('Error deleting payment:', error);
       toast({
         title: 'خطأ',
         description: `حدث خطأ أثناء حذف الدفعة: ${error.message}`,
