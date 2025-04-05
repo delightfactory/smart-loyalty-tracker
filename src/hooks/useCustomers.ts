@@ -52,14 +52,15 @@ export function useCustomers() {
       // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
       const normalizedCustomer: Omit<Customer, 'id'> = {
         ...customer,
-        currentPoints: Number(customer.currentPoints),
-        pointsEarned: Number(customer.pointsEarned),
-        pointsRedeemed: Number(customer.pointsRedeemed),
-        classification: Number(customer.classification),
-        level: Number(customer.level),
-        creditBalance: Number(customer.creditBalance)
+        currentPoints: Number(customer.currentPoints || 0),
+        pointsEarned: Number(customer.pointsEarned || 0),
+        pointsRedeemed: Number(customer.pointsRedeemed || 0),
+        classification: Number(customer.classification || 0),
+        level: Number(customer.level || 0),
+        creditBalance: Number(customer.creditBalance || 0)
       };
       
+      console.log('Adding customer (normalized):', normalizedCustomer);
       return customersService.create(normalizedCustomer);
     },
     onSuccess: () => {
@@ -84,14 +85,15 @@ export function useCustomers() {
       // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
       const normalizedCustomer: Customer = {
         ...customer,
-        currentPoints: Number(customer.currentPoints),
-        pointsEarned: Number(customer.pointsEarned),
-        pointsRedeemed: Number(customer.pointsRedeemed),
-        classification: Number(customer.classification),
-        level: Number(customer.level),
-        creditBalance: Number(customer.creditBalance)
+        currentPoints: Number(customer.currentPoints || 0),
+        pointsEarned: Number(customer.pointsEarned || 0),
+        pointsRedeemed: Number(customer.pointsRedeemed || 0),
+        classification: Number(customer.classification || 0),
+        level: Number(customer.level || 0),
+        creditBalance: Number(customer.creditBalance || 0)
       };
       
+      console.log('Updating customer (normalized):', normalizedCustomer);
       return customersService.update(normalizedCustomer);
     },
     onSuccess: (data) => {

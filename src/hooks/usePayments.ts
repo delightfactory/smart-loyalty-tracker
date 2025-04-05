@@ -34,7 +34,15 @@ export function usePayments() {
       if (typeof payment.date === 'string') {
         payment.date = new Date(payment.date);
       }
-      return paymentsService.create(payment);
+      
+      // Make sure all numeric values are properly converted
+      const processedPayment = {
+        ...payment,
+        amount: Number(payment.amount || 0)
+      };
+      
+      console.log('Adding payment (processed):', processedPayment);
+      return paymentsService.create(processedPayment);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -60,7 +68,15 @@ export function usePayments() {
   });
   
   const updatePayment = useMutation({
-    mutationFn: (payment: Payment) => paymentsService.update(payment),
+    mutationFn: (payment: Payment) => {
+      // Ensure all numeric values are properly converted
+      const processedPayment = {
+        ...payment,
+        amount: Number(payment.amount || 0)
+      };
+      
+      return paymentsService.update(processedPayment);
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
