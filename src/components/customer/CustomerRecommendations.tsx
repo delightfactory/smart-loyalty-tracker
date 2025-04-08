@@ -237,16 +237,16 @@ function getPurchasePattern(invoices: Invoice[]) {
 function getMostFrequentCategory(categoryDistribution: Record<ProductCategory, number>) {
   return Object.entries(categoryDistribution)
     .reduce((max, [category, percentage]) => 
-      percentage > max.percentage ? { category, percentage } : max, 
+      (percentage as number) > (max.percentage as number) ? { category, percentage } : max, 
       { category: ProductCategory.ENGINE_CARE, percentage: 0 }
     ).category as ProductCategory;
 }
 
 function getLeastFrequentCategory(categoryDistribution: Record<ProductCategory, number>) {
   return Object.entries(categoryDistribution)
-    .filter(([_, percentage]) => percentage > 0) // Only consider categories that were purchased
+    .filter(([_, percentage]) => (percentage as number) > 0) // Only consider categories that were purchased
     .reduce((min, [category, percentage]) => 
-      percentage < min.percentage ? { category, percentage } : min, 
+      (percentage as number) < (min.percentage as number) ? { category, percentage } : min, 
       { category: ProductCategory.ENGINE_CARE, percentage: 100 }
     ).category as ProductCategory;
 }

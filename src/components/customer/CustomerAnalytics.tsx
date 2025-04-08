@@ -42,10 +42,10 @@ const CustomerAnalytics = ({ customerId }: CustomerAnalyticsProps) => {
   
   // Format category distribution data for pie chart
   const categoryData = Object.entries(categoryDistribution)
-    .filter(([_, value]) => value > 0)
+    .filter(([_, value]) => Number(value) > 0)
     .map(([key, value]) => ({
       name: key,
-      value
+      value: Number(value)
     }));
   
   // Format monthly purchase data
