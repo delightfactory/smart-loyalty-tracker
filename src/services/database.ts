@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
@@ -29,9 +28,7 @@ import {
   appRedemptionItemToDbRedemptionItem
 } from '@/lib/adapters';
 
-// خدمات المنتجات
 export const productsService = {
-  // الحصول على جميع المنتجات
   async getAll(): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
@@ -46,7 +43,6 @@ export const productsService = {
     return data.map(dbProductToAppProduct);
   },
   
-  // الحصول على منتج بواسطة المعرف
   async getById(id: string): Promise<Product> {
     const { data, error } = await supabase
       .from('products')
@@ -62,10 +58,9 @@ export const productsService = {
     return dbProductToAppProduct(data);
   },
   
-  // إنشاء منتج جديد
   async create(product: Omit<Product, 'id'>): Promise<Product> {
     const dbProduct = appProductToDbProduct(product as Product);
-    delete dbProduct.id; // حذف المعرف لأننا نريد أن يتم إنشاؤه تلقائيًا
+    delete dbProduct.id;
     
     const { data, error } = await supabase
       .from('products')
@@ -81,7 +76,6 @@ export const productsService = {
     return dbProductToAppProduct(data);
   },
   
-  // تحديث منتج
   async update(product: Product): Promise<Product> {
     const dbProduct = appProductToDbProduct(product);
     
@@ -100,7 +94,6 @@ export const productsService = {
     return dbProductToAppProduct(data);
   },
   
-  // حذف منتج
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('products')
@@ -114,9 +107,7 @@ export const productsService = {
   }
 };
 
-// خدمات العملاء
 export const customersService = {
-  // الحصول على جميع العملاء
   async getAll(): Promise<Customer[]> {
     const { data, error } = await supabase
       .from('customers')
@@ -131,7 +122,6 @@ export const customersService = {
     return data.map(dbCustomerToAppCustomer);
   },
   
-  // الحصول على عميل بواسطة المعرف
   async getById(id: string): Promise<Customer> {
     const { data, error } = await supabase
       .from('customers')
@@ -147,11 +137,9 @@ export const customersService = {
     return dbCustomerToAppCustomer(data);
   },
   
-  // إنشاء عميل جديد
   async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
-    // تأكد من إنشاء معرّف فريد لعميل الجديد
     const customerId = `CUST${Date.now().toString().slice(-6)}`;
     dbCustomer.id = customerId;
     
@@ -169,7 +157,6 @@ export const customersService = {
     return dbCustomerToAppCustomer(data);
   },
   
-  // تحديث عميل
   async update(customer: Customer): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
@@ -188,7 +175,6 @@ export const customersService = {
     return dbCustomerToAppCustomer(data);
   },
   
-  // حذف عميل
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('customers')
@@ -201,7 +187,6 @@ export const customersService = {
     }
   },
   
-  // طريقة لتحديث بيانات العميل
   async updateCustomerData(customer: Customer): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
     
@@ -221,9 +206,7 @@ export const customersService = {
   }
 };
 
-// خدمة المدفوعات
 export const paymentsService = {
-  // الحصول على جميع المدفوعات
   async getAll(): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
@@ -238,7 +221,6 @@ export const paymentsService = {
     return data.map(dbPaymentToAppPayment);
   },
   
-  // الحصول على مدفوعات عميل
   async getByCustomerId(customerId: string): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
@@ -254,7 +236,6 @@ export const paymentsService = {
     return data.map(dbPaymentToAppPayment);
   },
   
-  // الحصول على مدفوعات فاتورة
   async getByInvoiceId(invoiceId: string): Promise<Payment[]> {
     const { data, error } = await supabase
       .from('payments')
@@ -270,44 +251,35 @@ export const paymentsService = {
     return data.map(dbPaymentToAppPayment);
   },
   
-  // إنشاء دفعة جديدة
   async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    // تحويل الكائن إلى الصيغة المناسبة لقاعدة البيانات
     const dbPayment = appPaymentToDbPayment(payment);
     
-    // إنشاء معرّف فريد للدفعة
     const paymentId = `PAY${Date.now().toString().slice(-6)}`;
     dbPayment.id = paymentId;
     
-    // Make sure date is converted to ISO string for Supabase
     if (dbPayment.date instanceof Date) {
       dbPayment.date = dbPayment.date.toISOString();
     }
     
-    // إدراج الدفعة في قاعدة البيانات
     const { data, error } = await supabase
       .from('payments')
       .insert(dbPayment)
       .select()
       .single();
-    
+      
     if (error) throw error;
     
-    // إذا كانت الدفعة مرتبطة بفاتورة، فقم بتحديث حالة الفاتورة
     if (payment.invoiceId) {
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
     }
     
-    // تحديث رصيد العميل المستحق
     if (payment.customerId) {
       await updateCustomerCreditBalance(payment.customerId);
     }
     
-    // تحويل النتيجة إلى الصيغة المناسبة للتطبيق
     return dbPaymentToAppPayment(data);
   },
   
-  // تحديث دفعة
   async update(payment: Payment): Promise<Payment> {
     const dbPayment = appPaymentToDbPayment(payment);
     
@@ -323,12 +295,10 @@ export const paymentsService = {
       throw error;
     }
     
-    // إذا كانت الدفعة مرتبطة بفاتورة، فقم بتحديث حالة الفاتورة
     if (payment.invoiceId) {
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
     }
     
-    // تحديث رصيد العميل المستحق
     if (payment.customerId) {
       await updateCustomerCreditBalance(payment.customerId);
     }
@@ -336,9 +306,7 @@ export const paymentsService = {
     return dbPaymentToAppPayment(data);
   },
   
-  // حذف دفعة
   async delete(id: string): Promise<void> {
-    // احصل على معلومات الدفعة قبل حذفها
     const { data: paymentData, error: fetchError } = await supabase
       .from('payments')
       .select('*')
@@ -352,7 +320,6 @@ export const paymentsService = {
     
     const payment = dbPaymentToAppPayment(paymentData);
     
-    // احذف الدفعة
     const { error } = await supabase
       .from('payments')
       .delete()
@@ -363,7 +330,6 @@ export const paymentsService = {
       throw error;
     }
     
-    // حدّث حالة الفاتورة ورصيد العميل بعد حذف الدفعة
     if (payment.invoiceId) {
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
     }
@@ -374,12 +340,10 @@ export const paymentsService = {
   }
 };
 
-// Helper function to update invoice status after a payment
 const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: string): Promise<void> => {
   console.log(`Updating invoice status for invoice ${invoiceId}`);
   
   try {
-    // Get the invoice
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
       .select('*')
@@ -391,7 +355,6 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
       throw invoiceError;
     }
     
-    // Get all payments for this invoice
     const { data: paymentsData, error: paymentsError } = await supabase
       .from('payments')
       .select('*')
@@ -405,7 +368,6 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     const invoice = dbInvoiceToAppInvoice(invoiceData);
     const payments = paymentsData.map(dbPaymentToAppPayment);
     
-    // Calculate total payments (payments minus refunds)
     const totalPayments = payments.reduce((sum, payment) => {
       if (payment.type === 'payment') {
         return sum + payment.amount;
@@ -417,26 +379,23 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     
     console.log(`Invoice ${invoiceId} - Total amount: ${invoice.totalAmount}, Total payments: ${totalPayments}`);
     
-    // Determine new status based on payment amount
-    let newStatus: string;
+    let newStatus: InvoiceStatus;
     
     if (totalPayments >= invoice.totalAmount) {
-      newStatus = 'مدفوع';
+      newStatus = InvoiceStatus.PAID;
     } else if (totalPayments > 0) {
-      newStatus = 'مدفوع جزئياً';
+      newStatus = InvoiceStatus.PARTIALLY_PAID;
     } else {
-      newStatus = invoice.paymentMethod === 'آجل' ? 'غير مدفوع' : 'مدفوع';
+      newStatus = invoice.paymentMethod === PaymentMethod.CREDIT ? InvoiceStatus.UNPAID : InvoiceStatus.PAID;
     }
     
-    // Check if invoice is overdue
     const today = new Date();
     if (invoice.dueDate && today > new Date(invoice.dueDate) && totalPayments < invoice.totalAmount) {
-      newStatus = 'متأخر';
+      newStatus = InvoiceStatus.OVERDUE;
     }
     
     console.log(`Updating invoice ${invoiceId} status to: ${newStatus}`);
     
-    // Update invoice status
     const { error: updateError } = await supabase
       .from('invoices')
       .update({ status: newStatus })
@@ -454,12 +413,10 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
   }
 };
 
-// Helper function to update customer credit balance
 const updateCustomerCreditBalance = async (customerId: string): Promise<void> => {
   console.log(`Updating credit balance for customer ${customerId}`);
   
   try {
-    // Get all unpaid or partially paid invoices for this customer
     const { data: invoicesData, error: invoicesError } = await supabase
       .from('invoices')
       .select('*')
@@ -471,13 +428,11 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
       throw invoicesError;
     }
     
-    // Calculate total amount due
     let totalAmountDue = 0;
     
     for (const invoiceData of invoicesData) {
       const invoice = dbInvoiceToAppInvoice(invoiceData);
       
-      // Get all payments for this invoice
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('*')
@@ -490,7 +445,6 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
       
       const payments = paymentsData.map(dbPaymentToAppPayment);
       
-      // Calculate total paid for this invoice
       const totalPaidForInvoice = payments.reduce((sum, payment) => {
         if (payment.type === 'payment') {
           return sum + payment.amount;
@@ -505,7 +459,6 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
     
     console.log(`Customer ${customerId} - Total credit balance: ${totalAmountDue}`);
     
-    // Update customer credit balance
     const { error: updateError } = await supabase
       .from('customers')
       .update({ credit_balance: totalAmountDue })
@@ -523,9 +476,7 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
   }
 };
 
-// خدمة الفواتير
 export const invoicesService = {
-  // الحصول على جميع الفواتير مع العناصر والمدفوعات
   async getAll(): Promise<Invoice[]> {
     const { data, error } = await supabase
       .from('invoices')
@@ -544,7 +495,6 @@ export const invoicesService = {
     return data.map(dbInvoiceToAppInvoice);
   },
   
-  // الحصول على الفواتير حسب معرف العميل
   async getByCustomerId(customerId: string): Promise<Invoice[]> {
     const { data, error } = await supabase
       .from('invoices')
@@ -564,7 +514,6 @@ export const invoicesService = {
     return data.map(dbInvoiceToAppInvoice);
   },
   
-  // الحصول على فاتورة بواسطة المعرف
   async getById(id: string): Promise<Invoice> {
     const { data, error } = await supabase
       .from('invoices')
@@ -584,11 +533,7 @@ export const invoicesService = {
     return dbInvoiceToAppInvoice(data);
   },
   
-  // إنشاء فاتورة جديدة مع العناصر
   async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]): Promise<Invoice> {
-    // بدء معاملة قاعدة البيانات
-    
-    // إنشاء معرّف فريد للفاتورة
     const invoiceId = `INV${Date.now().toString().slice(-6)}`;
     const dbInvoice = appInvoiceToDbInvoice({ ...invoice, id: invoiceId });
     
@@ -603,7 +548,6 @@ export const invoicesService = {
       throw invoiceError;
     }
     
-    // إضافة عناصر الفاتورة
     if (items.length > 0) {
       const invoiceItems = items.map(item => ({
         ...appInvoiceItemToDbInvoiceItem(item),
@@ -620,7 +564,6 @@ export const invoicesService = {
       }
     }
     
-    // إذا كانت الفاتورة مدفوعة نقدًا، أضف سجل دفع
     if (invoice.paymentMethod === 'نقداً' && invoice.status === 'مدفوع') {
       const paymentId = `PAY${Date.now().toString().slice(-6)}`;
       const payment = {
@@ -637,11 +580,9 @@ export const invoicesService = {
       await supabase.from('payments').insert(payment);
     }
     
-    // الحصول على الفاتورة الكاملة بعد الإنشاء
     return this.getById(invoiceId);
   },
   
-  // تحديث فاتورة
   async update(invoice: Invoice): Promise<Invoice> {
     const dbInvoice = appInvoiceToDbInvoice(invoice);
     
@@ -664,9 +605,7 @@ export const invoicesService = {
     });
   },
   
-  // حذف فاتورة
   async delete(id: string): Promise<void> {
-    // حذف عناصر الفاتورة أولاً
     const { error: itemsError } = await supabase
       .from('invoice_items')
       .delete()
@@ -677,7 +616,6 @@ export const invoicesService = {
       throw itemsError;
     }
     
-    // ثم حذف الفاتورة
     const { error } = await supabase
       .from('invoices')
       .delete()
@@ -690,9 +628,7 @@ export const invoicesService = {
   }
 };
 
-// خدمات عمليات استبدال النقاط
 export const redemptionsService = {
-  // الحصول على جميع عمليات استبدال النقاط
   async getAll(): Promise<Redemption[]> {
     const { data, error } = await supabase
       .from('redemptions')
@@ -710,7 +646,6 @@ export const redemptionsService = {
     return data.map(dbRedemptionToAppRedemption);
   },
   
-  // الحصول على عمليات استبدال النقاط لعميل
   async getByCustomerId(customerId: string): Promise<Redemption[]> {
     const { data, error } = await supabase
       .from('redemptions')
@@ -729,7 +664,6 @@ export const redemptionsService = {
     return data.map(dbRedemptionToAppRedemption);
   },
   
-  // الحصول على عملية استبدال نقاط بواسطة المعرف
   async getById(id: string): Promise<Redemption> {
     const { data, error } = await supabase
       .from('redemptions')
@@ -748,9 +682,7 @@ export const redemptionsService = {
     return dbRedemptionToAppRedemption(data);
   },
   
-  // إنشاء عملية استبدال نقاط جديدة
   async create(redemption: Omit<Redemption, 'id'>, items: Omit<RedemptionItem, 'id'>[]): Promise<Redemption> {
-    // إنشاء معرّف فريد لعملية الاستبدال
     const redemptionId = `RED${Date.now().toString().slice(-6)}`;
     const dbRedemption = appRedemptionToDbRedemption({ ...redemption, id: redemptionId });
     
@@ -765,7 +697,6 @@ export const redemptionsService = {
       throw redemptionError;
     }
     
-    // إضافة عناصر الاستبدال
     if (items.length > 0) {
       const redemptionItems = items.map(item => ({
         ...appRedemptionItemToDbRedemptionItem(item),
@@ -782,11 +713,9 @@ export const redemptionsService = {
       }
     }
     
-    // الحصول على عملية الاستبدال الكاملة بعد الإنشاء
     return this.getById(redemptionId);
   },
   
-  // تحديث عملية استبدال نقاط
   async update(redemption: Redemption): Promise<Redemption> {
     const dbRedemption = appRedemptionToDbRedemption(redemption);
     
@@ -808,9 +737,7 @@ export const redemptionsService = {
     });
   },
   
-  // حذف عملية استبدال نقاط
   async delete(id: string): Promise<void> {
-    // حذف عناصر الاستبدال أولاً
     const { error: itemsError } = await supabase
       .from('redemption_items')
       .delete()
@@ -821,7 +748,6 @@ export const redemptionsService = {
       throw itemsError;
     }
     
-    // ثم حذف عملية الاستبدال
     const { error } = await supabase
       .from('redemptions')
       .delete()
