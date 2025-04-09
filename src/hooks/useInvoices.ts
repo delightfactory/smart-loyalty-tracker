@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService } from '@/services/database';
-import { Invoice, InvoiceItem, InvoiceStatus, Customer } from '@/lib/types';
+import { Invoice, InvoiceItem, InvoiceStatus, Customer, PaymentMethod, PaymentType } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 
@@ -71,7 +71,7 @@ const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient
         
         // حساب المبلغ المدفوع
         const paidAmount = invoice.payments?.reduce((sum, payment) => {
-          return payment.type === 'payment' ? sum + payment.amount : sum - payment.amount;
+          return payment.type === PaymentType.PAYMENT ? sum + payment.amount : sum - payment.amount;
         }, 0) || 0;
         
         // إضافة المبلغ المتبقي إلى الرصيد الآجل
@@ -111,9 +111,13 @@ export function useInvoiceMutations() {
   const queryClient = useQueryClient();
   
   const addInvoice = useMutation({
-    mutationFn: ({ invoice, items }: { invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[] }) => 
-      invoicesService.create(invoice, items),
+    mutationFn: async ({ invoice, items }: { invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id'>[] }) => {
+      console.log("Adding invoice with customer ID:", invoice.customerId);
+      return invoicesService.create(invoice, items);
+    },
     onSuccess: async (data) => {
+      console.log("Invoice created successfully with ID:", data.id, "for customer:", data.customerId);
+      
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
       

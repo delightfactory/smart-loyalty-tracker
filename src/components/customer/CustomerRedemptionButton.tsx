@@ -14,19 +14,20 @@ interface CustomerRedemptionButtonProps {
 const CustomerRedemptionButton = ({ customer }: CustomerRedemptionButtonProps) => {
   const navigate = useNavigate();
   const { getByCustomerId } = useInvoices();
-  const { data: customerInvoices = [] } = getByCustomerId(customer.id);
+  const { data: customerInvoices = [], isLoading } = getByCustomerId(customer.id);
   const [hasUnpaidInvoices, setHasUnpaidInvoices] = useState(false);
   
   useEffect(() => {
-    if (customerInvoices.length > 0) {
+    if (customerInvoices && customerInvoices.length > 0) {
       const unpaid = customerInvoices.some(invoice => 
         invoice.status === 'غير مدفوع' || 
         invoice.status === 'مدفوع جزئياً' || 
         invoice.status === 'متأخر'
       );
+      console.log(`Customer ${customer.id} has unpaid invoices:`, unpaid);
       setHasUnpaidInvoices(unpaid);
     }
-  }, [customerInvoices]);
+  }, [customerInvoices, customer.id]);
   
   const handleRedemption = () => {
     navigate(`/create-redemption/${customer.id}`);
@@ -42,7 +43,7 @@ const CustomerRedemptionButton = ({ customer }: CustomerRedemptionButtonProps) =
       variant="outline"
       className={canRedeem ? "text-amber-600" : "text-muted-foreground opacity-70"}
       onClick={handleRedemption}
-      disabled={!canRedeem}
+      disabled={!canRedeem || isLoading}
       title={!canRedeem ? (
         hasUnpaidInvoices 
           ? "لا يمكن الاستبدال: العميل لديه فواتير غير مدفوعة" 

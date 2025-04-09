@@ -38,11 +38,9 @@ const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
-  // استخدام React Query hook
   const { getAll, addProduct } = useProducts();
   const { data: products = [], isLoading, refetch } = getAll;
   
-  // Form state
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
     unit: '',
@@ -54,13 +52,11 @@ const Products = () => {
   });
 
   const filteredProducts = products.filter(product => {
-    // Apply search filter
     const matchesSearch = 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.id.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Apply category filter - Use 'all' instead of empty string
     const matchesCategory = categoryFilter !== 'all' ? product.category === categoryFilter : true;
     
     return matchesSearch && matchesCategory;
@@ -76,13 +72,17 @@ const Products = () => {
       return;
     }
     
-    // Ensure pointsRequired is a number for database consistency
     const productToAdd = {
-      ...newProduct,
-      pointsRequired: Number(newProduct.pointsRequired) || 0,
+      name: newProduct.name,
+      unit: newProduct.unit,
+      brand: newProduct.brand,
+      category: newProduct.category || ProductCategory.ENGINE_CARE,
+      price: Number(newProduct.price) || 0,
       pointsEarned: Number(newProduct.pointsEarned) || 0,
-      price: Number(newProduct.price) || 0
+      pointsRequired: Number(newProduct.pointsRequired) || 0
     };
+    
+    console.log("Adding product with data:", productToAdd);
     
     addProduct.mutate(productToAdd as Omit<Product, 'id'>, {
       onSuccess: () => {

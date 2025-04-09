@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
 import { Product, ProductCategory } from '@/lib/types';
@@ -55,7 +56,6 @@ export function useProducts() {
       
       // تحويل القيم الرقمية بشكل صريح وضمان أن جميع الحقول الضرورية موجودة
       const processedProduct = {
-        ...product,
         name: product.name || '',
         category: product.category || ProductCategory.ENGINE_CARE,
         unit: product.unit || '',
