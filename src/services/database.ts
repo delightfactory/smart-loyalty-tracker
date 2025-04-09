@@ -290,6 +290,16 @@ export const paymentsService = {
     
     if (error) throw error;
     
+    // إذا كانت الدفعة مرتبطة بفاتورة، فقم بتحديث حالة الفاتورة
+    if (payment.invoiceId) {
+      await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
+    }
+    
+    // تحديث رصيد العميل المستحق
+    if (payment.customerId) {
+      await updateCustomerCreditBalance(payment.customerId);
+    }
+    
     // تحويل النتيجة إلى الصيغة المناسبة للتطبيق
     return dbPaymentToAppPayment(data);
   },
@@ -310,11 +320,36 @@ export const paymentsService = {
       throw error;
     }
     
+    // إذا كانت الدفعة مرتبطة بفاتورة، فقم بتحديث حالة الفاتورة
+    if (payment.invoiceId) {
+      await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
+    }
+    
+    // تحديث رصيد العميل المستحق
+    if (payment.customerId) {
+      await updateCustomerCreditBalance(payment.customerId);
+    }
+    
     return dbPaymentToAppPayment(data);
   },
   
   // حذف دفعة
   async delete(id: string): Promise<void> {
+    // احصل على معلومات الدفعة قبل حذفها
+    const { data: paymentData, error: fetchError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) {
+      console.error(`Error fetching payment with id ${id}:`, fetchError);
+      throw fetchError;
+    }
+    
+    const payment = dbPaymentToAppPayment(paymentData);
+    
+    // احذف الدفعة
     const { error } = await supabase
       .from('payments')
       .delete()
@@ -324,6 +359,164 @@ export const paymentsService = {
       console.error(`Error deleting payment with id ${id}:`, error);
       throw error;
     }
+    
+    // حدّث حالة الفاتورة ورصيد العميل بعد حذف الدفعة
+    if (payment.invoiceId) {
+      await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
+    }
+    
+    if (payment.customerId) {
+      await updateCustomerCreditBalance(payment.customerId);
+    }
+  }
+};
+
+// Helper function to update invoice status after a payment
+const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: string): Promise<void> => {
+  console.log(`Updating invoice status for invoice ${invoiceId}`);
+  
+  try {
+    // Get the invoice
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .single();
+      
+    if (invoiceError) {
+      console.error(`Error fetching invoice ${invoiceId}:`, invoiceError);
+      throw invoiceError;
+    }
+    
+    // Get all payments for this invoice
+    const { data: paymentsData, error: paymentsError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('invoice_id', invoiceId);
+      
+    if (paymentsError) {
+      console.error(`Error fetching payments for invoice ${invoiceId}:`, paymentsError);
+      throw paymentsError;
+    }
+    
+    const invoice = dbInvoiceToAppInvoice(invoiceData);
+    const payments = paymentsData.map(dbPaymentToAppPayment);
+    
+    // Calculate total payments (payments minus refunds)
+    const totalPayments = payments.reduce((sum, payment) => {
+      if (payment.type === 'payment') {
+        return sum + payment.amount;
+      } else if (payment.type === 'refund') {
+        return sum - payment.amount;
+      }
+      return sum;
+    }, 0);
+    
+    console.log(`Invoice ${invoiceId} - Total amount: ${invoice.totalAmount}, Total payments: ${totalPayments}`);
+    
+    // Determine new status based on payment amount
+    let newStatus: string;
+    
+    if (totalPayments >= invoice.totalAmount) {
+      newStatus = 'مدفوع';
+    } else if (totalPayments > 0) {
+      newStatus = 'مدفوع جزئياً';
+    } else {
+      newStatus = invoice.paymentMethod === 'آجل' ? 'غير مدفوع' : 'مدفوع';
+    }
+    
+    // Check if invoice is overdue
+    const today = new Date();
+    if (invoice.dueDate && today > new Date(invoice.dueDate) && totalPayments < invoice.totalAmount) {
+      newStatus = 'متأخر';
+    }
+    
+    console.log(`Updating invoice ${invoiceId} status to: ${newStatus}`);
+    
+    // Update invoice status
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ status: newStatus })
+      .eq('id', invoiceId);
+      
+    if (updateError) {
+      console.error(`Error updating invoice ${invoiceId} status:`, updateError);
+      throw updateError;
+    }
+    
+    console.log(`Invoice ${invoiceId} status updated successfully to ${newStatus}`);
+  } catch (error) {
+    console.error(`Failed to update invoice status for ${invoiceId}:`, error);
+    throw error;
+  }
+};
+
+// Helper function to update customer credit balance
+const updateCustomerCreditBalance = async (customerId: string): Promise<void> => {
+  console.log(`Updating credit balance for customer ${customerId}`);
+  
+  try {
+    // Get all unpaid or partially paid invoices for this customer
+    const { data: invoicesData, error: invoicesError } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('customer_id', customerId)
+      .in('status', ['غير مدفوع', 'مدفوع جزئياً', 'متأخر']);
+      
+    if (invoicesError) {
+      console.error(`Error fetching invoices for customer ${customerId}:`, invoicesError);
+      throw invoicesError;
+    }
+    
+    // Calculate total amount due
+    let totalAmountDue = 0;
+    
+    for (const invoiceData of invoicesData) {
+      const invoice = dbInvoiceToAppInvoice(invoiceData);
+      
+      // Get all payments for this invoice
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+        
+      if (paymentsError) {
+        console.error(`Error fetching payments for invoice ${invoice.id}:`, paymentsError);
+        throw paymentsError;
+      }
+      
+      const payments = paymentsData.map(dbPaymentToAppPayment);
+      
+      // Calculate total paid for this invoice
+      const totalPaidForInvoice = payments.reduce((sum, payment) => {
+        if (payment.type === 'payment') {
+          return sum + payment.amount;
+        } else if (payment.type === 'refund') {
+          return sum - payment.amount;
+        }
+        return sum;
+      }, 0);
+      
+      totalAmountDue += (invoice.totalAmount - totalPaidForInvoice);
+    }
+    
+    console.log(`Customer ${customerId} - Total credit balance: ${totalAmountDue}`);
+    
+    // Update customer credit balance
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({ credit_balance: totalAmountDue })
+      .eq('id', customerId);
+      
+    if (updateError) {
+      console.error(`Error updating credit balance for customer ${customerId}:`, updateError);
+      throw updateError;
+    }
+    
+    console.log(`Credit balance for customer ${customerId} updated successfully to ${totalAmountDue}`);
+  } catch (error) {
+    console.error(`Failed to update credit balance for customer ${customerId}:`, error);
+    throw error;
   }
 };
 

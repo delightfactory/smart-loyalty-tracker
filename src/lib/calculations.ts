@@ -1,5 +1,5 @@
 
-import { invoices, products, getInvoicesByCustomerId } from './data';
+import { invoices, products, customers, getInvoicesByCustomerId, getCustomerById } from './data';
 import { ProductCategory } from './types';
 
 // إضافة هذا الدالة لتحقق من إمكانية استبدال النقاط
@@ -7,9 +7,16 @@ export const canRedeemPoints = (customerId: string, pointsNeeded: number) => {
   // تحقق من أن رقم العميل موجود
   if (!customerId) return false;
   
-  // بشكل افتراضي، سنسمح بالاستبدال
-  console.log(`Checking if customer ${customerId} can redeem ${pointsNeeded} points`);
-  return true;
+  // احصل على بيانات العميل
+  const customer = getCustomerById(customerId);
+  if (!customer) return false;
+  
+  // تحقق من أن العميل لديه نقاط كافية للاستبدال
+  const hasEnoughPoints = customer.currentPoints >= pointsNeeded;
+  
+  console.log(`Checking if customer ${customerId} can redeem ${pointsNeeded} points. Current points: ${customer.currentPoints}, Has enough: ${hasEnoughPoints}`);
+  
+  return hasEnoughPoints;
 };
 
 // حساب توزيع المشتريات حسب الفئات
