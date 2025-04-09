@@ -61,7 +61,16 @@ export const UserMenu = () => {
           
           <DropdownMenuItem onClick={() => { 
             navigate('/settings'); 
-            setTimeout(() => document.querySelector('[data-value="security"]')?.click(), 100);
+            setTimeout(() => {
+              const securityTab = document.querySelector('[data-value="security"]');
+              if (securityTab) {
+                securityTab.dispatchEvent(new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window
+                }));
+              }
+            }, 100);
           }} className="cursor-pointer">
             <Key className="mr-2 h-4 w-4" />
             <span>تغيير كلمة المرور</span>
