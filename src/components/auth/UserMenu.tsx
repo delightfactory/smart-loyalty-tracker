@@ -8,11 +8,12 @@ import {
   DropdownMenuItem, 
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuGroup
 } from '@/components/ui/dropdown-menu';
 import { UserRole } from '@/lib/auth-types';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Settings, Shield, User } from 'lucide-react';
+import { LogOut, Settings, Shield, User, Key, UserCog } from 'lucide-react';
 
 export const UserMenu = () => {
   const { user, profile, signOut, hasRole, isAuthenticated } = useAuth();
@@ -40,26 +41,51 @@ export const UserMenu = () => {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>حسابي</DropdownMenuLabel>
+        <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+          {profile?.email}
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
-          <User className="mr-2 h-4 w-4" />
-          <span>الملف الشخصي</span>
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+            <User className="mr-2 h-4 w-4" />
+            <span>الملف الشخصي</span>
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>الإعدادات</span>
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => { 
+            navigate('/settings'); 
+            setTimeout(() => document.querySelector('[data-value="security"]')?.click(), 100);
+          }} className="cursor-pointer">
+            <Key className="mr-2 h-4 w-4" />
+            <span>تغيير كلمة المرور</span>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
         
         {hasRole(UserRole.ADMIN) && (
-          <DropdownMenuItem onClick={() => navigate('/users')} className="cursor-pointer">
-            <Shield className="mr-2 h-4 w-4" />
-            <span>إدارة المستخدمين</span>
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => navigate('/users')} className="cursor-pointer">
+                <UserCog className="mr-2 h-4 w-4" />
+                <span>إدارة المستخدمين</span>
+              </DropdownMenuItem>
+              
+              {hasRole(UserRole.ADMIN) && (
+                <DropdownMenuItem onClick={() => navigate('/settings?tab=users')} className="cursor-pointer">
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>إعدادات النظام</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuGroup>
+          </>
         )}
-        
-        <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
-          <Settings className="mr-2 h-4 w-4" />
-          <span>الإعدادات</span>
-        </DropdownMenuItem>
         
         <DropdownMenuSeparator />
         

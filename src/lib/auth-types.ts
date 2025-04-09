@@ -17,6 +17,8 @@ export interface UserProfile {
   phone: string | null;
   position: string | null;
   roles: UserRole[];
+  createdAt?: string;
+  lastSignInAt?: string | null;
 }
 
 // Auth State Interface
@@ -25,4 +27,12 @@ export interface AuthState {
   profile: any | null;
   isLoading: boolean;
   error: string | null;
+}
+
+// Create User Interface
+export interface CreateUserParams {
+  email: string;
+  password: string;
+  fullName: string;
+  roles: UserRole[];
 }

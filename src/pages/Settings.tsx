@@ -29,12 +29,12 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="security">
-          <SecurityTab />
+          <SecuritySettingsTab />
         </TabsContent>
         
         {hasRole(UserRole.ADMIN) && (
           <TabsContent value="users">
-            <UsersTab />
+            <UsersSettingsTab />
           </TabsContent>
         )}
       </Tabs>
@@ -44,22 +44,12 @@ const Settings = () => {
 
 const ProfileTab = () => {
   return (
-    <div>
-      <h2>الملف الشخصي</h2>
-      <p>هذا الجزء قيد التطوير.</p>
+    <div className="grid gap-6">
+      <div className="flex flex-col">
+        <h2 className="text-xl font-semibold">الملف الشخصي</h2>
+        <p className="text-muted-foreground">هذا القسم قيد التطوير. سيتم قريبًا إضافة خيارات لتحديث بيانات الملف الشخصي وتغيير صورة المستخدم.</p>
+      </div>
     </div>
-  );
-};
-
-const SecurityTab = () => {
-  return (
-    <SecuritySettingsTab />
-  );
-};
-
-const UsersTab = () => {
-  return (
-    <UsersSettingsTab />
   );
 };
 
