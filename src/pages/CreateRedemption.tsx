@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -31,31 +30,25 @@ const CreateRedemption = () => {
   const [success, setSuccess] = useState(false);
   const [newRedemptionId, setNewRedemptionId] = useState<string | null>(null);
   
-  // React Query hooks
   const { getById, updateCustomer } = useCustomers();
   const { getByCustomerId } = useInvoices();
   const { addRedemption, getByCustomerId: getCustomerRedemptions, getById: getRedemptionById } = useRedemptions();
 
-  // Get customer data
   const customerQuery = getById(selectedCustomerId);
   const customer = customerQuery.data;
   
-  // Get customer invoices 
   const invoicesQuery = getByCustomerId(selectedCustomerId);
   const customerInvoices = invoicesQuery.data || [];
   
-  // Get customer redemption history
   const redemptionsQuery = getCustomerRedemptions(selectedCustomerId);
   const customerRedemptions = redemptionsQuery.data || [];
   
-  // Get new redemption if available
   const newRedemptionQuery = getRedemptionById(newRedemptionId || '');
   const newRedemption = newRedemptionQuery.data;
   
   useEffect(() => {
     if (redemptionItems.length > 0) {
       const calculatedTotalPoints = redemptionItems.reduce((sum, item) => {
-        // تأكد من أن القيمة رقمية
         const itemPoints = Number(item.totalPointsRequired) || 0;
         return sum + itemPoints;
       }, 0);
@@ -65,7 +58,6 @@ const CreateRedemption = () => {
     }
   }, [redemptionItems]);
   
-  // Check if customer has unpaid invoices
   const hasUnpaidInvoices = () => {
     if (!customerInvoices || !customerInvoices.length) return false;
     
@@ -76,7 +68,6 @@ const CreateRedemption = () => {
     );
   };
   
-  // تشغيل تأثير الاحتفال عند نجاح العملية
   const triggerSuccessConfetti = () => {
     confetti({
       particleCount: 100,
@@ -113,7 +104,6 @@ const CreateRedemption = () => {
       return;
     }
     
-    // تحقق من رصيد نقاط العميل
     const customerCurrentPoints = Number(customer.currentPoints) || 0;
     if (customerCurrentPoints < totalRedemptionPoints) {
       toast({
@@ -124,7 +114,6 @@ const CreateRedemption = () => {
       return;
     }
     
-    // تحقق من وجود فواتير غير مدفوعة
     if (hasUnpaidInvoices()) {
       toast({
         title: "خطأ",
@@ -135,13 +124,10 @@ const CreateRedemption = () => {
     }
     
     setSubmitting(true);
-    // Create redemption using the hook
-    const currentDate = new Date();
-    
     addRedemption.mutate({
       redemption: {
         customerId: selectedCustomerId,
-        date: currentDate,
+        date: new Date(),
         totalPointsRedeemed: totalRedemptionPoints,
         status: RedemptionStatus.COMPLETED,
         items: redemptionItems
@@ -149,7 +135,6 @@ const CreateRedemption = () => {
       items: redemptionItems
     }, {
       onSuccess: (data) => {
-        // Update the customer's points
         if (customer) {
           const updatedCustomer = { ...customer };
           updatedCustomer.pointsRedeemed = Number(updatedCustomer.pointsRedeemed || 0) + totalRedemptionPoints;
@@ -158,13 +143,9 @@ const CreateRedemption = () => {
           updateCustomer.mutate(updatedCustomer);
         }
         
-        // تسجيل معرف الاستبدال الجديد لعرضه
         setNewRedemptionId(data.id);
-        
-        // إظهار شاشة النجاح
         setSuccess(true);
         
-        // تشغيل تأثير الاحتفال
         setTimeout(() => {
           triggerSuccessConfetti();
         }, 500);
@@ -186,7 +167,6 @@ const CreateRedemption = () => {
     });
   };
   
-  // عرض شاشة النجاح بعد إتمام العملية
   if (success && newRedemption) {
     return (
       <PageContainer title="تم الاستبدال بنجاح" subtitle="تمت عملية استبدال النقاط بنجاح">
@@ -253,7 +233,6 @@ const CreateRedemption = () => {
                 description: "جاري طباعة إيصال الاستبدال...",
                 variant: "default"
               });
-              // هنا يمكن إضافة رمز الطباعة الفعلي
             }} 
           />
           
@@ -314,7 +293,6 @@ const CreateRedemption = () => {
         </Alert>
       )}
       
-      {/* عرض شريط التقدم بنقاط العميل إذا تم اختيار عميل */}
       {customer && (
         <Card className="mb-6 bg-slate-50">
           <CardContent className="pt-6">

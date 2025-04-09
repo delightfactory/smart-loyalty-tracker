@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
@@ -61,6 +62,19 @@ export const productsService = {
   async create(product: Omit<Product, 'id'>): Promise<Product> {
     const dbProduct = appProductToDbProduct(product as Product);
     delete dbProduct.id;
+    
+    // Make sure all numeric fields are properly handled
+    if (dbProduct.points_required === undefined) {
+      dbProduct.points_required = 0;
+    }
+    
+    if (dbProduct.points_earned === undefined) {
+      dbProduct.points_earned = 0;
+    }
+    
+    if (dbProduct.price === undefined) {
+      dbProduct.price = 0;
+    }
     
     const { data, error } = await supabase
       .from('products')
@@ -369,9 +383,9 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     const payments = paymentsData.map(dbPaymentToAppPayment);
     
     const totalPayments = payments.reduce((sum, payment) => {
-      if (payment.type === 'payment') {
+      if (payment.type === PaymentType.PAYMENT) {
         return sum + payment.amount;
-      } else if (payment.type === 'refund') {
+      } else if (payment.type === PaymentType.REFUND) {
         return sum - payment.amount;
       }
       return sum;
@@ -381,7 +395,10 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     
     let newStatus: InvoiceStatus;
     
-    if (totalPayments >= invoice.totalAmount) {
+    // Fix: Use proper comparison with a small epsilon to account for floating point errors
+    const epsilon = 0.01; // Small tolerance for floating point comparison
+    
+    if (totalPayments >= invoice.totalAmount - epsilon) {
       newStatus = InvoiceStatus.PAID;
     } else if (totalPayments > 0) {
       newStatus = InvoiceStatus.PARTIALLY_PAID;
@@ -390,7 +407,7 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     }
     
     const today = new Date();
-    if (invoice.dueDate && today > new Date(invoice.dueDate) && totalPayments < invoice.totalAmount) {
+    if (invoice.dueDate && today > new Date(invoice.dueDate) && totalPayments < invoice.totalAmount - epsilon) {
       newStatus = InvoiceStatus.OVERDUE;
     }
     
@@ -421,7 +438,7 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
       .from('invoices')
       .select('*')
       .eq('customer_id', customerId)
-      .in('status', ['غير مدفوع', 'مدفوع جزئياً', 'متأخر']);
+      .in('status', [InvoiceStatus.UNPAID, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]);
       
     if (invoicesError) {
       console.error(`Error fetching invoices for customer ${customerId}:`, invoicesError);
@@ -446,9 +463,9 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
       const payments = paymentsData.map(dbPaymentToAppPayment);
       
       const totalPaidForInvoice = payments.reduce((sum, payment) => {
-        if (payment.type === 'payment') {
+        if (payment.type === PaymentType.PAYMENT) {
           return sum + payment.amount;
-        } else if (payment.type === 'refund') {
+        } else if (payment.type === PaymentType.REFUND) {
           return sum - payment.amount;
         }
         return sum;
@@ -672,11 +689,15 @@ export const redemptionsService = {
         items:redemption_items(*)
       `)
       .eq('id', id)
-      .single();
+      .maybeSingle(); // Fix: Use maybeSingle instead of single to prevent error
       
     if (error) {
       console.error(`Error fetching redemption with id ${id}:`, error);
       throw error;
+    }
+    
+    if (!data) {
+      throw new Error(`Redemption with id ${id} not found`);
     }
     
     return dbRedemptionToAppRedemption(data);
