@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
@@ -7,7 +8,9 @@ import {
   InvoiceItem, 
   Redemption, 
   RedemptionItem,
-  PaymentType
+  PaymentType,
+  InvoiceStatus,
+  PaymentMethod
 } from '@/lib/types';
 import { 
   dbProductToAppProduct, 
