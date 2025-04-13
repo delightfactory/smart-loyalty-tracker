@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole, UserProfile } from '@/lib/auth-types';
 
@@ -519,10 +518,14 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
     
     // التحقق من وجود مستخدم مسؤول بالفعل
     const adminExists = await checkAdminExists();
+    console.log('Admin exists?', adminExists);
+    
     if (adminExists) {
       console.log('Admin user already exists');
       return null;
     }
+    
+    console.log('No admin found. Creating new admin with:', { email, fullName });
     
     // إنشاء مستخدم مسؤول جديد
     const newAdmin = await createUser({
@@ -532,7 +535,7 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
       roles: [UserRole.ADMIN]
     });
     
-    console.log('Default admin created successfully');
+    console.log('Default admin created successfully:', newAdmin);
     return newAdmin;
   } catch (error) {
     console.error('Error creating default admin:', error);

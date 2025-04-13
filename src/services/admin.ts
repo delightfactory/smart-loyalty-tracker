@@ -11,14 +11,18 @@ export const adminCredentials = {
 
 // تحقق مما إذا كان المستخدم موجودًا بالفعل
 export const isAdminExists = async () => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: adminCredentials.email,
-    password: adminCredentials.password,
-  });
-  
-  if (error) {
+  try {
+    // التحقق من وجود مستخدمين لديهم دور المسؤول
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', UserRole.ADMIN);
+      
+    if (error) throw error;
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error("Error checking if admin exists:", error);
     return false;
   }
-  
-  return !!data.user;
 };

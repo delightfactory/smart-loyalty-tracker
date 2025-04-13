@@ -6,17 +6,32 @@ import { CreateAdminAccount } from '@/components/auth/CreateAdminAccount';
 import { useAuth } from '@/hooks/useAuth';
 import PageContainer from '@/components/layout/PageContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { isAdminExists } from '@/services/admin';
 
 const Auth = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>('login');
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
   
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       navigate('/dashboard');
     }
+    
+    // التحقق مما إذا كان هناك مدير موجود
+    const checkAdmin = async () => {
+      const hasAdmin = await isAdminExists();
+      setAdminExists(hasAdmin);
+      
+      // إذا لم يكن هناك مدير، انتقل تلقائيًا إلى تبويب إنشاء المدير
+      if (!hasAdmin) {
+        setActiveTab('admin');
+      }
+    };
+    
+    checkAdmin();
   }, [isAuthenticated, isLoading, navigate]);
   
   return (
