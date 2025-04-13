@@ -14,21 +14,25 @@ import {
   Users
 } from 'lucide-react';
 
-const SidebarContent = () => {
+interface SidebarContentProps {
+  isSidebarOpen: boolean;
+}
+
+const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
   const { hasRole } = useAuth();
   const isAdmin = hasRole(UserRole.ADMIN);
   
   return (
     <div className="flex flex-col gap-1">
-      <SidebarLink to="/dashboard" icon={<Home />}>لوحة التحكم</SidebarLink>
-      <SidebarLink to="/products" icon={<Package />}>المنتجات</SidebarLink>
-      <SidebarLink to="/customers" icon={<ShoppingCart />}>العملاء</SidebarLink>
-      <SidebarLink to="/customer-followup" icon={<ClipboardCheck />}>متابعة العملاء</SidebarLink>
-      <SidebarLink to="/invoices" icon={<Receipt />}>الفواتير</SidebarLink>
-      <SidebarLink to="/create-invoice" icon={<FileSpreadsheet />}>إنشاء فاتورة</SidebarLink>
-      <SidebarLink to="/analytics" icon={<BarChartBig />}>التحليلات</SidebarLink>
-      {isAdmin && <SidebarLink to="/users" icon={<Users />}>إدارة المستخدمين</SidebarLink>}
-      <SidebarLink to="/settings" icon={<Cog />}>الإعدادات</SidebarLink>
+      <SidebarLink href="/dashboard" icon={<Home />} label="لوحة التحكم" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/products" icon={<Package />} label="المنتجات" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/customers" icon={<ShoppingCart />} label="العملاء" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/customer-followup" icon={<ClipboardCheck />} label="متابعة العملاء" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/invoices" icon={<Receipt />} label="الفواتير" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/create-invoice" icon={<FileSpreadsheet />} label="إنشاء فاتورة" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/analytics" icon={<BarChartBig />} label="التحليلات" isSidebarOpen={isSidebarOpen} />
+      {isAdmin && <SidebarLink href="/users" icon={<Users />} label="إدارة المستخدمين" isSidebarOpen={isSidebarOpen} />}
+      <SidebarLink href="/settings" icon={<Cog />} label="الإعدادات" isSidebarOpen={isSidebarOpen} />
     </div>
   );
 };
