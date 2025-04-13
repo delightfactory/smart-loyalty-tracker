@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -23,6 +23,7 @@ import NotFound from '@/pages/NotFound';
 import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import UsersPage from '@/pages/Users';
+import RequireAuth from '@/components/auth/RequireAuth';
 
 function App() {
   return (
@@ -33,7 +34,13 @@ function App() {
             <Routes>
               <Route path="/auth" element={<Auth />} />
               
-              <Route element={<Layout />}>
+              <Route element={
+                <RequireAuth>
+                  <Layout>
+                    <Outlet />
+                  </Layout>
+                </RequireAuth>
+              }>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/products" element={<Products />} />
