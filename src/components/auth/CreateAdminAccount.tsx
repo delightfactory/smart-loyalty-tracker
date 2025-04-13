@@ -144,7 +144,10 @@ export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSucces
       
       // تصحيح القضية: تعريف نوع البيانات وفحص وجودها
       if (data && data.users && data.users.length > 0) {
-        const adminUser = data.users.find(u => u.email === email);
+        // يجب التصريح بنوع البيانات بشكل صحيح
+        const adminUser = data.users.find(user => {
+          return typeof user.email === 'string' && user.email === email;
+        });
         
         if (!adminUser) {
           throw new Error("لم يتم العثور على مستخدم بهذا البريد الإلكتروني");
