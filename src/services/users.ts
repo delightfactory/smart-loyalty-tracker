@@ -522,23 +522,169 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
     
     if (adminExists) {
       console.log('Admin user already exists');
+      
+      // محاولة إيجاد المستخدم بالبريد الإلكتروني
+      const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+      
+      if (userError) {
+        console.error("Error listing users:", userError);
+        throw userError;
+      }
+      
+      const adminUser = userData?.users.find(u => u.email === email);
+      
+      if (adminUser) {
+        console.log('Found existing admin user:', adminUser.id);
+        
+        // التأكد من أن المستخدم لديه دور المسؤول
+        await ensureUserHasAdminRole(adminUser.id);
+        
+        // استرجاع بيانات المستخدم المسؤول
+        const adminProfile = await getUserById(adminUser.id);
+        return adminProfile;
+      }
+      
       return null;
     }
     
     console.log('No admin found. Creating new admin with:', { email, fullName });
     
     // إنشاء مستخدم مسؤول جديد
-    const newAdmin = await createUser({
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      fullName,
-      roles: [UserRole.ADMIN]
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName
+      }
     });
     
-    console.log('Default admin created successfully:', newAdmin);
+    if (authError || !authData.user) {
+      console.error('Error creating auth user:', authError);
+      throw authError || new Error('Failed to create user');
+    }
+    
+    console.log('User created successfully:', authData.user.id);
+    const userId = authData.user.id;
+    
+    // التحقق من وجود ملف شخصي
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (profileError) {
+      console.error('Error checking profile existence:', profileError);
+      
+      // إنشاء ملف شخصي إذا لم يكن موجوداً
+      const { data: newProfile, error: newProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          full_name: fullName
+        })
+        .select('*')
+        .single();
+        
+      if (newProfileError) {
+        console.error('Error creating profile:', newProfileError);
+        throw newProfileError;
+      }
+      
+      console.log('Profile created:', newProfile);
+    } else if (!profileData) {
+      // إنشاء ملف شخصي إذا لم يكن موجوداً
+      const { data: newProfile, error: newProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          full_name: fullName
+        })
+        .select('*')
+        .single();
+        
+      if (newProfileError) {
+        console.error('Error creating profile:', newProfileError);
+        throw newProfileError;
+      }
+      
+      console.log('Profile created:', newProfile);
+    }
+    
+    // إضافة دور المسؤول
+    console.log('Adding admin role for user:', userId);
+    const { error: roleError } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role: UserRole.ADMIN
+      });
+      
+    if (roleError) {
+      console.error('Error adding admin role:', roleError);
+      throw roleError;
+    }
+    
+    console.log('Admin role added successfully');
+    
+    const newAdmin: UserProfile = {
+      id: userId,
+      email,
+      fullName,
+      avatarUrl: null,
+      phone: null,
+      position: null,
+      roles: [UserRole.ADMIN]
+    };
+    
     return newAdmin;
   } catch (error) {
     console.error('Error creating default admin:', error);
+    throw error;
+  }
+};
+
+// إضافة وظيفة للتأكد من صلاحيات المستخدم الحالي
+export const ensureUserHasAdminRole = async (userId: string): Promise<void> => {
+  try {
+    console.log('Ensuring user has admin role:', userId);
+    
+    // التحقق مما إذا كان المستخدم لديه دور المسؤول بالفعل
+    const { data: existingRoles, error: checkError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    
+    if (checkError) {
+      console.error('Error checking user roles:', checkError);
+      throw checkError;
+    }
+    
+    // التحقق مما إذا كان المستخدم لديه دور المسؤول
+    const hasAdminRole = existingRoles.some(r => r.role === UserRole.ADMIN);
+    
+    // إذا لم يكن المستخدم لديه دور المسؤول، أضفه
+    if (!hasAdminRole) {
+      console.log('Adding admin role to user:', userId);
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: UserRole.ADMIN
+        });
+      
+      if (insertError) {
+        console.error('Error adding admin role:', insertError);
+        throw insertError;
+      }
+      
+      console.log('Admin role added successfully');
+    } else {
+      console.log('User already has admin role');
+    }
+  } catch (error) {
+    console.error('Error ensuring admin role:', error);
     throw error;
   }
 };

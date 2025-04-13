@@ -1,9 +1,9 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, UserRole } from '@/lib/auth-types';
 import { useToast } from '@/components/ui/use-toast';
+import { adminCredentials } from '@/services/admin';
 
 interface AuthState {
   user: User | null;
@@ -38,10 +38,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     error: null,
   });
 
-  // مزامنة بيانات الملف الشخصي مع حالة المستخدم
   const fetchUserProfile = async (userId: string) => {
     try {
-      // جلب بيانات الملف الشخصي
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -50,7 +48,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (profileError) throw profileError;
       
-      // جلب أدوار المستخدم
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -58,7 +55,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (rolesError) throw rolesError;
       
-      // تنسيق بيانات الملف الشخصي
       const userRoles = rolesData.map(r => r.role as UserRole);
       
       const userProfile: UserProfile = {
@@ -89,7 +85,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // استمع للتغييرات في حالة المصادقة
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -104,7 +99,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session?.user) {
-            // استخدم setTimeout لتجنب أي مشكلات في عمليات supabase المتداخلة
             setTimeout(() => {
               fetchUserProfile(session.user.id);
             }, 0);
@@ -120,14 +114,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // تحقق من وجود جلسة موجودة
     supabase.auth.getSession().then(({ data: { session } }) => {
       setState(prevState => ({
         ...prevState,
         session,
         user: session?.user || null,
         isAuthenticated: !!session?.user,
-        isLoading: !!session?.user, // فقط استمر في تحميل إذا كان هناك مستخدم
+        isLoading: !!session?.user,
       }));
       
       if (session?.user) {
@@ -145,7 +138,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // تسجيل الدخول باستخدام البريد الإلكتروني وكلمة المرور
   const signIn = async (email: string, password: string) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -186,7 +178,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // إنشاء حساب جديد
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -230,7 +221,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // تسجيل الخروج
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -258,7 +248,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // تحديث الملف الشخصي
   const updateProfile = async (profileData: Partial<UserProfile>) => {
     try {
       if (!state.user) {
@@ -277,7 +266,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) throw error;
       
-      // تحديث الملف الشخصي في الحالة
       setState(prev => ({
         ...prev,
         profile: {
@@ -300,7 +288,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // تحديث كلمة المرور
   const updatePassword = async (currentPassword: string, newPassword: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
@@ -323,7 +310,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // التحقق من صلاحيات المستخدم
   const hasRole = (role: UserRole): boolean => {
     return state.roles.includes(role);
   };
