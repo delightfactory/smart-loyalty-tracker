@@ -67,7 +67,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         fullName: user.fullName || '',
         phone: user.phone || '',
         position: user.position || '',
-        roles: user.roles.map(role => role) || [UserRole.USER],
+        roles: user.roles || [UserRole.USER],
       });
     }
   }, [user, form]);

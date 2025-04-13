@@ -23,113 +23,41 @@ import NotFound from '@/pages/NotFound';
 import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import UsersPage from '@/pages/Users';
-import RequireAuth from '@/components/auth/RequireAuth';
-import './App.css';
 
 function App() {
   return (
-    <QueryProvider>
-      <AuthProvider>
-        <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-          <BrowserRouter>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={
-                  <RequireAuth>
-                    <Dashboard />
-                  </RequireAuth>
-                } />
-                <Route path="/products" element={
-                  <RequireAuth>
-                    <Products />
-                  </RequireAuth>
-                } />
-                <Route path="/product/:id" element={
-                  <RequireAuth>
-                    <ProductDetails />
-                  </RequireAuth>
-                } />
-                <Route path="/customers" element={
-                  <RequireAuth>
-                    <Customers />
-                  </RequireAuth>
-                } />
-                <Route path="/customer/:id" element={
-                  <RequireAuth>
-                    <CustomerDetails />
-                  </RequireAuth>
-                } />
-                <Route path="/customer-followup" element={
-                  <RequireAuth>
-                    <CustomerFollowup />
-                  </RequireAuth>
-                } />
-                <Route path="/invoices" element={
-                  <RequireAuth>
-                    <Invoices />
-                  </RequireAuth>
-                } />
-                <Route path="/invoice/:id" element={
-                  <RequireAuth>
-                    <InvoiceDetails />
-                  </RequireAuth>
-                } />
-                <Route path="/create-invoice" element={
-                  <RequireAuth>
-                    <CreateInvoice />
-                  </RequireAuth>
-                } />
-                <Route path="/create-invoice/:customerId" element={
-                  <RequireAuth>
-                    <CreateInvoice />
-                  </RequireAuth>
-                } />
-                <Route path="/create-redemption/:customerId" element={
-                  <RequireAuth>
-                    <CreateRedemption />
-                  </RequireAuth>
-                } />
-                <Route path="/create-payment" element={
-                  <RequireAuth>
-                    <CreatePayment />
-                  </RequireAuth>
-                } />
-                <Route path="/create-payment/:customerId" element={
-                  <RequireAuth>
-                    <CreatePayment />
-                  </RequireAuth>
-                } />
-                <Route path="/analytics" element={
-                  <RequireAuth>
-                    <Analytics />
-                  </RequireAuth>
-                } />
-                <Route path="/users" element={
-                  <RequireAuth>
-                    <UsersPage />
-                  </RequireAuth>
-                } />
-                <Route path="/profile" element={
-                  <RequireAuth>
-                    <Profile />
-                  </RequireAuth>
-                } />
-                <Route path="/settings" element={
-                  <RequireAuth>
-                    <Settings />
-                  </RequireAuth>
-                } />
-                <Route path="/404" element={<NotFound />} />
-                <Route path="*" element={<Navigate to="/404" replace />} />
-              </Routes>
-            </Layout>
+    <BrowserRouter>
+      <ThemeProvider defaultTheme="light" storageKey="car-care-theme">
+        <QueryProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              
+              <Route element={<Layout />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/products/:id" element={<ProductDetails />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/customers/:id" element={<CustomerDetails />} />
+                <Route path="/customer-followup" element={<CustomerFollowup />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices/:id" element={<InvoiceDetails />} />
+                <Route path="/create-invoice" element={<CreateInvoice />} />
+                <Route path="/create-redemption/:customerId" element={<CreateRedemption />} />
+                <Route path="/create-payment" element={<CreatePayment />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
             <Toaster />
-          </BrowserRouter>
-        </ThemeProvider>
-      </AuthProvider>
-    </QueryProvider>
+          </AuthProvider>
+        </QueryProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 
