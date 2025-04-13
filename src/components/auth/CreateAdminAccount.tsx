@@ -9,9 +9,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LogIn } from "lucide-react";
-import { adminCredentials } from '@/services/admin';
+import { adminCredentials, ensureUserHasAdminRole } from '@/services/admin';
 import { UserRole } from '@/lib/auth-types';
-import { createDefaultAdmin, ensureUserHasAdminRole } from '@/services/users';
+import { createDefaultAdmin } from '@/services/users';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CreateAdminAccountProps {
@@ -138,25 +138,30 @@ export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSucces
     
     try {
       // البحث عن مستخدم بالبريد الإلكتروني المحدد
-      const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+      const { data, error: userError } = await supabase.auth.admin.listUsers();
       
       if (userError) throw userError;
       
-      const adminUser = userData?.users.find(u => u.email === email);
-      
-      if (!adminUser) {
-        throw new Error("لم يتم العثور على مستخدم بهذا البريد الإلكتروني");
+      // تصحيح القضية: تعريف نوع البيانات وفحص وجودها
+      if (data && data.users && data.users.length > 0) {
+        const adminUser = data.users.find(u => u.email === email);
+        
+        if (!adminUser) {
+          throw new Error("لم يتم العثور على مستخدم بهذا البريد الإلكتروني");
+        }
+        
+        // التأكد من أن المستخدم لديه دور المسؤول
+        await ensureUserHasAdminRole(adminUser.id);
+        
+        toast({
+          title: "تم إصلاح صلاحيات المسؤول بنجاح",
+          description: "يمكنك الآن تسجيل الدخول بصلاحيات كاملة",
+        });
+        
+        setSuccess(true);
+      } else {
+        throw new Error("لم يتم العثور على أي مستخدمين");
       }
-      
-      // التأكد من أن المستخدم لديه دور المسؤول
-      await ensureUserHasAdminRole(adminUser.id);
-      
-      toast({
-        title: "تم إصلاح صلاحيات المسؤول بنجاح",
-        description: "يمكنك الآن تسجيل الدخول بصلاحيات كاملة",
-      });
-      
-      setSuccess(true);
     } catch (error: any) {
       setError(error.message || "حدث خطأ أثناء إصلاح صلاحيات المسؤول");
       console.error("خطأ في إصلاح صلاحيات المسؤول:", error);

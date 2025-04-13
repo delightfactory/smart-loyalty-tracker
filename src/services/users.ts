@@ -524,24 +524,27 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
       console.log('Admin user already exists');
       
       // محاولة إيجاد المستخدم بالبريد الإلكتروني
-      const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+      const { data, error: userError } = await supabase.auth.admin.listUsers();
       
       if (userError) {
         console.error("Error listing users:", userError);
         throw userError;
       }
       
-      const adminUser = userData?.users.find(u => u.email === email);
-      
-      if (adminUser) {
-        console.log('Found existing admin user:', adminUser.id);
+      // تصحيح القضية: تعريف نوع البيانات وفحص وجودها
+      if (data && data.users && data.users.length > 0) {
+        const adminUser = data.users.find(u => u.email === email);
         
-        // التأكد من أن المستخدم لديه دور المسؤول
-        await ensureUserHasAdminRole(adminUser.id);
-        
-        // استرجاع بيانات المستخدم المسؤول
-        const adminProfile = await getUserById(adminUser.id);
-        return adminProfile;
+        if (adminUser) {
+          console.log('Found existing admin user:', adminUser.id);
+          
+          // التأكد من أن المستخدم لديه دور المسؤول
+          await ensureUserHasAdminRole(adminUser.id);
+          
+          // استرجاع بيانات المستخدم المسؤول
+          const adminProfile = await getUserById(adminUser.id);
+          return adminProfile;
+        }
       }
       
       return null;
