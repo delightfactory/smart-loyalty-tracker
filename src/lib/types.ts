@@ -1,11 +1,21 @@
 // Product Categories
 export enum ProductCategory {
-  ENGINE_CARE = "العناية بالمحرك",
-  EXTERIOR_CARE = "العناية بالسطح الخارجي",
-  TIRE_CARE = "العناية بالإطارات",
-  DASHBOARD_CARE = "العناية بالتابلوه",
-  INTERIOR_CARE = "العناية بالفرش الداخلي"
+  ENGINE_CARE = "ENGINE_CARE",
+  EXTERIOR_CARE = "EXTERIOR_CARE",
+  TIRE_CARE = "TIRE_CARE",
+  DASHBOARD_CARE = "DASHBOARD_CARE",
+  INTERIOR_CARE = "INTERIOR_CARE",
+  SUPPLIES = "SUPPLIES"
 }
+
+export const ProductCategoryLabels: Record<ProductCategory, string> = {
+  [ProductCategory.ENGINE_CARE]: "العناية بالمحرك",
+  [ProductCategory.EXTERIOR_CARE]: "العناية بالسطح الخارجي",
+  [ProductCategory.TIRE_CARE]: "العناية بالإطارات",
+  [ProductCategory.DASHBOARD_CARE]: "العناية بالتابلوه",
+  [ProductCategory.INTERIOR_CARE]: "العناية بالفرش الداخلي",
+  [ProductCategory.SUPPLIES]: "المستلزمات"
+};
 
 // Customer Business Types
 export enum BusinessType {
@@ -21,12 +31,12 @@ export enum BusinessType {
 export interface Product {
   id: string; // المستخدم يدخل هذا الحقل (كود المنتج)
   name: string;
+  category: string; // تغيير النوع من ProductCategory إلى string لدعم القيم العربية
   unit: string;
-  category: ProductCategory;
-  price: number;
-  pointsEarned: number;
-  pointsRequired: number;
   brand: string;
+  price: number;
+  pointsEarned?: number;
+  pointsRequired?: number;
 }
 
 // Customer Interface
@@ -133,10 +143,10 @@ export interface Redemption {
 export interface CustomerAnalysis {
   customer: Customer;
   totalPurchases: number;
-  categoriesDistribution: Record<ProductCategory, number>; // Percentage per category
+  categoriesDistribution: Record<string, number>; // Percentage per category
   purchaseFrequency: number; // Average days between purchases
   onTimePaymentRate: number; // Percentage of on-time payments
-  mostPurchasedCategories: ProductCategory[];
+  mostPurchasedCategories: string[];
   mostPurchasedProducts: string[]; // Product IDs
   purchaseTrend: 'increasing' | 'stable' | 'decreasing';
 }
@@ -149,7 +159,7 @@ export interface DashboardSummary {
   totalRevenue: number;
   totalPointsIssued: number;
   totalPointsRedeemed: number;
-  categoryDistribution: Record<ProductCategory, number>;
+  categoryDistribution: Record<string, number>;
   topCustomers: Customer[];
   recentInvoices: Invoice[];
 }

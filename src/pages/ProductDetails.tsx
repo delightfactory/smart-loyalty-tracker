@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -29,26 +28,56 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Edit, Trash, TrendingUp } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
-import { getProductById, products, invoices, customers } from '@/lib/data';
+import { useProducts } from '@/hooks/useProducts';
+import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 
 const ProductDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [product, setProduct] = useState(getProductById(id || ''));
-  
-  // If product not found, redirect to products page
+  const { getById, updateProduct, deleteProduct, getAll } = useProducts();
+  const productQuery = getById(id || '');
+  const allProductsQuery = getAll;
+  // ✅ إصلاح نهائي لأنواع allData
+  const allData = (Array.isArray(allProductsQuery.data) ? { products: allProductsQuery.data, invoices: [], customers: [] } : allProductsQuery.data) || { products: [], invoices: [], customers: [] };
+  const product = productQuery.data;
+  const products = allData.products;
+  const invoices = allData.invoices;
+  const customers = allData.customers;
+  const isLoading = productQuery.isLoading || allProductsQuery.isLoading;
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
   useEffect(() => {
-    if (!product) {
+    if (!isLoading && !product) {
       navigate('/products');
     }
-  }, [product, navigate]);
-  
-  if (!product) {
-    return null;
+  }, [product, isLoading, navigate]);
+
+  if (isLoading || !product) {
+    return (
+      <PageContainer title="تفاصيل المنتج">
+        <div className="flex justify-center items-center h-40">
+          <span>جاري التحميل...</span>
+        </div>
+      </PageContainer>
+    );
   }
-  
-  // Calculate product rank based on sales
+
+  const formatNumber = (num: number | string) => Number(num).toLocaleString('en-US');
+  const formatDate = (date: string | Date) => {
+    const d = new Date(date);
+    return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  };
+
   const productSales = products.map(p => {
     const sales = invoices.reduce((total, invoice) => {
       const item = invoice.items.find(item => item.productId === p.id);
@@ -60,7 +89,6 @@ const ProductDetails = () => {
   
   const productRank = productSales.findIndex(p => p.id === product.id) + 1;
   
-  // Calculate total sales and revenue for this product
   const totalSales = invoices.reduce((total, invoice) => {
     const item = invoice.items.find(item => item.productId === product.id);
     return total + (item ? item.quantity : 0);
@@ -71,11 +99,10 @@ const ProductDetails = () => {
     return total + (item ? item.totalPrice : 0);
   }, 0);
   
-  // Monthly sales data
   const monthlySalesData = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
     date.setMonth(date.getMonth() - i);
-    const month = date.toLocaleString('ar-EG', { month: 'long' });
+    const month = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
     
     const monthInvoices = invoices.filter(invoice => {
       const invoiceDate = new Date(invoice.date);
@@ -100,7 +127,6 @@ const ProductDetails = () => {
     };
   }).reverse();
   
-  // Customers who purchased this product
   const customerPurchases = invoices
     .filter(invoice => invoice.items.some(item => item.productId === product.id))
     .reduce((acc, invoice) => {
@@ -119,11 +145,11 @@ const ProductDetails = () => {
   const topCustomers = Object.entries(customerPurchases)
     .map(([customerId, quantity]) => ({
       customerId,
-      quantity
+      quantity: Number(quantity)
     }))
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 5);
-  
+
   return (
     <PageContainer title="تفاصيل المنتج" subtitle={product.name}>
       <div className="mb-6">
@@ -160,23 +186,23 @@ const ProductDetails = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">السعر</p>
-                <p className="text-lg font-bold">{product.price.toLocaleString('ar-EG')} ج.م</p>
+                <p className="text-lg font-bold">{formatNumber(product.price)} ج.م</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">النقاط المكتسبة</p>
-                <p className="text-lg font-bold">{product.pointsEarned}</p>
+                <p className="text-lg font-bold">{formatNumber(product.pointsEarned)}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm font-medium text-muted-foreground">النقاط المطلوبة للاستبدال</p>
-                <p className="text-lg font-bold">{product.pointsRequired}</p>
+                <p className="text-lg font-bold">{formatNumber(product.pointsRequired)}</p>
               </div>
             </div>
             <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => { setEditProduct(product); setIsEditDialogOpen(true); }}>
                 <Edit className="h-4 w-4 ml-2" />
                 تعديل
               </Button>
-              <Button variant="destructive" size="sm">
+              <Button variant="destructive" size="sm" onClick={() => setIsDeleteDialogOpen(true)}>
                 <Trash className="h-4 w-4 ml-2" />
                 حذف
               </Button>
@@ -191,27 +217,19 @@ const ProductDetails = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي المبيعات</p>
-                <p className="text-2xl font-bold">{totalSales} {product.unit}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي المبيعات</p>
+                <p className="text-2xl font-bold text-center">{formatNumber(totalSales)} {product.unit}</p>
               </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الإيرادات</p>
-                <p className="text-2xl font-bold">{totalRevenue.toLocaleString('ar-EG')} ج.م</p>
+              <div className="flex flex-col items-center justify-center">
+                <p className="text-sm font-medium text-muted-foreground mb-1">إجمالي الإيرادات</p>
+                <p className="text-2xl font-bold text-center">{formatNumber(totalRevenue)} ج.م</p>
               </div>
-              <div className="col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">ترتيب المنتج</p>
-                <div className="flex items-center">
-                  <TrendingUp className={cn(
-                    "h-5 w-5 mr-2",
-                    productRank <= 3 ? "text-green-500" : 
-                    productRank <= 10 ? "text-amber-500" : "text-gray-500"
-                  )} />
-                  <p className="text-2xl font-bold">
-                    {productRank} من أصل {products.length}
-                  </p>
-                </div>
+              <div className="flex flex-col items-center justify-center gap-1">
+                <span className="text-3xl font-extrabold text-blue-700">{formatNumber(productRank)}</span>
+                <span className="text-xs text-muted-foreground">من أصل</span>
+                <span className="text-xl font-bold text-gray-700">{formatNumber(products.length)}</span>
               </div>
             </div>
           </CardContent>
@@ -320,6 +338,61 @@ const ProductDetails = () => {
           </CardContent>
         </Card>
       </div>
+      
+      {isEditDialogOpen && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>تعديل المنتج</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-1">اسم المنتج</label>
+                <input className="input" value={editProduct?.name || ''} onChange={e => setEditProduct({ ...editProduct, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block mb-1">السعر</label>
+                <input className="input" type="number" value={editProduct?.price || ''} onChange={e => setEditProduct({ ...editProduct, price: Number(e.target.value) })} />
+              </div>
+              {/* باقي الحقول... */}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>إلغاء</Button>
+              <Button onClick={() => {
+                updateProduct.mutate(editProduct, {
+                  onSuccess: () => {
+                    setIsEditDialogOpen(false);
+                    toast({ title: 'تم التحديث', description: 'تم تحديث بيانات المنتج بنجاح' });
+                  }
+                });
+              }}>حفظ التعديلات</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      
+      {isDeleteDialogOpen && (
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>تأكيد حذف المنتج</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع بعد الحذف.</div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>إلغاء</Button>
+              <Button variant="destructive" onClick={() => {
+                deleteProduct.mutate(product.id, {
+                  onSuccess: () => {
+                    setIsDeleteDialogOpen(false);
+                    toast({ title: 'تم الحذف', description: 'تم حذف المنتج بنجاح' });
+                    navigate('/products');
+                  }
+                });
+              }}>تأكيد الحذف</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </PageContainer>
   );
 };
