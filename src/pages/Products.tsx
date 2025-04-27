@@ -42,13 +42,14 @@ const Products = () => {
   const { data: products = [], isLoading, refetch } = getAll;
   
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
+    id: '',
     name: '',
     unit: '',
     category: ProductCategory.ENGINE_CARE,
     price: 0,
     pointsEarned: 0,
     pointsRequired: 0,
-    brand: ''
+    brand: '',
   });
 
   const filteredProducts = products.filter(product => {
@@ -63,20 +64,21 @@ const Products = () => {
   });
   
   const handleAddProduct = () => {
-    if (!newProduct.name || !newProduct.unit || !newProduct.brand) {
+    if (!newProduct.id || !newProduct.name || !newProduct.unit || !newProduct.brand) {
       toast({
         title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
+        description: "يرجى ملء جميع الحقول المطلوبة بما في ذلك كود المنتج",
         variant: "destructive"
       });
       return;
     }
     
     const productToAdd = {
+      id: newProduct.id,
       name: newProduct.name,
-      unit: newProduct.unit,
-      brand: newProduct.brand,
       category: newProduct.category || ProductCategory.ENGINE_CARE,
+      unit: newProduct.unit || '',
+      brand: newProduct.brand || '',
       price: Number(newProduct.price) || 0,
       pointsEarned: Number(newProduct.pointsEarned) || 0,
       pointsRequired: Number(newProduct.pointsRequired) || 0
@@ -84,16 +86,17 @@ const Products = () => {
     
     console.log("Adding product with data:", productToAdd);
     
-    addProduct.mutate(productToAdd as Omit<Product, 'id'>, {
+    addProduct.mutate(productToAdd, {
       onSuccess: () => {
         setNewProduct({
+          id: '',
           name: '',
           unit: '',
           category: ProductCategory.ENGINE_CARE,
           price: 0,
           pointsEarned: 0,
           pointsRequired: 0,
-          brand: ''
+          brand: '',
         });
         setIsAddDialogOpen(false);
       }
@@ -154,6 +157,15 @@ const Products = () => {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label htmlFor="id">كود المنتج</Label>
+                    <Input 
+                      id="id" 
+                      value={newProduct.id}
+                      onChange={(e) => setNewProduct({...newProduct, id: e.target.value})}
+                      className="mt-1"
+                    />
+                  </div>
                   <div className="col-span-2">
                     <Label htmlFor="name">اسم المنتج</Label>
                     <Input 

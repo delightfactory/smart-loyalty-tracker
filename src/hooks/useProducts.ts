@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsService } from '@/services/database';
 import { Product, ProductCategory } from '@/lib/types';
@@ -51,11 +50,12 @@ export function useProducts() {
   });
   
   const addProduct = useMutation({
-    mutationFn: async (product: Omit<Product, 'id'>) => {
+    mutationFn: async (product: Product) => {
       console.log('Adding product (before processing):', product);
       
       // تحويل القيم الرقمية بشكل صريح وضمان أن جميع الحقول الضرورية موجودة
       const processedProduct = {
+        id: product.id,
         name: product.name || '',
         category: product.category || ProductCategory.ENGINE_CARE,
         unit: product.unit || '',

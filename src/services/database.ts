@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
@@ -61,7 +60,6 @@ export const productsService = {
   
   async create(product: Omit<Product, 'id'>): Promise<Product> {
     const dbProduct = appProductToDbProduct(product as Product);
-    delete dbProduct.id;
     
     // Make sure all numeric fields are properly handled
     if (dbProduct.points_required === undefined) {

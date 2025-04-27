@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -23,6 +22,16 @@ import RevenueChart from '@/components/dashboard/RevenueChart';
 import CustomersList from '@/components/dashboard/CustomersList';
 import RecentInvoices from '@/components/dashboard/RecentInvoices';
 import PointsRedemptionChart from '@/components/dashboard/PointsRedemptionChart';
+import CustomerStatsCards from '@/components/dashboard/CustomerStatsCards';
+import NewCustomersChart from '@/components/dashboard/NewCustomersChart';
+import TopCustomersTable from '@/components/dashboard/TopCustomersTable';
+import InactiveCustomersTable from '@/components/dashboard/InactiveCustomersTable';
+import CategoryDiversityTable from '@/components/dashboard/CategoryDiversityTable';
+import CustomerFrequencyTable from '@/components/dashboard/CustomerFrequencyTable';
+import CustomerRFMTable from '@/components/dashboard/CustomerRFMTable';
+import ChurnRiskTable from '@/components/dashboard/ChurnRiskTable';
+import BusinessTypeDistribution from '@/components/dashboard/BusinessTypeDistribution';
+import TopRedemptionCustomersTable from '@/components/dashboard/TopRedemptionCustomersTable';
 
 // Utility functions
 // 1. Filter data by date range
@@ -397,8 +406,65 @@ const Dashboard = () => {
 
         <TabsContent value="customers">
           {/* Customer analysis components will be here */}
+          <CustomerStatsCards
+            totalCustomers={customersData ? customersData.length : 0}
+            newCustomers={(() => {
+              if (!customersData) return 0;
+              const now = new Date();
+              return customersData.filter((c: any) => {
+                const createdAt = new Date(c.createdAt || c.created_at);
+                return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+              }).length;
+            })()}
+            activeCustomers={(() => {
+              if (!customersData || !invoicesData) return 0;
+              // عميل نشط: لديه فاتورة خلال آخر 60 يوم
+              const now = new Date();
+              return customersData.filter((c: any) => {
+                const lastInvoice = invoicesData
+                  .filter((inv: any) => inv.customerId === c.id)
+                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                if (!lastInvoice) return false;
+                const lastDate = new Date(lastInvoice.date);
+                const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+                return diffDays <= 60;
+              }).length;
+            })()}
+            inactiveCustomers={(() => {
+              if (!customersData || !invoicesData) return 0;
+              // عميل غير نشط: لم يشترِ منذ أكثر من 60 يوم
+              const now = new Date();
+              return customersData.filter((c: any) => {
+                const lastInvoice = invoicesData
+                  .filter((inv: any) => inv.customerId === c.id)
+                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                if (!lastInvoice) return true;
+                const lastDate = new Date(lastInvoice.date);
+                const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+                return diffDays > 60;
+              }).length;
+            })()}
+            loading={!customersData || !invoicesData}
+          />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Will be populated with charts and tables */}
+            <NewCustomersChart customers={customersData || []} />
+            <TopCustomersTable customers={customersData || []} invoices={invoicesData || []} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <InactiveCustomersTable customers={customersData || []} invoices={invoicesData || []} />
+            <CategoryDiversityTable customers={customersData || []} invoices={invoicesData || []} products={productsData || []} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <CustomerFrequencyTable customers={customersData || []} invoices={invoicesData || []} />
+            <CustomerRFMTable customers={customersData || []} invoices={invoicesData || []} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <ChurnRiskTable customers={customersData || []} invoices={invoicesData || []} thresholdDays={90} />
+            <BusinessTypeDistribution customers={customersData || []} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <TopRedemptionCustomersTable customers={customersData || []} />
+            {/* سيتم إضافة التحليلات الأخرى هنا */}
             <Card>
               <CardHeader>
                 <CardTitle>قريباً</CardTitle>

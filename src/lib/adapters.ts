@@ -38,7 +38,7 @@ export function appProductToDbProduct(product: Product): any {
     unit: product.unit,
     brand: product.brand,
     points_earned: product.pointsEarned,
-    pointsRequired: product.pointsRequired
+    points_required: product.pointsRequired
   };
 }
 

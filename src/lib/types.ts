@@ -1,4 +1,3 @@
-
 // Product Categories
 export enum ProductCategory {
   ENGINE_CARE = "العناية بالمحرك",
@@ -20,7 +19,7 @@ export enum BusinessType {
 
 // Product Interface
 export interface Product {
-  id: string;
+  id: string; // المستخدم يدخل هذا الحقل (كود المنتج)
   name: string;
   unit: string;
   category: ProductCategory;

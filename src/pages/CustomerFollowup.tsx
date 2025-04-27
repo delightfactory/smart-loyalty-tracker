@@ -1,39 +1,52 @@
-
 import { useState, useEffect } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { customers } from '@/lib/data';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useInvoices } from '@/hooks/useInvoices';
 import CustomerPerformanceTab from '@/components/customer/CustomerPerformanceTab';
 import InactiveCustomersTable from '@/components/customer/InactiveCustomersTable';
 import InactivityStatCards from '@/components/customer/InactivityStatCards';
 import InactivityFilter from '@/components/customer/InactivityFilter';
 
-const inactiveCustomers = customers.map(customer => ({
-  ...customer,
-  lastPurchase: new Date(Date.now() - Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000),
-  inactiveDays: Math.floor(Math.random() * 180) + 1,
-  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(customer.name)}`,
-  email: `${customer.contactPerson.replace(/\s+/g, '.').toLowerCase()}@${customer.name.replace(/\s+/g, '-').toLowerCase()}.com`,
-  loyaltyPoints: customer.currentPoints // Using currentPoints as loyaltyPoints
-}));
-
 const CustomerFollowup = () => {
   const [period, setPeriod] = useState<string>("30");
   const [date, setDate] = useState<Date | undefined>(undefined);
-  const [filteredCustomers, setFilteredCustomers] = useState(inactiveCustomers);
   const [activeTab, setActiveTab] = useState<string>("all");
-  
-  useEffect(() => {
-    const days = parseInt(period);
-    const filtered = inactiveCustomers.filter(customer => 
-      customer.inactiveDays >= days
-    );
-    setFilteredCustomers(filtered.sort((a, b) => b.inactiveDays - a.inactiveDays));
-  }, [period]);
 
-  const criticalCustomers = filteredCustomers.filter(c => c.inactiveDays > 90);
-  const warningCustomers = filteredCustomers.filter(c => c.inactiveDays >= 30 && c.inactiveDays <= 90);
-  const recentCustomers = filteredCustomers.filter(c => c.inactiveDays < 30);
+  // جلب العملاء والفواتير الحقيقية
+  const { getAll: getAllCustomers } = useCustomers();
+  const { data: customers = [], isLoading: customersLoading } = getAllCustomers;
+  const { getAll: getAllInvoices } = useInvoices();
+  const { data: invoices = [], isLoading: invoicesLoading } = getAllInvoices;
+
+  // بناء بيانات العملاء غير النشطين من البيانات الحقيقية
+  const inactiveCustomers = customers.map(customer => {
+    const customerInvoices = invoices.filter(inv => inv.customerId === customer.id);
+    const lastPurchaseDate = customerInvoices.length
+      ? new Date(Math.max(...customerInvoices.map(inv => new Date(inv.date).getTime())))
+      : null;
+    const inactiveDays = lastPurchaseDate
+      ? Math.floor((Date.now() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    return {
+      ...customer,
+      lastPurchase: lastPurchaseDate,
+      inactiveDays: inactiveDays,
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(customer.name)}`,
+      email: customer.contactPerson || '', // تم استبدال email بحقل contactPerson أو أي حقل متوفر
+      loyaltyPoints: customer.currentPoints
+    };
+  });
+
+  // فلترة العملاء حسب فترة الغياب
+  const filteredCustomers = inactiveCustomers.filter(customer => {
+    if (customer.inactiveDays === null) return false;
+    return customer.inactiveDays >= parseInt(period);
+  }).sort((a, b) => (b.inactiveDays || 0) - (a.inactiveDays || 0));
+
+  const criticalCustomers = filteredCustomers.filter(c => (c.inactiveDays || 0) > 90);
+  const warningCustomers = filteredCustomers.filter(c => (c.inactiveDays || 0) >= 30 && (c.inactiveDays || 0) <= 90);
+  const recentCustomers = filteredCustomers.filter(c => (c.inactiveDays || 0) < 30);
 
   return (
     <PageContainer 
@@ -64,23 +77,18 @@ const CustomerFollowup = () => {
             <TabsTrigger value="recent">عملاء حديثي الغياب</TabsTrigger>
             <TabsTrigger value="performance">تحليل الأداء</TabsTrigger>
           </TabsList>
-          
           <TabsContent value="all">
             <InactiveCustomersTable customers={filteredCustomers} />
           </TabsContent>
-          
           <TabsContent value="critical">
             <InactiveCustomersTable customers={criticalCustomers} />
           </TabsContent>
-          
           <TabsContent value="warning">
             <InactiveCustomersTable customers={warningCustomers} />
           </TabsContent>
-          
           <TabsContent value="recent">
             <InactiveCustomersTable customers={recentCustomers} />
           </TabsContent>
-          
           <TabsContent value="performance">
             <CustomerPerformanceTab customers={inactiveCustomers} />
           </TabsContent>
