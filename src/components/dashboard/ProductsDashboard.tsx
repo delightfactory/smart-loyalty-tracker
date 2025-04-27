@@ -6,21 +6,58 @@ import { productsService, invoicesService } from '@/services/database';
 import { Product, Invoice, ProductCategory } from '@/lib/types';
 import { formatNumberEn, formatAmountEn } from '@/lib/formatters';
 
-export default function ProductsDashboard() {
-  const [tab, setTab] = useState('overview');
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => await productsService.getAll(),
-  });
-  const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: async () => await invoicesService.getAll(),
-  });
+interface ProductsDashboardProps {
+  products?: Product[];
+  invoices?: Invoice[];
+  timeRange?: string;
+  customRange?: { from?: Date; to?: Date };
+}
 
-  // جمع بيانات المبيعات للمنتجات
+export default function ProductsDashboard({ products = [], invoices = [], timeRange = 'all', customRange }: ProductsDashboardProps) {
+  const [tab, setTab] = useState('overview');
+  // فلترة الفواتير حسب الفترة الزمنية
+  let filteredInvoices = invoices;
+  if (timeRange && timeRange !== 'all' && invoices.length) {
+    const now = new Date();
+    let startDate = new Date();
+    switch (timeRange) {
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      case 'custom':
+        if (customRange?.from && customRange?.to) {
+          startDate = new Date(customRange.from);
+          const endDate = new Date(customRange.to);
+          filteredInvoices = invoices.filter(inv => {
+            const d = new Date(inv.date);
+            return d >= startDate && d <= endDate;
+          });
+        }
+        break;
+      default:
+        break;
+    }
+    if (timeRange !== 'custom') {
+      filteredInvoices = invoices.filter(inv => {
+        const d = new Date(inv.date);
+        return d >= startDate && d <= now;
+      });
+    }
+  }
+
+  // جمع بيانات المبيعات للمنتجات بناءً على الفواتير المفلترة
   const productSales = products.map((product: Product) => {
     let totalSold = 0, totalRevenue = 0, lastSoldDate: Date|null = null;
-    invoices.forEach((inv: Invoice) => {
+    filteredInvoices.forEach((inv: Invoice) => {
       inv.items.forEach((item: any) => {
         if (item.productId === product.id) {
           totalSold += item.quantity;

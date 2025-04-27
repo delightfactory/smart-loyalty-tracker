@@ -42,6 +42,7 @@ export interface Customer {
   creditBalance: number;
   classification: number; // Auto-calculated based on categories purchased from
   level: number; // Ranking compared to other customers
+  created_at?: string;
 }
 
 // Invoice Item Interface
