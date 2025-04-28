@@ -56,6 +56,8 @@ export function dbCustomerToAppCustomer(dbCustomer: any): Customer {
     classification: dbCustomer.classification,
     level: dbCustomer.level,
     creditBalance: dbCustomer.credit_balance,
+    governorate: dbCustomer.governorate ?? '',
+    city: dbCustomer.city ?? '',
   };
 }
 
@@ -73,6 +75,8 @@ export function appCustomerToDbCustomer(customer: Customer | Omit<Customer, 'id'
     classification: customer.classification,
     level: customer.level,
     credit_balance: customer.creditBalance,
+    governorate: customer.governorate ?? null,
+    city: customer.city ?? null,
   };
 }
 

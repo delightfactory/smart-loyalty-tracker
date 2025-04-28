@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   Dialog,
@@ -18,6 +17,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Customer, BusinessType } from '@/lib/types';
+import { egyptGovernorates } from '@/lib/egyptLocations';
 
 interface CustomerEditDialogProps {
   customer: Customer;
@@ -43,7 +43,7 @@ const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditD
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>تعديل بيانات العميل</DialogTitle>
         </DialogHeader>
@@ -75,6 +75,43 @@ const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditD
                 onChange={(e) => handleChange('phone', e.target.value)}
                 className="mt-1"
               />
+            </div>
+            <div>
+              <Label htmlFor="governorate">المحافظة</Label>
+              <Select
+                value={editedCustomer.governorate || ''}
+                onValueChange={(value) => {
+                  handleChange('governorate', value);
+                  // Reset city if governorate changes
+                  setEditedCustomer((prev) => ({ ...prev, city: '' }));
+                }}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="اختر المحافظة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {egyptGovernorates.map((gov) => (
+                    <SelectItem key={gov.governorate} value={gov.governorate}>{gov.governorate}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="city">المدينة</Label>
+              <Select
+                value={editedCustomer.city || ''}
+                onValueChange={(value) => handleChange('city', value)}
+                disabled={!editedCustomer.governorate}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="اختر المدينة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(egyptGovernorates.find(gov => gov.governorate === editedCustomer.governorate)?.cities || []).map((city) => (
+                    <SelectItem key={city} value={city}>{city}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="businessType">نوع النشاط</Label>

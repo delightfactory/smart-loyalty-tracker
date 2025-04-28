@@ -1,5 +1,5 @@
-
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Table, 
@@ -20,6 +20,7 @@ import { FileText, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Invoice, InvoiceStatus } from '@/lib/types';
 import { getProductById } from '@/lib/data';
+import PurchasesFilterBar from './PurchasesFilterBar';
 
 interface CustomerPurchasesTableProps {
   invoices: Invoice[];
@@ -28,15 +29,27 @@ interface CustomerPurchasesTableProps {
 
 const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTableProps) => {
   const navigate = useNavigate();
-  
+  const [search, setSearch] = useState('');
+  const [dateRange, setDateRange] = useState<{from: string, to: string}>({from: '', to: ''});
+
+  // Format currency and date in ENGLISH
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+    return value.toLocaleString('en-US', { style: 'currency', currency: 'EGP' });
   };
-  
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('ar-EG');
+    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   };
-  
+
+  // Filter logic
+  const filteredInvoices = invoices.filter((invoice) => {
+    const matchSearch = search === '' || invoice.id.includes(search) || invoice.items.some(item => item.productId.includes(search));
+    const invoiceDate = new Date(invoice.date);
+    const fromDate = dateRange.from ? new Date(dateRange.from) : null;
+    const toDate = dateRange.to ? new Date(dateRange.to) : null;
+    const matchDate = (!fromDate || invoiceDate >= fromDate) && (!toDate || invoiceDate <= toDate);
+    return matchSearch && matchDate;
+  });
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -50,7 +63,16 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
         </Button>
       </CardHeader>
       <CardContent>
-        {invoices.length > 0 ? (
+        {/* Filters and summary */}
+        <PurchasesFilterBar
+          onSearch={setSearch}
+          onDateRangeChange={(from, to) => setDateRange({from, to})}
+        />
+        <div className="mb-2 flex gap-6 text-xs text-muted-foreground">
+          <div>عدد الفواتير: <span className="font-bold text-primary">{filteredInvoices.length}</span></div>
+          <div>إجمالي المشتريات: <span className="font-bold text-primary">{filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toLocaleString('en-US', { style: 'currency', currency: 'EGP' })}</span></div>
+        </div>
+        {filteredInvoices.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -64,7 +86,7 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
+              {filteredInvoices.map((invoice) => (
                 <TableRow 
                   key={invoice.id} 
                   className="cursor-pointer hover:bg-muted/50"
@@ -94,7 +116,7 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <FileText className="h-12 w-12 mb-4 opacity-50" />
-            <p>لا توجد فواتير لهذا العميل</p>
+            <p>لا توجد فواتير مطابقة للبحث أو التصفية</p>
             <Button 
               variant="outline" 
               className="mt-4"

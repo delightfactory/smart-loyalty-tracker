@@ -149,23 +149,20 @@ export const customersService = {
     return dbCustomerToAppCustomer(data);
   },
   
-  async create(customer: Omit<Customer, 'id'>): Promise<Customer> {
+  async create(customer: Customer): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
-    
-    const customerId = `CUST${Date.now().toString().slice(-6)}`;
-    dbCustomer.id = customerId;
-    
+
     const { data, error } = await supabase
       .from('customers')
       .insert(dbCustomer)
       .select('*')
       .single();
-      
+
     if (error) {
       console.error('Error creating customer:', error);
       throw error;
     }
-    
+
     return dbCustomerToAppCustomer(data);
   },
   

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { 
   Card, 
@@ -16,130 +15,96 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Coins, ArrowDown, ArrowUp } from 'lucide-react';
+import { CreditCard, Coins, ArrowDown, ArrowUp, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import PaymentsFilterBar from './PaymentsFilterBar';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
 
 interface Payment {
   id: string;
   customerId: string;
   amount: number;
-  date: Date;
+  date: Date | string;
   method: string;
   invoiceId?: string;
   notes?: string;
   type: 'payment' | 'refund';
 }
 
-// Mock payments data - in a real app, this would come from a database
-const mockPayments: Payment[] = [
-  {
-    id: 'PAY001',
-    customerId: 'C001',
-    amount: 500,
-    date: new Date(2023, 5, 16),
-    method: 'نقدًا',
-    invoiceId: 'INV001',
-    notes: 'دفعة جزئية على الفاتورة',
-    type: 'payment'
-  },
-  {
-    id: 'PAY002',
-    customerId: 'C001',
-    amount: 300,
-    date: new Date(2023, 5, 20),
-    method: 'تحويل بنكي',
-    invoiceId: 'INV001',
-    notes: 'تسوية الفاتورة',
-    type: 'payment'
-  },
-  {
-    id: 'PAY003',
-    customerId: 'C002',
-    amount: 200,
-    date: new Date(2023, 5, 21),
-    method: 'نقدًا',
-    invoiceId: 'INV002',
-    notes: 'دفعة جزئية',
-    type: 'payment'
-  },
-  {
-    id: 'REF001',
-    customerId: 'C001',
-    amount: 50,
-    date: new Date(2023, 5, 25),
-    method: 'نقدًا',
-    invoiceId: 'INV001',
-    notes: 'استرجاع جزئي',
-    type: 'refund'
-  }
-];
+const CustomerPaymentHistory = ({ customerId }: { customerId: string }) => {
+  // جلب المدفوعات من hook
+  const { getByCustomerId: getPayments } = usePayments();
+  const { getByCustomerId: getInvoices } = useInvoices();
+  const { data: paymentsData = [], isLoading: loadingPayments } = getPayments(customerId);
+  const { data: invoicesData = [], isLoading: loadingInvoices } = getInvoices(customerId);
+  const [search, setSearch] = useState('');
+  const [dateRange, setDateRange] = useState<{from: string, to: string}>({from: '', to: ''});
 
-interface CustomerPaymentHistoryProps {
-  customerId: string;
-}
+  // استخراج الفواتير النقدية المدفوعة بالكامل أو جزئياً ولم يتم تسجيلها كدفعة منفصلة
+  const invoicePayments = (invoicesData || [])
+    .filter(inv =>
+      (inv.status === 'مدفوع' || inv.status === 'مدفوع جزئياً') &&
+      inv.paymentMethod === 'نقداً'
+    )
+    .map(inv => ({
+      id: `INV-${inv.id}`,
+      customerId: inv.customerId,
+      amount: inv.totalAmount,
+      date: inv.date,
+      method: inv.paymentMethod,
+      invoiceId: inv.id,
+      notes: 'دفعة نقدية من الفاتورة',
+      type: 'payment'
+    }))
+    // استثنِ الفواتير التي يوجد لها دفعة منفصلة بنفس invoiceId
+    .filter(invPay => !(paymentsData || []).some(pay => pay.invoiceId === invPay.invoiceId));
 
-const CustomerPaymentHistory = ({ customerId }: CustomerPaymentHistoryProps) => {
-  const [payments, setPayments] = useState<Payment[]>([]);
-
-  useEffect(() => {
-    // Filter payments for this customer
-    const customerPayments = mockPayments.filter(payment => payment.customerId === customerId);
-    setPayments(customerPayments);
-  }, [customerId]);
+  // دمج جميع المدفوعات مع الفواتير النقدية
+  const allPayments = [...(paymentsData || []), ...invoicePayments];
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+    return value.toLocaleString('en-US', { style: 'currency', currency: 'EGP' });
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('ar-EG');
+  const formatDate = (date: Date | string) => {
+    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   };
 
-  const getTotalPayments = () => {
-    const paymentsTotal = payments
-      .filter(p => p.type === 'payment')
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    
-    const refundsTotal = payments
-      .filter(p => p.type === 'refund')
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    
-    return paymentsTotal - refundsTotal;
-  };
+  const filteredPayments = allPayments.filter((payment) => {
+    const matchSearch = search === '' || payment.id.includes(search) || (payment.notes && payment.notes.includes(search));
+    const paymentDate = new Date(payment.date);
+    const fromDate = dateRange.from ? new Date(dateRange.from) : null;
+    const toDate = dateRange.to ? new Date(dateRange.to) : null;
+    const matchDate = (!fromDate || paymentDate >= fromDate) && (!toDate || paymentDate <= toDate);
+    return matchSearch && matchDate;
+  });
+
+  if (loadingPayments || loadingInvoices) {
+    return (
+      <Card><CardContent className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+        <CreditCard className="h-10 w-10 animate-spin mb-3" />
+        <p>جاري تحميل سجل المدفوعات...</p>
+      </CardContent></Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <CreditCard className="mr-2 h-5 w-5" />
-          سجل المدفوعات
-        </CardTitle>
-        <CardDescription>جميع المدفوعات والاسترجاعات للعميل</CardDescription>
+        <CardTitle>سجل المدفوعات</CardTitle>
+        <CardDescription>جميع عمليات الدفع والاسترجاع، بما في ذلك المدفوعات النقدية من الفواتير</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-6 p-4 bg-muted rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Coins className="h-8 w-8 text-primary mr-3" />
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي المدفوعات</p>
-                <p className="text-2xl font-bold">{formatCurrency(getTotalPayments())}</p>
-              </div>
-            </div>
-            <div className="flex space-x-4 space-x-reverse">
-              <div className="text-center">
-                <p className="text-sm font-medium text-muted-foreground">عدد المدفوعات</p>
-                <p className="text-xl font-bold">{payments.filter(p => p.type === 'payment').length}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-muted-foreground">عدد الاسترجاعات</p>
-                <p className="text-xl font-bold">{payments.filter(p => p.type === 'refund').length}</p>
-              </div>
-            </div>
-          </div>
+        <PaymentsFilterBar
+          onSearch={setSearch}
+          onDateRangeChange={(from, to) => setDateRange({from, to})}
+        />
+        <div className="mb-2 flex gap-6 text-xs text-muted-foreground">
+          <div>عدد العمليات: <span className="font-bold text-primary">{filteredPayments.length}</span></div>
+          <div>إجمالي المدفوعات: <span className="font-bold text-primary">{filteredPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { style: 'currency', currency: 'EGP' })}</span></div>
         </div>
-
-        {payments.length > 0 ? (
+        {filteredPayments.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -153,9 +118,9 @@ const CustomerPaymentHistory = ({ customerId }: CustomerPaymentHistoryProps) => 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((payment) => (
+              {filteredPayments.map((payment) => (
                 <TableRow key={payment.id}>
-                  <TableCell className="font-medium">{payment.id}</TableCell>
+                  <TableCell>{payment.id}</TableCell>
                   <TableCell>{formatDate(payment.date)}</TableCell>
                   <TableCell>
                     {payment.type === 'payment' ? (
@@ -177,7 +142,7 @@ const CustomerPaymentHistory = ({ customerId }: CustomerPaymentHistoryProps) => 
                     {payment.type === 'payment' ? '+' : '-'} {formatCurrency(payment.amount)}
                   </TableCell>
                   <TableCell>{payment.method}</TableCell>
-                  <TableCell>{payment.invoiceId || 'غير مرتبط'}</TableCell>
+                  <TableCell>{payment.invoiceId}</TableCell>
                   <TableCell>{payment.notes || '-'}</TableCell>
                 </TableRow>
               ))}
@@ -185,8 +150,8 @@ const CustomerPaymentHistory = ({ customerId }: CustomerPaymentHistoryProps) => 
           </Table>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-            <CreditCard className="h-12 w-12 mb-4 opacity-50" />
-            <p>لا توجد مدفوعات لهذا العميل</p>
+            <FileText className="h-12 w-12 mb-4 opacity-50" />
+            <p>لا توجد عمليات مطابقة للبحث أو التصفية</p>
           </div>
         )}
       </CardContent>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -52,10 +51,11 @@ import {
   getProductById, 
   updateInvoice, 
   invoices,
-  updateCustomer
+  updateCustomer,
 } from '@/lib/data';
 import { InvoiceStatus, Invoice, PaymentMethod } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useCustomers } from '@/hooks/useCustomers';
 
 const InvoiceDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -86,7 +86,9 @@ const InvoiceDetails = () => {
     );
   }
   
-  const customer = getCustomerById(invoice.customerId);
+  const { getById } = useCustomers();
+  const customerQuery = getById(invoice.customerId);
+  const customer = customerQuery?.data;
   
   const formatCurrency = (value: number) => {
     return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
@@ -129,14 +131,6 @@ const InvoiceDetails = () => {
       // Reverse points earned
       updatedCustomer.pointsEarned -= invoice.pointsEarned;
       
-      // Reverse points redeemed
-      if (invoice.pointsRedeemed > 0) {
-        updatedCustomer.pointsRedeemed -= invoice.pointsRedeemed;
-      }
-      
-      // Update current points balance
-      updatedCustomer.currentPoints = updatedCustomer.pointsEarned - updatedCustomer.pointsRedeemed;
-      
       // Reverse credit if it was a credit invoice and still unpaid
       if (invoice.paymentMethod === PaymentMethod.CREDIT && 
           (invoice.status === InvoiceStatus.UNPAID || invoice.status === InvoiceStatus.PARTIALLY_PAID)) {
@@ -160,6 +154,10 @@ const InvoiceDetails = () => {
     navigate('/invoices');
     
     setDeleteDialogOpen(false);
+    
+    if (customerQuery && customerQuery.refetch) {
+      customerQuery.refetch();
+    }
   };
   
   const handleAddPayment = () => {
@@ -403,6 +401,7 @@ const InvoiceDetails = () => {
       </AlertDialog>
     </PageContainer>
   );
+  
 };
 
 export default InvoiceDetails;

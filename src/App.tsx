@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
@@ -50,6 +49,7 @@ function App() {
                 <Route path="/customer-followup" element={<CustomerFollowup />} />
                 <Route path="/invoices" element={<Invoices />} />
                 <Route path="/invoices/:id" element={<InvoiceDetails />} />
+                <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />
                 <Route path="/create-invoice" element={<CreateInvoice />} />
                 <Route path="/create-redemption/:customerId" element={<CreateRedemption />} />
                 <Route path="/create-payment" element={<CreatePayment />} />

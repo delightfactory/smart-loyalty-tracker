@@ -135,14 +135,9 @@ const CreateRedemption = () => {
       items: redemptionItems
     }, {
       onSuccess: (data) => {
-        if (customer) {
-          const updatedCustomer = { ...customer };
-          updatedCustomer.pointsRedeemed = Number(updatedCustomer.pointsRedeemed || 0) + totalRedemptionPoints;
-          updatedCustomer.currentPoints = Number(updatedCustomer.pointsEarned || 0) - Number(updatedCustomer.pointsRedeemed || 0);
-          
-          updateCustomer.mutate(updatedCustomer);
+        if (customerQuery && customerQuery.refetch) {
+          customerQuery.refetch();
         }
-        
         setNewRedemptionId(data.id);
         setSuccess(true);
         

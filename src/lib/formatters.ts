@@ -6,8 +6,13 @@ export function toEnglishDigits(input: string | number): string {
 }
 
 // دالة لتنسيق المبالغ المالية بالأرقام الإنجليزية
-export function formatAmountEn(amount: number): string {
-  return toEnglishDigits(amount.toLocaleString('en-US', { style: 'currency', currency: 'EGP' }));
+export function formatAmountEn(amount: number, options?: { currency?: boolean }): string {
+  if (options && options.currency === false) {
+    // فقط أرقام إنجليزية بدون أي رمز عملة
+    return toEnglishDigits(Number(amount).toLocaleString('en-US'));
+  }
+  // الافتراضي: عملة الجنيه المصري
+  return toEnglishDigits(Number(amount).toLocaleString('en-US', { style: 'currency', currency: 'EGP' }));
 }
 
 // دالة لتنسيق التواريخ بالأرقام الإنجليزية وتنسيق ثابت (DD/MM/YYYY)
