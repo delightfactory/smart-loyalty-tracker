@@ -1,4 +1,3 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,38 +17,44 @@ const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDeta
   const { getAll } = useProducts();
   const { data: products = [] } = getAll;
   
-  // Format date to local date string
-  const formattedDate = new Date(redemption.date).toLocaleDateString('ar-EG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  // Format date to English format (YYYY-MM-DD)
+  const formattedDate = redemption.date
+    ? new Date(redemption.date).toLocaleDateString('en-GB')
+    : '---';
   
+  // دعم الوضع الداكن للألوان
+  const statusColors = {
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+    cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    unknown: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+  };
+
   // Get status display elements
   const getStatusDisplay = () => {
     switch(redemption.status) {
       case RedemptionStatus.COMPLETED:
         return {
           text: 'مكتمل',
-          bgColor: 'bg-green-100 text-green-800',
+          bgColor: statusColors.completed,
           icon: <CheckCircle className="h-4 w-4 mr-2" />
         };
       case RedemptionStatus.PENDING:
         return {
           text: 'قيد الانتظار',
-          bgColor: 'bg-amber-100 text-amber-800',
+          bgColor: statusColors.pending,
           icon: <Clock className="h-4 w-4 mr-2" />
         };
       case RedemptionStatus.CANCELLED:
         return {
           text: 'ملغي',
-          bgColor: 'bg-red-100 text-red-800',
+          bgColor: statusColors.cancelled,
           icon: <AlertTriangle className="h-4 w-4 mr-2" />
         };
       default:
         return {
           text: 'غير معروف',
-          bgColor: 'bg-gray-100 text-gray-800',
+          bgColor: statusColors.unknown,
           icon: <Clock className="h-4 w-4 mr-2" />
         };
     }
@@ -62,7 +67,7 @@ const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDeta
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="bg-slate-50">
+      <CardHeader className="bg-slate-50 dark:bg-slate-900">
         <div className="flex justify-between items-center">
           <CardTitle>تفاصيل الاستبدال</CardTitle>
           <Badge className={statusDisplay.bgColor}>
@@ -73,7 +78,7 @@ const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDeta
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent className="pt-6 dark:bg-slate-900">
         <div className="space-y-6">
           <div className="flex items-center space-x-4 rtl:space-x-reverse">
             <Calendar className="h-5 w-5 text-muted-foreground" />
@@ -100,11 +105,11 @@ const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDeta
                   return (
                     <div 
                       key={index} 
-                      className="border rounded-md p-3 bg-slate-50"
+                      className="border rounded-md p-3 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
                     >
                       <div className="flex justify-between">
                         <span className="font-medium">{productName}</span>
-                        <span>{pointsRequired} × {quantity} = {totalPointsRequired} نقطة</span>
+                        <span>{pointsRequired} × {quantity} = {totalPointsRequired} points</span>
                       </div>
                     </div>
                   );
@@ -115,24 +120,24 @@ const RedemptionDetailsCard = ({ redemption, onCancel, onPrint }: RedemptionDeta
             )}
           </div>
           
-          <div className="border-t pt-4 space-y-2">
+          <div className="border-t pt-4 space-y-2 border-slate-200 dark:border-slate-700">
             <div className="flex justify-between text-lg font-semibold">
               <span>إجمالي النقاط المستبدلة:</span>
-              <span className="text-amber-600">{totalPointsRedeemed} نقطة</span>
+              <span className="text-amber-600 dark:text-amber-300">{totalPointsRedeemed} points</span>
             </div>
           </div>
           
           {redemption.status === RedemptionStatus.CANCELLED && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
+            <div className="bg-red-50 border border-red-200 dark:bg-red-900/30 dark:border-red-700 rounded-md p-4 mt-4">
               <div className="flex items-center">
-                <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-                <span className="font-medium text-red-800">تم إلغاء عملية الاستبدال</span>
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-300 mr-2" />
+                <span className="font-medium text-red-800 dark:text-red-200">تم إلغاء عملية الاستبدال</span>
               </div>
             </div>
           )}
         </div>
       </CardContent>
-      <CardFooter className="bg-slate-50 flex gap-3 justify-end">
+      <CardFooter className="bg-slate-50 dark:bg-slate-900 flex gap-3 justify-end">
         {onPrint && (
           <Button variant="outline" size="sm" onClick={onPrint}>
             <Printer className="h-4 w-4 mr-2" />

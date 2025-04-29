@@ -1,4 +1,3 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { RedemptionItem, Product } from '@/lib/types';
@@ -8,12 +7,14 @@ interface RedemptionItemsListProps {
   redemptionItems: RedemptionItem[];
   onRemoveItem: (index: number) => void;
   products: Product[];
+  numberFormat?: string;
 }
 
 const RedemptionItemsList = ({ 
   redemptionItems, 
   onRemoveItem,
-  products 
+  products,
+  numberFormat = 'en-US'
 }: RedemptionItemsListProps) => {
   // Calculate total points required
   const totalPoints = redemptionItems.reduce((sum, item) => {
@@ -36,30 +37,30 @@ const RedemptionItemsList = ({
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-hidden bg-white dark:bg-slate-900">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>المنتج</TableHead>
-            <TableHead className="text-center">الكمية</TableHead>
-            <TableHead className="text-center">النقاط المطلوبة للوحدة</TableHead>
-            <TableHead className="text-center">إجمالي النقاط</TableHead>
-            <TableHead className="w-[80px]"></TableHead>
+            <TableHead className="bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200">المنتج</TableHead>
+            <TableHead className="text-center bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200">الكمية</TableHead>
+            <TableHead className="text-center bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200">النقاط المطلوبة للوحدة</TableHead>
+            <TableHead className="text-center bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200">إجمالي النقاط</TableHead>
+            <TableHead className="w-[80px] bg-slate-100 dark:bg-slate-800"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {redemptionItems.map((item, index) => (
-            <TableRow key={index}>
-              <TableCell className="font-medium">{getProductName(item.productId)}</TableCell>
-              <TableCell className="text-center">{Number(item.quantity)}</TableCell>
-              <TableCell className="text-center">{Number(item.pointsRequired)}</TableCell>
-              <TableCell className="text-center font-medium">{Number(item.totalPointsRequired)}</TableCell>
+            <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+              <TableCell className="font-medium text-gray-900 dark:text-gray-100">{getProductName(item.productId)}</TableCell>
+              <TableCell className="text-center text-blue-900 dark:text-blue-300">{Number(item.quantity).toLocaleString(numberFormat)}</TableCell>
+              <TableCell className="text-center text-amber-700 dark:text-amber-300">{Number(item.pointsRequired).toLocaleString(numberFormat)}</TableCell>
+              <TableCell className="text-center font-medium text-green-800 dark:text-green-300">{Number(item.totalPointsRequired).toLocaleString(numberFormat)}</TableCell>
               <TableCell>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onRemoveItem(index)}
-                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 dark:text-red-300 dark:hover:text-red-500"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span className="sr-only">حذف</span>
@@ -67,12 +68,12 @@ const RedemptionItemsList = ({
               </TableCell>
             </TableRow>
           ))}
-          <TableRow className="bg-slate-50">
-            <TableCell colSpan={3} className="text-left font-bold">
+          <TableRow className="bg-slate-50 dark:bg-slate-800">
+            <TableCell colSpan={3} className="text-left font-bold text-gray-900 dark:text-gray-100">
               إجمالي النقاط المطلوبة
             </TableCell>
-            <TableCell className="text-center font-bold text-amber-600">
-              {totalPoints}
+            <TableCell className="text-center font-bold text-amber-600 dark:text-amber-300">
+              {totalPoints.toLocaleString(numberFormat)}
             </TableCell>
             <TableCell></TableCell>
           </TableRow>

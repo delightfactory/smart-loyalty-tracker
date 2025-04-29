@@ -23,6 +23,9 @@ import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import UsersPage from '@/pages/Users';
 import Payments from '@/pages/Payments';
+import RedemptionsList from '@/pages/RedemptionsList';
+import RedemptionDetails from '@/pages/RedemptionDetails';
+import EditRedemption from '@/pages/EditRedemption';
 import RequireAuth from '@/components/auth/RequireAuth';
 
 function App() {
@@ -53,10 +56,14 @@ function App() {
                 <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />
                 <Route path="/create-invoice" element={<CreateInvoice />} />
                 <Route path="/create-invoice/:customerId/edit/:edit" element={<CreateInvoice />} />
+                <Route path="/create-redemption" element={<CreateRedemption />} />
                 <Route path="/create-redemption/:customerId" element={<CreateRedemption />} />
                 <Route path="/create-payment/:customerId" element={<CreatePayment />} />
                 <Route path="/create-payment" element={<CreatePayment />} />
                 <Route path="/payments" element={<Payments />} />
+                <Route path="/redemptions" element={<RedemptionsList />} />
+                <Route path="/redemption/:id" element={<RedemptionDetails />} />
+                <Route path="/edit-redemption/:id" element={<EditRedemption />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/profile" element={<Profile />} />

@@ -7,6 +7,7 @@ import {
   Cog, 
   CreditCard, 
   FileSpreadsheet, 
+  Gift,
   Home, 
   Package, 
   Receipt, 
@@ -32,6 +33,7 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
       <SidebarLink href="/create-invoice" icon={<FileSpreadsheet />} label="إنشاء فاتورة" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/analytics" icon={<BarChartBig />} label="التحليلات" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/payments" icon={<CreditCard />} label="المدفوعات" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/redemptions" icon={<Gift />} label="الاستبدالات" isSidebarOpen={isSidebarOpen} />
       {isAdmin && <SidebarLink href="/users" icon={<Users />} label="إدارة المستخدمين" isSidebarOpen={isSidebarOpen} />}
       <SidebarLink href="/settings" icon={<Cog />} label="الإعدادات" isSidebarOpen={isSidebarOpen} />
     </div>
