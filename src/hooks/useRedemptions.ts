@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService, customersService } from '@/services/database';
 import { Redemption, RedemptionItem, RedemptionStatus, Customer } from '@/lib/types';
@@ -56,8 +55,11 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
 export function useRedemptions() {
   const queryClient = useQueryClient();
   
-  // إعداد التحديثات في الوقت الفعلي لعمليات الاستبدال
+  // إعداد التحديثات في الوقت الفعلي لعمليات الاستبدال والعملاء والفواتير والمدفوعات
   useRealtime('redemptions');
+  useRealtime('customers');
+  useRealtime('invoices');
+  useRealtime('payments');
   
   // إسترجاع كل عمليات الاستبدال
   const getAll = useQuery({

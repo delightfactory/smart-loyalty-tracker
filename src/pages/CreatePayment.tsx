@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { z } from 'zod';
@@ -32,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { usePayments } from '@/hooks/usePayments';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoices } from '@/hooks/useInvoices';
+import SmartSearch from '@/components/search/SmartSearch';
 
 const paymentSchema = z.object({
   customerId: z.string({ required_error: "يجب اختيار العميل" }),
@@ -191,6 +191,11 @@ const CreatePayment = () => {
     return customers.find(customer => customer.id === id);
   };
   
+  // --- تحسينات العرض ---
+  // 1. توحيد تنسيقات الأرقام والتواريخ للإنجليزية
+  const formatCurrency = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'EGP', minimumFractionDigits: 2 });
+  const formatDate = (date: string | Date) => new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  
   return (
     <PageContainer title="إضافة دفعة جديدة" subtitle="تسجيل دفعات العملاء">
       <div className="mb-6">
@@ -223,25 +228,17 @@ const CreatePayment = () => {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>العميل</FormLabel>
-                          <Select
-                            onValueChange={(value) => onCustomerChange(value)}
-                            defaultValue={field.value}
-                            value={field.value}
-                            disabled={!!customerId} // تعطيل إذا تم تمرير معرف العميل
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر العميل" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {customers.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.id}>
-                                  {customer.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SmartSearch
+                            type="customer"
+                            customers={customers} // تمرير بيانات العملاء الحقيقية
+                            placeholder="ابحث عن اسم العميل أو رقم الهاتف أو رقم العميل..."
+                            onSelectCustomer={customer => {
+                              field.onChange(customer.id);
+                              setSelectedCustomerId(customer.id);
+                            }}
+                            className="mb-2"
+                            initialSearchTerm={form.getValues('customerId') ? customers.find(c => c.id === form.getValues('customerId'))?.name || '' : ''}
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -267,7 +264,7 @@ const CreatePayment = () => {
                                 {unpaidInvoices.length > 0 ? (
                                   unpaidInvoices.map((invoice) => (
                                     <SelectItem key={invoice.id} value={invoice.id}>
-                                      {invoice.id} - {invoice.totalAmount.toLocaleString('ar-EG')} ج.م
+                                      {invoice.id} - {formatCurrency(invoice.totalAmount)}
                                     </SelectItem>
                                   ))
                                 ) : (
@@ -421,7 +418,7 @@ const CreatePayment = () => {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">رصيد الآجل</p>
-                          <p className="text-lg font-bold">{customer.creditBalance.toLocaleString('ar-EG')} ج.م</p>
+                          <p className="text-lg font-bold">{formatCurrency(customer.creditBalance)}</p>
                         </div>
                       </div>
                       
@@ -436,12 +433,12 @@ const CreatePayment = () => {
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">التاريخ</p>
                               <p className="text-lg font-bold">
-                                {new Date(selectedInvoice.date).toLocaleDateString('ar-EG')}
+                                {formatDate(selectedInvoice.date)}
                               </p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">الإجمالي</p>
-                              <p className="text-lg font-bold">{selectedInvoice.totalAmount.toLocaleString('ar-EG')} ج.م</p>
+                              <p className="text-lg font-bold">{formatCurrency(selectedInvoice.totalAmount)}</p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">الحالة</p>
@@ -463,11 +460,11 @@ const CreatePayment = () => {
                                       <div className="flex items-center">
                                         <span className={payment.type === PaymentType.PAYMENT ? "text-green-600" : "text-red-600"}>
                                           {payment.type === PaymentType.PAYMENT ? '+ ' : '- '}
-                                          {payment.amount.toLocaleString('ar-EG')} ج.م
+                                          {formatCurrency(payment.amount)}
                                         </span>
                                       </div>
                                       <span className="text-sm text-muted-foreground">
-                                        {new Date(payment.date).toLocaleDateString('ar-EG')}
+                                        {formatDate(payment.date)}
                                       </span>
                                     </div>
                                   ))}

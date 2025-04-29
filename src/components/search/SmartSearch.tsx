@@ -20,25 +20,30 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Barcode, User, ShoppingCart, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { products, customers } from '@/lib/data';
 import { Product, Customer, ProductCategory, BusinessType } from '@/lib/types';
 
 interface SmartSearchProps {
   type?: 'product' | 'customer' | 'all';
   onSelectProduct?: (product: Product) => void;
   onSelectCustomer?: (customer: Customer) => void;
+  customers?: Customer[];
+  products?: Product[];
   placeholder?: string;
   className?: string;
   initialSearchTerm?: string;
+  onChange?: (val: string) => void;
 }
 
 const SmartSearch = ({
   type = 'all',
   onSelectProduct,
   onSelectCustomer,
+  customers = [],
+  products = [],
   placeholder = 'بحث...',
   className,
-  initialSearchTerm = ''
+  initialSearchTerm = '',
+  onChange
 }: SmartSearchProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -55,45 +60,47 @@ const SmartSearch = ({
   
   useEffect(() => {
     if (barcodeMode && search && search.length > 3) {
-      const product = products.find(p => p.id === search);
-      if (product) {
-        handleSelectProduct(product);
-        return;
-      }
-      
       const customer = customers.find(c => c.id === search);
       if (customer) {
         handleSelectCustomer(customer);
         return;
       }
-      
+
       toast({
         title: "لم يتم العثور على نتائج",
         description: `لم يتم العثور على نتائج للباركود ${search}`,
         variant: "destructive"
       });
-      
+
       setTimeout(() => {
         setSearch('');
-      }, 1000);
+      }, 1500);
     }
-  }, [search, barcodeMode]);
+  }, [barcodeMode, search, customers]);
+  
+  useEffect(() => {
+    if (onChange) onChange(search);
+  }, [search]);
   
   const filteredProducts = products.filter(product => 
     (type === 'all' || type === 'product') &&
-    (product.id.toLowerCase().includes(search.toLowerCase()) ||
-     product.name.toLowerCase().includes(search.toLowerCase()) ||
-     product.brand.toLowerCase().includes(search.toLowerCase()) ||
-     product.category.includes(search))
+    (
+      product.id.toLowerCase().includes(search.toLowerCase()) ||
+      product.name.toLowerCase().includes(search.toLowerCase()) ||
+      product.brand.toLowerCase().includes(search.toLowerCase()) ||
+      (typeof product.category === 'string' && product.category.toLowerCase().includes(search.toLowerCase()))
+    )
   ).slice(0, 8);
   
   const filteredCustomers = customers.filter(customer => 
     (type === 'all' || type === 'customer') &&
-    (customer.id.toLowerCase().includes(search.toLowerCase()) ||
-     customer.name.toLowerCase().includes(search.toLowerCase()) ||
-     customer.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-     customer.phone.includes(search) ||
-     customer.businessType.includes(search))
+    (
+      customer.id.toLowerCase().includes(search.toLowerCase()) ||
+      customer.name.toLowerCase().includes(search.toLowerCase()) ||
+      customer.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
+      customer.phone.replace(/\D/g, '').includes(search.replace(/\D/g, '')) || // تجاهل الرموز في رقم الهاتف
+      customer.businessType.includes(search)
+    )
   ).slice(0, 8);
   
   const handleSelectProduct = (product: Product) => {
@@ -237,7 +244,7 @@ const SmartSearch = ({
                             <span className="text-xs text-muted-foreground">({product.id})</span>
                             <Badge className={cn(
                               "text-xs",
-                              getCategoryColor(product.category)
+                              getCategoryColor(product.category as ProductCategory)
                             )}>
                               {product.category}
                             </Badge>

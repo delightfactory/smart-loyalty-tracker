@@ -1,4 +1,3 @@
-
 import { 
   Card, 
   CardContent, 
@@ -39,7 +38,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-medium">{customer.pointsEarned} نقطة</p>
+                <p className="font-medium">{customer.currentPoints} نقطة</p>
                 <p className="text-sm text-muted-foreground">المستوى {customer.level}</p>
               </div>
             </div>

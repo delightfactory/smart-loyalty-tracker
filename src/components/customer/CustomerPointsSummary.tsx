@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Star, Award, TrendingUp } from 'lucide-react';
@@ -10,13 +9,7 @@ interface CustomerPointsSummaryProps {
 
 const CustomerPointsSummary = ({ customer }: CustomerPointsSummaryProps) => {
   // تأكد من أن القيم رقمية
-  const pointsEarned = Number(customer.pointsEarned || 0);
-  const pointsRedeemed = Number(customer.pointsRedeemed || 0);
   const currentPoints = Number(customer.currentPoints || 0);
-  
-  const pointsPercentage = pointsEarned > 0 
-    ? (currentPoints / pointsEarned) * 100 
-    : 0;
   
   const tierLabels = ['عادي', 'فضي', 'ذهبي', 'بلاتيني', 'VIP'];
   const currentTier = customer.level > 0 && customer.level <= tierLabels.length 
@@ -34,7 +27,7 @@ const CustomerPointsSummary = ({ customer }: CustomerPointsSummaryProps) => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">النقاط المكتسبة</span>
-              <span className="font-medium">{pointsEarned}</span>
+              <span className="font-medium">{customer.pointsEarned || 0}</span>
             </div>
             <Progress value={100} className="h-2 bg-blue-100" indicatorClassName="bg-blue-500" />
           </div>
@@ -42,10 +35,10 @@ const CustomerPointsSummary = ({ customer }: CustomerPointsSummaryProps) => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">النقاط المستبدلة</span>
-              <span className="font-medium">{pointsRedeemed}</span>
+              <span className="font-medium">{customer.pointsRedeemed || 0}</span>
             </div>
             <Progress 
-              value={(pointsRedeemed / Math.max(pointsEarned, 1)) * 100} 
+              value={(customer.pointsRedeemed / Math.max(customer.pointsEarned, 1)) * 100} 
               className="h-2 bg-green-100" 
               indicatorClassName="bg-green-500" 
             />
@@ -55,14 +48,14 @@ const CustomerPointsSummary = ({ customer }: CustomerPointsSummaryProps) => {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">نسبة الاستخدام</span>
               <span className="font-medium">
-                {pointsEarned > 0 
-                  ? `${Math.round((pointsRedeemed / pointsEarned) * 100)}%`
+                {customer.pointsEarned > 0 
+                  ? `${Math.round((customer.pointsRedeemed / customer.pointsEarned) * 100)}%`
                   : '0%'
                 }
               </span>
             </div>
             <Progress 
-              value={(pointsRedeemed / Math.max(pointsEarned, 1)) * 100} 
+              value={(customer.pointsRedeemed / Math.max(customer.pointsEarned, 1)) * 100} 
               className="h-2 bg-amber-100" 
               indicatorClassName="bg-amber-500" 
             />

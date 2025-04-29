@@ -1,9 +1,9 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsService } from '@/services/database';
 import { Payment } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
+import { updateCustomerDataBasedOnInvoices } from './useInvoices';
 
 export function usePayments() {
   const queryClient = useQueryClient();
@@ -48,7 +48,7 @@ export function usePayments() {
       console.log('Adding payment (processed):', processedPayment);
       return paymentsService.create(processedPayment);
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
       
@@ -60,6 +60,9 @@ export function usePayments() {
       
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
+      // تحديث رصيد العميل بشكل لحظي بعد الدفع
+      await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
       
       toast({
         title: 'تم تسجيل الدفعة بنجاح',
@@ -94,7 +97,7 @@ export function usePayments() {
       console.log('Updating payment (processed):', processedPayment);
       return paymentsService.update(processedPayment);
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'customer', data.customerId] });
       
@@ -106,6 +109,9 @@ export function usePayments() {
       
       queryClient.invalidateQueries({ queryKey: ['customers', data.customerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      
+      // تحديث رصيد العميل بشكل لحظي بعد تعديل الدفعة
+      await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
       
       toast({
         title: 'تم تحديث الدفعة بنجاح',
@@ -123,13 +129,17 @@ export function usePayments() {
   });
   
   const deletePayment = useMutation({
-    mutationFn: (id: string) => paymentsService.delete(id),
-    onSuccess: () => {
+    mutationFn: (id: string & { customerId?: string }) => paymentsService.delete(id),
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       // تحديث جميع البيانات المتعلقة بالعملاء والفواتير
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      
+      // تحديث رصيد العميل بشكل لحظي بعد حذف الدفعة
+      // يجب تمرير customerId بشكل صريح عند الحذف إذا كان متاحًا
+      if ((variables as any)?.customerId) {
+        await updateCustomerDataBasedOnInvoices((variables as any).customerId, queryClient);
+      }
       toast({
         title: 'تم حذف الدفعة بنجاح',
         description: 'تم حذف الدفعة بنجاح من النظام',

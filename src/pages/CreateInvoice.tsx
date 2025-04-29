@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -53,18 +52,18 @@ import { useToast } from '@/components/ui/use-toast';
 
 const CreateInvoice = () => {
   const navigate = useNavigate();
-  const { customerId, editInvoiceId } = useParams();
+  const { customerId, edit } = useParams();
   const { toast } = useToast();
-  const { addInvoice, getById } = useInvoices();
+  const { addInvoice, getById, updateInvoice } = useInvoices();
   const { getAll } = useProducts();
   const { data: products = [] } = getAll;
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
-    console.log("Component mounted. customerId:", customerId, "editInvoice:", editInvoiceId);
+    console.log("Component mounted. customerId:", customerId, "edit:", edit);
     setIsMounted(true);
     return () => setIsMounted(false);
-  }, [customerId, editInvoiceId]);
+  }, [customerId, edit]);
 
   // Form state
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -77,8 +76,8 @@ const CreateInvoice = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   
-  // Get the editing invoice if in edit mode
-  const { data: editInvoice, isLoading: isLoadingInvoice } = getById(editInvoiceId || '');
+  // احصل على بيانات الفاتورة إذا كنا في وضع التعديل
+  const { data: editInvoice, isLoading: isLoadingInvoice } = getById(edit || '');
   
   // Set up navigation confirmation if form is dirty
   useNavigationConfirm(isDirty);
@@ -90,7 +89,7 @@ const CreateInvoice = () => {
     }
   }, [customerId, isMounted]);
   
-  // Initialize form with invoice data if in edit mode
+  // عند التعديل، قم بتهيئة النموذج ببيانات الفاتورة
   useEffect(() => {
     if (editInvoice && isMounted) {
       setSelectedCustomerId(editInvoice.customerId);
@@ -177,7 +176,7 @@ const CreateInvoice = () => {
     setIsDirty(true);
   };
   
-  // Handle saving the invoice
+  // عند الحفظ، إذا كنا في وضع التعديل نفذ updateInvoice.mutateAsync مباشرة ببيانات الفاتورة والأصناف
   const handleSaveInvoice = async () => {
     if (!selectedCustomerId) {
       toast({
@@ -187,7 +186,7 @@ const CreateInvoice = () => {
       });
       return;
     }
-    
+
     if (items.length === 0) {
       toast({
         title: "تنبيه",
@@ -196,28 +195,41 @@ const CreateInvoice = () => {
       });
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
-      
-      // Prepare invoice data
-      const newInvoice: Omit<Invoice, 'id'> = {
-        customerId: selectedCustomerId,
-        date: invoiceDate,
-        dueDate: dueDate,
-        items: items,
-        totalAmount: totalAmount,
-        pointsEarned: adjustedPointsEarned,
-        pointsRedeemed: 0,
-        status: paymentMethod === PaymentMethod.CASH ? InvoiceStatus.PAID : InvoiceStatus.UNPAID,
-        paymentMethod: paymentMethod,
-        categoriesCount: categoriesCount
-      };
-      
-      // Send request to create invoice
-      await addInvoice.mutateAsync({ invoice: newInvoice, items });
-      
-      // Navigate to invoice list
+      if (editInvoice) {
+        // تعديل الفاتورة: أرسل جميع بيانات الفاتورة مع الأصناف
+        const updatedInvoice = {
+          ...editInvoice,
+          customerId: selectedCustomerId,
+          date: invoiceDate,
+          dueDate: dueDate,
+          paymentMethod,
+          items,
+          totalAmount,
+          pointsEarned: adjustedPointsEarned,
+          pointsRedeemed: 0,
+          status: paymentMethod === PaymentMethod.CASH ? InvoiceStatus.PAID : InvoiceStatus.UNPAID,
+          categoriesCount,
+        };
+        await updateInvoice.mutateAsync(updatedInvoice);
+      } else {
+        // إضافة فاتورة جديدة
+        const newInvoice = {
+          customerId: selectedCustomerId,
+          date: invoiceDate,
+          dueDate: dueDate,
+          paymentMethod,
+          items,
+          totalAmount,
+          pointsEarned: adjustedPointsEarned,
+          pointsRedeemed: 0,
+          status: paymentMethod === PaymentMethod.CASH ? InvoiceStatus.PAID : InvoiceStatus.UNPAID,
+          categoriesCount,
+        };
+        await addInvoice.mutateAsync({ invoice: newInvoice, items });
+      }
       navigate('/invoices');
     } catch (error) {
       console.error('Error saving invoice:', error);
@@ -233,7 +245,11 @@ const CreateInvoice = () => {
   
   // Format currency helper
   const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+    return amount.toLocaleString('en-US', { style: 'currency', currency: 'EGP' });
+  };
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-CA'); // YYYY-MM-DD
   };
   
   return (
@@ -245,7 +261,7 @@ const CreateInvoice = () => {
               <CustomerSelector 
                 selectedCustomerId={selectedCustomerId}
                 onSelectCustomer={setSelectedCustomerId}
-                disabled={!!editInvoiceId}
+                disabled={!!editInvoice}
               />
               
               <div className="space-y-2">
@@ -258,7 +274,7 @@ const CreateInvoice = () => {
                       disabled={isSubmitting}
                     >
                       <CalendarIcon className="ml-2 h-4 w-4" />
-                      {invoiceDate ? format(invoiceDate, 'yyyy/MM/dd') : 'اختر التاريخ'}
+                      {invoiceDate ? formatDate(invoiceDate) : 'اختر التاريخ'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -316,7 +332,7 @@ const CreateInvoice = () => {
                         disabled={isSubmitting}
                       >
                         <CalendarCheck className="ml-2 h-4 w-4" />
-                        {dueDate ? format(dueDate, 'yyyy/MM/dd') : 'اختر تاريخ الاستحقاق'}
+                        {dueDate ? formatDate(dueDate) : 'اختر تاريخ الاستحقاق'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
@@ -370,10 +386,74 @@ const CreateInvoice = () => {
                         <TableRow key={index}>
                           <TableCell>{product?.name || 'غير معروف'}</TableCell>
                           <TableCell>{product?.unit || ''}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  // تقليل الكمية
+                                  if (item.quantity > 1) {
+                                    const updatedItems = [...items];
+                                    updatedItems[index] = {
+                                      ...item,
+                                      quantity: item.quantity - 1,
+                                      totalPrice: item.price * (item.quantity - 1),
+                                      pointsEarned: product?.pointsEarned ? product.pointsEarned * (item.quantity - 1) : 0
+                                    };
+                                    setItems(updatedItems);
+                                    setIsDirty(true);
+                                  }
+                                }}
+                                disabled={isSubmitting || item.quantity <= 1}
+                              >
+                                -
+                              </Button>
+                              <Input
+                                type="number"
+                                min={1}
+                                className="w-16 text-center"
+                                value={item.quantity}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (!isNaN(val) && val > 0) {
+                                    const updatedItems = [...items];
+                                    updatedItems[index] = {
+                                      ...item,
+                                      quantity: val,
+                                      totalPrice: item.price * val,
+                                      pointsEarned: product?.pointsEarned ? product.pointsEarned * val : 0
+                                    };
+                                    setItems(updatedItems);
+                                    setIsDirty(true);
+                                  }
+                                }}
+                                disabled={isSubmitting}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  // زيادة الكمية
+                                  const updatedItems = [...items];
+                                  updatedItems[index] = {
+                                    ...item,
+                                    quantity: item.quantity + 1,
+                                    totalPrice: item.price * (item.quantity + 1),
+                                    pointsEarned: product?.pointsEarned ? product.pointsEarned * (item.quantity + 1) : 0
+                                  };
+                                  setItems(updatedItems);
+                                  setIsDirty(true);
+                                }}
+                                disabled={isSubmitting}
+                              >
+                                +
+                              </Button>
+                            </div>
+                          </TableCell>
                           <TableCell>{formatCurrency(item.price)}</TableCell>
                           <TableCell>{formatCurrency(item.totalPrice)}</TableCell>
-                          <TableCell>{item.pointsEarned}</TableCell>
+                          <TableCell>{item.pointsEarned.toLocaleString('en-US')}</TableCell>
                           <TableCell>
                             <Button 
                               variant="ghost" 
@@ -415,7 +495,7 @@ const CreateInvoice = () => {
               
               <div className="bg-muted rounded-md p-4">
                 <div className="text-muted-foreground text-sm">النقاط المكتسبة</div>
-                <div className="text-2xl font-bold mt-1">{adjustedPointsEarned} نقطة</div>
+                <div className="text-2xl font-bold mt-1">{adjustedPointsEarned.toLocaleString('en-US')} نقطة</div>
               </div>
             </div>
             

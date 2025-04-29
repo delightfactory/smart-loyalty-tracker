@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import SidebarLink from './SidebarLink';
 import { UserRole } from '@/lib/auth-types';
@@ -6,6 +5,7 @@ import {
   BarChartBig, 
   ClipboardCheck, 
   Cog, 
+  CreditCard, 
   FileSpreadsheet, 
   Home, 
   Package, 
@@ -31,6 +31,7 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
       <SidebarLink href="/invoices" icon={<Receipt />} label="الفواتير" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/create-invoice" icon={<FileSpreadsheet />} label="إنشاء فاتورة" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/analytics" icon={<BarChartBig />} label="التحليلات" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/payments" icon={<CreditCard />} label="المدفوعات" isSidebarOpen={isSidebarOpen} />
       {isAdmin && <SidebarLink href="/users" icon={<Users />} label="إدارة المستخدمين" isSidebarOpen={isSidebarOpen} />}
       <SidebarLink href="/settings" icon={<Cog />} label="الإعدادات" isSidebarOpen={isSidebarOpen} />
     </div>

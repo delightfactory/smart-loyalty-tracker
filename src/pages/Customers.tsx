@@ -30,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Users, Plus, Search, Filter, UserPlus, Star, Loader2, Eye, Pencil, Trash } from 'lucide-react';
+import { Users, Plus, Search, Filter, UserPlus, Star, Loader2, Eye, Pencil, Trash, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { BusinessType, Customer, ProductCategory } from '@/lib/types';
@@ -47,6 +47,11 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import CustomerCard from '@/components/customer/CustomerCard';
 import CustomerEditDialog from '@/components/customer/CustomerEditDialog';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
+import { useRedemptions } from '@/hooks/useRedemptions';
+import { useMemo } from 'react';
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -60,6 +65,18 @@ const Customers = () => {
   const { getAll, addCustomer, updateCustomer } = useCustomers();
   const { data: customers = [], isLoading, refetch } = getAll;
   
+  // زر تحديث يدوي لإجبار إعادة جلب بيانات العملاء
+  const [refreshing, setRefreshing] = useState(false);
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+    toast({
+      title: 'تم تحديث البيانات',
+      description: 'تم إعادة جلب بيانات العملاء من قاعدة البيانات',
+    });
+  };
+
   // إعداد الاستماع لتحديثات العملاء في الوقت الفعلي
   useEffect(() => {
     const channel = supabase
@@ -376,8 +393,75 @@ const Customers = () => {
     }
   }, [viewMode]);
 
+  // --- Real-time points cell ---
+  function CustomerPointsCell({ customerId }: { customerId: string }) {
+    const { getByCustomerId: getInvoices } = useInvoices();
+    const { getByCustomerId: getRedemptions } = useRedemptions();
+    const invoicesQuery = getInvoices(customerId);
+    const redemptionsQuery = getRedemptions(customerId);
+    const points = useMemo(() => {
+      const invoices = invoicesQuery.data || [];
+      const redemptions = redemptionsQuery.data || [];
+      const pointsEarned = invoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0);
+      const pointsRedeemed = redemptions.reduce((sum, r) => sum + (r.totalPointsRedeemed || 0), 0);
+      return pointsEarned - pointsRedeemed;
+    }, [invoicesQuery.data, redemptionsQuery.data]);
+    if (invoicesQuery.isLoading || redemptionsQuery.isLoading) {
+      return <span className="text-muted-foreground">...</span>;
+    }
+    if (invoicesQuery.isError || redemptionsQuery.isError) {
+      return <span className="text-destructive">خطأ</span>;
+    }
+    return <>{formatNumber(points)}</>;
+  }
+
+  // --- Real-time balance cell ---
+  function CustomerBalanceCell({ customerId }: { customerId: string }) {
+    const { getByCustomerId: getInvoices } = useInvoices();
+    const { getByCustomerId: getPayments } = usePayments();
+    const invoicesQuery = getInvoices(customerId);
+    const paymentsQuery = getPayments(customerId);
+    const totalBalance = useMemo(() => {
+      const invoices = invoicesQuery.data || [];
+      const payments = paymentsQuery.data || [];
+      const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      const paymentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      return invoiceTotal - paymentTotal;
+    }, [invoicesQuery.data, paymentsQuery.data]);
+    if (invoicesQuery.isLoading || paymentsQuery.isLoading) {
+      return <span className="text-muted-foreground">...</span>;
+    }
+    if (invoicesQuery.isError || paymentsQuery.isError) {
+      return <span className="text-destructive">خطأ</span>;
+    }
+    return <>{formatNumber(totalBalance)} ج.م</>;
+  }
+
   return (
-    <PageContainer title="إدارة العملاء" subtitle="عرض وإضافة وتحليل العملاء">
+    <PageContainer
+      title="إدارة العملاء"
+      subtitle="عرض وإضافة وتحليل العملاء"
+      extra={
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            className="p-2 h-10 w-10 border border-muted-foreground/20 hover:bg-primary/10 hover:text-primary transition-colors shadow-sm rounded-full relative"
+            onClick={handleManualRefresh}
+            disabled={refreshing || isLoading}
+            aria-label="تحديث البيانات"
+          >
+            {refreshing || isLoading ? (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <RotateCcw className="animate-spin w-5 h-5 text-primary" />
+              </span>
+            ) : (
+              <RotateCcw className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+            )}
+          </Button>
+          <ThemeToggle />
+        </div>
+      }
+    >
       {/* أزرار عصرية أعلى الصفحة */}
       <div className="flex flex-wrap gap-2 mb-4 items-center">
         <Button
@@ -492,8 +576,8 @@ const Customers = () => {
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">هاتف</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المحافظة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المدينة</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">النقاط الحالية</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">رصيد الآجل</TableHead>
+                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">النقاط الحالية</TableHead>
+                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">رصيد العميل</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">التصنيف</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المستوى</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">إجراءات</TableHead>
@@ -532,8 +616,16 @@ const Customers = () => {
                     <TableCell dir="ltr" className="tracking-wider font-mono dark:text-zinc-100">{customer.phone}</TableCell>
                     <TableCell className="dark:text-zinc-100">{customer.governorate || '-'}</TableCell>
                     <TableCell className="dark:text-zinc-100">{customer.city || '-'}</TableCell>
-                    <TableCell className="text-emerald-700 font-bold dark:text-emerald-300">{formatNumber(customer.currentPoints)}</TableCell>
-                    <TableCell className="text-orange-700 font-bold dark:text-orange-300">{formatNumber(customer.creditBalance)} ج.م</TableCell>
+                    <TableCell className="text-center align-middle">
+                      <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-emerald-50 dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-700">
+                        <CustomerPointsCell customerId={customer.id} />
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center align-middle">
+                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-orange-50 dark:bg-zinc-800 text-orange-700 dark:text-orange-300 font-bold border border-orange-200 dark:border-orange-700">
+                        <CustomerBalanceCell customerId={customer.id} />
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center text-amber-500 text-lg dark:text-amber-400">
                         {getClassificationDisplay(customer.classification)}

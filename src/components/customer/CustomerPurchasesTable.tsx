@@ -90,7 +90,7 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
                 <TableRow 
                   key={invoice.id} 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/invoice/${invoice.id}`)}
+                  onClick={() => navigate(`/invoices/${invoice.id}`)}
                 >
                   <TableCell className="font-medium">{invoice.id}</TableCell>
                   <TableCell>{formatDate(invoice.date)}</TableCell>
