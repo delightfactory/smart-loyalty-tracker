@@ -22,18 +22,25 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
     
     // حساب النقاط المستبدلة فقط للعمليات غير الملغية
     let totalPointsRedeemed = 0;
-    
+    let latestRedemptionDate = null;
     redemptions.forEach(redemption => {
       if (redemption.status !== RedemptionStatus.CANCELLED) {
         totalPointsRedeemed += redemption.totalPointsRedeemed;
+        // تحديث أحدث تاريخ استبدال
+        if (redemption.date) {
+          const redemptionDate = new Date(redemption.date);
+          if (!latestRedemptionDate || redemptionDate > latestRedemptionDate) {
+            latestRedemptionDate = redemptionDate;
+          }
+        }
       }
     });
-    
     // تحديث بيانات العميل
-    const updatedCustomer: Customer = {
+    const updatedCustomer = {
       ...customer,
       pointsRedeemed: totalPointsRedeemed,
-      currentPoints: customer.pointsEarned - totalPointsRedeemed
+      currentPoints: customer.pointsEarned - totalPointsRedeemed,
+      lastActive: latestRedemptionDate ? latestRedemptionDate.toISOString() : customer.lastActive || null
     };
     
     // تحديث بيانات العميل في قاعدة البيانات
@@ -45,7 +52,8 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
     
     console.log(`Updated customer points for ${customerId}:`, {
       pointsRedeemed: totalPointsRedeemed,
-      currentPoints: customer.pointsEarned - totalPointsRedeemed
+      currentPoints: customer.pointsEarned - totalPointsRedeemed,
+      lastActive: latestRedemptionDate ? latestRedemptionDate.toISOString() : customer.lastActive || null
     });
   } catch (error) {
     console.error('Error updating customer points:', error);
@@ -141,6 +149,13 @@ export function useRedemptions() {
       
       // تحديث نقاط العميل بعد تعديل الاستبدال
       await updateCustomerPoints(data.customerId, queryClient);
+      
+      // تحديث بيانات العميل بناءً على الفواتير أيضًا لضمان دقة آخر نشاط
+      if (typeof import('@/hooks/useInvoices').then === 'function') {
+        // dynamic import to avoid circular dependency
+        const { updateCustomerDataBasedOnInvoices } = await import('@/hooks/useInvoices');
+        await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
+      }
       
       toast({
         title: 'تم تحديث عملية الاستبدال بنجاح',

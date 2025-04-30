@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -46,6 +45,15 @@ const InactivityFilter = ({
   const handleToDateChange = (date: Date | null) => {
     setToDateValue(date);
     onDateRangeChange(fromDateValue, date);
+  };
+
+  // عند إعادة تعيين الفلتر الزمني، امسح أيضًا القيم المحلية لنطاق التاريخ
+  const handleReset = () => {
+    setPeriod('30');
+    setDate(subDays(new Date(), 30));
+    setFromDateValue(null);
+    setToDateValue(null);
+    onDateRangeChange(null, null);
   };
   
   // تنسيق الفترة للعرض
@@ -96,6 +104,15 @@ const InactivityFilter = ({
                 <SelectItem value="custom">فترة مخصصة</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 border border-gray-200"
+              onClick={handleReset}
+              aria-label="إعادة تعيين الفلتر الزمني"
+            >
+              إعادة تعيين
+            </Button>
             
             {period === "custom" ? (
               <div className="flex items-center gap-2">

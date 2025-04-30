@@ -3,6 +3,7 @@ import { invoicesService, customersService, redemptionsService } from '@/service
 import { Invoice, InvoiceItem, InvoiceStatus, Customer, PaymentMethod, PaymentType, RedemptionStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
+import { calculateClassificationAndLevel } from '@/lib/customerClassification';
 
 // Custom hook for fetching all invoices
 export function useAllInvoices() {
@@ -52,6 +53,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
     // حساب النقاط المكتسبة من الفواتير
     let totalPointsEarned = 0;
     let totalCreditBalance = 0;
+    let latestInvoiceDate = null;
     invoices.forEach(invoice => {
       totalPointsEarned += invoice.pointsEarned;
       // حساب الرصيد الآجل للفواتير غير المدفوعة أو المدفوعة جزئياً
@@ -65,24 +67,63 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
         // إضافة المبلغ المتبقي إلى الرصيد الآجل
         totalCreditBalance += (invoice.totalAmount - paidAmount);
       }
+      // تحديث أحدث تاريخ فاتورة
+      if (invoice.date) {
+        const invoiceDate = new Date(invoice.date);
+        if (!latestInvoiceDate || invoiceDate > latestInvoiceDate) {
+          latestInvoiceDate = invoiceDate;
+        }
+      }
     });
+    // حساب قيمة الائتمان (Credit Limit): متوسط مسحوبات العميل آخر 3 شهور
+    let creditLimit = 0;
+    const now = new Date();
+    const threeMonthsAgo = new Date(now);
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const recentInvoices = invoices.filter(inv => new Date(inv.date) >= threeMonthsAgo);
+    if (recentInvoices.length > 0) {
+      const total = recentInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+      creditLimit = total / 3;
+    }
     // الحصول على جميع عمليات الاستبدال للعميل
     let totalPointsRedeemed = 0;
+    let latestRedemptionDate = null;
     if (typeof redemptionsService !== 'undefined' && redemptionsService.getByCustomerId) {
       const redemptions = await redemptionsService.getByCustomerId(customerId);
       redemptions.forEach(redemption => {
         if (redemption.status !== RedemptionStatus.CANCELLED) {
           totalPointsRedeemed += redemption.totalPointsRedeemed;
+          // تحديث أحدث تاريخ استبدال
+          if (redemption.date) {
+            const redemptionDate = new Date(redemption.date);
+            if (!latestRedemptionDate || redemptionDate > latestRedemptionDate) {
+              latestRedemptionDate = redemptionDate;
+            }
+          }
         }
       });
     }
+    // تحديد أحدث تاريخ تفاعل
+    let lastActive = null;
+    if (latestInvoiceDate && latestRedemptionDate) {
+      lastActive = latestInvoiceDate > latestRedemptionDate ? latestInvoiceDate : latestRedemptionDate;
+    } else if (latestInvoiceDate) {
+      lastActive = latestInvoiceDate;
+    } else if (latestRedemptionDate) {
+      lastActive = latestRedemptionDate;
+    }
     // تحديث بيانات العميل
-    const updatedCustomer: Customer = {
+    const { classification, level } = calculateClassificationAndLevel(customer, invoices);
+    const updatedCustomer = {
       ...customer,
       pointsEarned: totalPointsEarned,
       pointsRedeemed: totalPointsRedeemed,
       currentPoints: totalPointsEarned - totalPointsRedeemed,
-      creditBalance: totalCreditBalance
+      creditBalance: totalCreditBalance,
+      lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
+      credit_limit: creditLimit,
+      classification,
+      level,
     };
     // تحديث بيانات العميل في قاعدة البيانات
     await customersService.update(updatedCustomer);
@@ -93,7 +134,9 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       pointsEarned: totalPointsEarned,
       pointsRedeemed: totalPointsRedeemed,
       currentPoints: totalPointsEarned - totalPointsRedeemed,
-      creditBalance: totalCreditBalance
+      creditBalance: totalCreditBalance,
+      lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
+      credit_limit: creditLimit,
     });
   } catch (error) {
     console.error('Error updating customer data based on invoices:', error);

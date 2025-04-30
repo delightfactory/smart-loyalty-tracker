@@ -42,10 +42,13 @@ import { addDays, format, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 interface CustomerAnalyticsProps {
-  customers: Customer[];
+  customers: any[];
+  invoices: any[];
+  products: any[];
+  isLoading: boolean;
 }
 
-const CustomerAnalytics = ({ customers }: CustomerAnalyticsProps) => {
+const CustomerAnalytics = ({ customers, invoices, products, isLoading }: CustomerAnalyticsProps) => {
   const [activeMetric, setActiveMetric] = useState<string>('activity');
 
   // Calculate inactivity stats

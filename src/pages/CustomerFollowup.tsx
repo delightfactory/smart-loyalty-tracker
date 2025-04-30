@@ -11,6 +11,7 @@ import InactiveCustomersTable from '@/components/customer/InactiveCustomersTable
 import InactivityStatCards from '@/components/customer/InactivityStatCards';
 import InactivityFilter from '@/components/customer/InactivityFilter';
 import { useCustomers } from '@/hooks/useCustomers';
+import { useInvoices } from '@/hooks/useInvoices';
 import { subDays } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Customer } from '@/lib/types';
@@ -24,12 +25,21 @@ const CustomerFollowup = () => {
   const customers = customersQuery.data || [];
   const isLoading = customersQuery.isLoading;
   
+  // --- إضافة استدعاء جميع الفواتير ---
+  const { getAll: getAllInvoices } = useInvoices();
+  const invoices = getAllInvoices.data || [];
+  
   // فلاتر تتبع العملاء
   const [period, setPeriod] = useState<string>('30');
   const [date, setDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
   
+  // فلاتر جديدة
+  const [selectedGovernorate, setSelectedGovernorate] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [selectedBusinessType, setSelectedBusinessType] = useState<string>('');
+
   // التعامل مع تغيير فترة عدم النشاط
   useEffect(() => {
     if (period === 'custom') {
@@ -52,11 +62,27 @@ const CustomerFollowup = () => {
   const handleDateRangeChange = (from: Date | null, to: Date | null) => {
     setFromDate(from || undefined);
     setToDate(to || undefined);
+    // إذا تم مسح التاريخين، أعد الفلتر للوضع الافتراضي
+    if (!from && !to) {
+      setPeriod('30');
+      setDate(subDays(new Date(), 30));
+    }
   };
   
   // تصفية العملاء حسب فترة عدم النشاط
   const getFilteredCustomers = (): Customer[] => {
     let filtered = [...customers];
+    
+    // فلترة المدن والمحافظات
+    if (selectedGovernorate) {
+      filtered = filtered.filter(c => c.governorate === selectedGovernorate);
+    }
+    if (selectedCity) {
+      filtered = filtered.filter(c => c.city === selectedCity);
+    }
+    if (selectedBusinessType) {
+      filtered = filtered.filter(c => c.businessType === selectedBusinessType);
+    }
     
     // تطبيق فلتر البحث
     if (searchTerm) {
@@ -65,7 +91,7 @@ const CustomerFollowup = () => {
         customer.name.toLowerCase().includes(term) || 
         customer.email?.toLowerCase().includes(term) || 
         customer.phone?.includes(term) ||
-        customer.businessType?.toLowerCase().includes(term)  // Changed from businessName to businessType
+        customer.businessType?.toLowerCase().includes(term)
       );
     }
     
@@ -88,7 +114,7 @@ const CustomerFollowup = () => {
           return lastActivityDate >= fromDate;
         });
       } else if (toDate) {
-        // تصفية العملاء غير النشطين قبل ت��ريخ معين
+        // تصفية العملاء غير النشطين قبل تاريخ معين
         return filtered.filter(customer => {
           const lastActivityDate = customer.lastActive ? new Date(customer.lastActive) : new Date(0);
           return lastActivityDate <= toDate;
@@ -111,23 +137,23 @@ const CustomerFollowup = () => {
   const filteredCustomers = getFilteredCustomers();
   
   // حساب إحصائيات عدم النشاط
-  const calculateInactivityStats = () => {
+  const calculateInactivityStats = (inputCustomers: Customer[]) => {
     const now = new Date();
-    const criticalInactive = customers.filter(customer => {
+    const criticalInactive = inputCustomers.filter(customer => {
       if (!customer.lastActive) return true;
       const lastActiveDate = new Date(customer.lastActive);
       const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
       return daysDiff > 90;
     }).length;
     
-    const warningInactive = customers.filter(customer => {
+    const warningInactive = inputCustomers.filter(customer => {
       if (!customer.lastActive) return false;
       const lastActiveDate = new Date(customer.lastActive);
       const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
       return daysDiff >= 30 && daysDiff <= 90;
     }).length;
     
-    const recentInactive = customers.filter(customer => {
+    const recentInactive = inputCustomers.filter(customer => {
       if (!customer.lastActive) return false;
       const lastActiveDate = new Date(customer.lastActive);
       const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -138,14 +164,14 @@ const CustomerFollowup = () => {
       critical: criticalInactive,
       warning: warningInactive,
       recent: recentInactive,
-      total: customers.length,
-      percentage: customers.length > 0 
-        ? Math.round(((criticalInactive + warningInactive + recentInactive) / customers.length) * 100)
+      total: inputCustomers.length,
+      percentage: inputCustomers.length > 0 
+        ? Math.round(((criticalInactive + warningInactive + recentInactive) / inputCustomers.length) * 100)
         : 0
     };
   };
   
-  const inactivityStats = calculateInactivityStats();
+  const inactivityStats = calculateInactivityStats(filteredCustomers);
   
   // تصدير بيانات العملاء غير النشطين
   const exportData = () => {
@@ -156,12 +182,12 @@ const CustomerFollowup = () => {
     });
   };
   
-  // تحديث بيانات العملاء
+  // تحديث بيانات العملاء يدويًا بعد أي عملية حرجة
   const refreshData = () => {
-    // تحديث البيانات (سيتم تنفيذه لاحقًا)
+    customersQuery.refetch();
     toast({
-      title: "تم تحديث البيانات",
-      description: "تم تحديث بيانات العملاء بنجاح",
+      title: 'تم تحديث البيانات',
+      description: 'تم تحديث بيانات العملاء بنجاح',
     });
   };
   
@@ -179,15 +205,54 @@ const CustomerFollowup = () => {
     >
       <div className="space-y-6">
         {/* فلتر فترة عدم النشاط */}
-        <InactivityFilter
-          period={period}
-          setPeriod={setPeriod}
-          date={date}
-          setDate={setDate}
-          fromDate={fromDate}
-          toDate={toDate}
-          onDateRangeChange={handleDateRangeChange}
-        />
+        <div className="flex flex-wrap gap-4 items-center">
+          <InactivityFilter
+            period={period}
+            setPeriod={setPeriod}
+            date={date}
+            setDate={setDate}
+            fromDate={fromDate}
+            toDate={toDate}
+            onDateRangeChange={handleDateRangeChange}
+          />
+          {/* فلاتر المدن والمحافظات ونوع النشاط */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={selectedGovernorate}
+              onChange={e => {
+                setSelectedGovernorate(e.target.value);
+                setSelectedCity('');
+              }}
+            >
+              <option value="">كل المحافظات</option>
+              {[...new Set(customers.map(c => c.governorate).filter(Boolean))].map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={selectedCity}
+              onChange={e => setSelectedCity(e.target.value)}
+              disabled={!selectedGovernorate}
+            >
+              <option value="">كل المدن</option>
+              {[...new Set(customers.filter(c => !selectedGovernorate || c.governorate === selectedGovernorate).map(c => c.city).filter(Boolean))].map(city => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={selectedBusinessType}
+              onChange={e => setSelectedBusinessType(e.target.value)}
+            >
+              <option value="">كل أنواع النشاط</option>
+              {[...new Set(customers.map(c => c.businessType).filter(Boolean))].map(bt => (
+                <option key={bt} value={bt}>{bt}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         
         {/* إحصائيات عدم النشاط */}
         <InactivityStatCards
@@ -291,7 +356,12 @@ const CustomerFollowup = () => {
           </TabsContent>
           
           <TabsContent value="analytics" className="mt-0">
-            <CustomerAnalytics customers={filteredCustomers} />
+            <CustomerAnalytics 
+              customers={filteredCustomers} 
+              invoices={invoices.filter(inv => filteredCustomers.some(c => c.id === inv.customerId))}
+              products={[]}
+              isLoading={isLoading}
+            />
           </TabsContent>
         </Tabs>
       </div>

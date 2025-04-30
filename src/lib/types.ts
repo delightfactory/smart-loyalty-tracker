@@ -59,9 +59,12 @@ export interface Customer {
   created_at?: string;
   governorate?: string;
   city?: string;
-  lastActive?: string; // Date of last activity
+  lastActive?: string; // Date of last activity (ISO string)
   totalSpent?: number; // Total amount spent by customer
   email?: string; // Optional email for customer
+  credit_period?: number; // مدة الائتمان بالأيام
+  credit_limit?: number;  // قيمة الائتمان
+  region?: string; // منطقة العميل (حل مشكلة عدم وجود الحقل في Customer)
 }
 
 // Invoice Item Interface

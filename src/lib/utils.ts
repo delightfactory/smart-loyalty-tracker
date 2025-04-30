@@ -20,3 +20,9 @@ export function formatDate(dateString?: string | Date): string {
     day: 'numeric',
   }).format(date);
 }
+
+// Format a number to English with up to 2 decimal places (rounded)
+export function formatNumberEn(value: number | string): string {
+  if (value === null || value === undefined || isNaN(Number(value))) return '-';
+  return Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}

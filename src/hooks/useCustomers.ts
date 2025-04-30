@@ -1,4 +1,3 @@
-
 // Update the useCustomers hook to properly expose customers and isLoading
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +5,7 @@ import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtime } from './use-realtime';
+import { useInvoices } from './useInvoices';
 
 export function useCustomers() {
   const queryClient = useQueryClient();
@@ -14,23 +14,30 @@ export function useCustomers() {
   // إعداد التحديثات في الوقت الفعلي للعملاء
   useRealtime('customers');
   
+  // استخدم بيانات الفواتير من hook useInvoices.getAll بدلاً من useInvoices مباشرة
+  const { getAll: invoicesQuery } = useInvoices();
+  const invoices = invoicesQuery?.data ?? [];
+  const invoicesLoading = invoicesQuery?.isLoading ?? false;
+  
   const getAll = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
       try {
         const customers = await customersService.getAll();
-        console.log('Fetched customers:', customers);
+        // لا تضف حسابات افتراضية هنا، فقط اعتمد على القيم من قاعدة البيانات
         return customers;
       } catch (error: any) {
         console.error('Error fetching customers:', error);
         toast({
-          title: 'خطأ',
-          description: `حدث خطأ أثناء جلب العملاء: ${error.message}`,
           variant: 'destructive',
+          title: 'حدث خطأ',
+          description: 'تعذر جلب بيانات العملاء',
         });
         return [];
       }
-    }
+    },
+    enabled: !invoicesLoading,
+    staleTime: 0 // Always fetch fresh data for accuracy
   });
   
   // Make direct access to data and loading state easier
@@ -42,7 +49,7 @@ export function useCustomers() {
     queryFn: async () => {
       try {
         const customer = await customersService.getById(id);
-        console.log(`Fetched customer ${id}:`, customer);
+        // لا تضف حسابات افتراضية هنا، فقط اعتمد على القيم من قاعدة البيانات
         return customer;
       } catch (error: any) {
         console.error(`Error fetching customer ${id}:`, error);
@@ -54,7 +61,7 @@ export function useCustomers() {
         throw error;
       }
     },
-    enabled: !!id
+    enabled: !!id && !invoicesLoading
   });
   
   const addCustomer = useMutation({
@@ -65,6 +72,7 @@ export function useCustomers() {
     onSuccess: (data) => {
       console.log('Customer added successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({
         title: 'تم إضافة العميل بنجاح',
         description: 'تمت إضافة العميل الجديد بنجاح',
@@ -88,6 +96,7 @@ export function useCustomers() {
     onSuccess: (data) => {
       console.log('Customer updated successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['customers', data.id] });
       toast({
         title: 'تم تحديث العميل بنجاح',

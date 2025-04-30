@@ -49,6 +49,7 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
 import { useNavigationConfirm } from '@/hooks/useNavigationConfirm';
 import { useToast } from '@/components/ui/use-toast';
+import { useCustomers } from '@/hooks/useCustomers';
 
 const CreateInvoice = () => {
   const navigate = useNavigate();
@@ -57,6 +58,8 @@ const CreateInvoice = () => {
   const { addInvoice, getById, updateInvoice } = useInvoices();
   const { getAll } = useProducts();
   const { data: products = [] } = getAll;
+  const { getAll: getAllCustomers } = useCustomers();
+  const { data: customers = [] } = getAllCustomers;
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
@@ -102,6 +105,21 @@ const CreateInvoice = () => {
     }
   }, [editInvoice, isMounted]);
   
+  // عند تغيير العميل أو طريقة الدفع، احسب تاريخ الاستحقاق تلقائيًا إذا كان الدفع آجل
+  useEffect(() => {
+    if (paymentMethod === PaymentMethod.CREDIT && selectedCustomerId) {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      const creditDays = customer?.credit_period || 0;
+      if (creditDays > 0) {
+        const newDueDate = new Date(invoiceDate);
+        newDueDate.setDate(newDueDate.getDate() + creditDays);
+        setDueDate(newDueDate);
+      } else {
+        setDueDate(undefined);
+      }
+    }
+  }, [paymentMethod, selectedCustomerId, invoiceDate, customers]);
+
   // Calculate totals
   const totalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalPointsEarned = items.reduce((sum, item) => sum + item.pointsEarned, 0);
@@ -196,6 +214,27 @@ const CreateInvoice = () => {
       return;
     }
 
+    if (paymentMethod === PaymentMethod.CREDIT) {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      const creditDays = customer?.credit_period || 0;
+      if (!selectedCustomerId || creditDays === 0) {
+        toast({
+          title: 'تنبيه',
+          description: 'هذا العميل ليس لديه صلاحية ائتمان ولا يمكن إصدار فاتورة آجل له',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!dueDate) {
+        toast({
+          title: 'تنبيه',
+          description: 'يجب تحديد تاريخ الاستحقاق للفاتورة الآجلة',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       if (editInvoice) {
@@ -252,6 +291,27 @@ const CreateInvoice = () => {
     return date.toLocaleDateString('en-CA'); // YYYY-MM-DD
   };
   
+  const handlePaymentMethodChange = (value: string) => {
+    setPaymentMethod(value as PaymentMethod);
+    if (value === PaymentMethod.CREDIT) {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      const creditDays = customer?.credit_period || 0;
+      if (!selectedCustomerId || creditDays === 0) {
+        toast({
+          title: 'تنبيه',
+          description: 'هذا العميل ليس لديه صلاحية ائتمان ولا يمكن إصدار فاتورة آجل له',
+          variant: 'destructive',
+        });
+        setPaymentMethod(PaymentMethod.CASH);
+        setDueDate(undefined);
+        return;
+      }
+      // سيُحسب تاريخ الاستحقاق تلقائيًا في useEffect أعلاه
+    } else {
+      setDueDate(undefined);
+    }
+  };
+
   return (
     <PageContainer title="إنشاء فاتورة جديدة" subtitle="إضافة فاتورة جديدة للعميل">
       <div className="space-y-6">
@@ -297,18 +357,7 @@ const CreateInvoice = () => {
                 <Label htmlFor="paymentMethod">طريقة الدفع</Label>
                 <Select 
                   value={paymentMethod} 
-                  onValueChange={(value) => {
-                    setPaymentMethod(value as PaymentMethod);
-                    
-                    // إذا تغيرت طريقة الدفع إلى آجل، نضيف موعد استحقاق بعد شهر
-                    if (value === PaymentMethod.CREDIT) {
-                      const nextMonth = new Date();
-                      nextMonth.setMonth(nextMonth.getMonth() + 1);
-                      setDueDate(nextMonth);
-                    }
-                    
-                    setIsDirty(true);
-                  }}
+                  onValueChange={handlePaymentMethodChange}
                   disabled={isSubmitting}
                 >
                   <SelectTrigger id="paymentMethod">
@@ -324,31 +373,13 @@ const CreateInvoice = () => {
               {paymentMethod === PaymentMethod.CREDIT && (
                 <div className="space-y-2">
                   <Label htmlFor="dueDate">تاريخ الاستحقاق</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-right"
-                        disabled={isSubmitting}
-                      >
-                        <CalendarCheck className="ml-2 h-4 w-4" />
-                        {dueDate ? formatDate(dueDate) : 'اختر تاريخ الاستحقاق'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dueDate}
-                        onSelect={(date) => {
-                          if (date) {
-                            setDueDate(date);
-                            setIsDirty(true);
-                          }
-                        }}
-                        disabled={(date) => date < new Date()}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Input
+                    id="dueDate"
+                    type="text"
+                    value={dueDate ? formatDate(dueDate) : ''}
+                    disabled
+                    className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                  />
                 </div>
               )}
             </div>

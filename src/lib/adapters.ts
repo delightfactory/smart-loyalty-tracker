@@ -58,6 +58,9 @@ export function dbCustomerToAppCustomer(dbCustomer: any): Customer {
     creditBalance: dbCustomer.credit_balance,
     governorate: dbCustomer.governorate ?? '',
     city: dbCustomer.city ?? '',
+    lastActive: dbCustomer.lastactive ? new Date(dbCustomer.lastactive).toISOString() : undefined,
+    credit_period: dbCustomer.credit_period ?? 0,
+    credit_limit: dbCustomer.credit_limit ?? 0,
   };
 }
 
@@ -77,6 +80,9 @@ export function appCustomerToDbCustomer(customer: Customer | Omit<Customer, 'id'
     credit_balance: customer.creditBalance,
     governorate: customer.governorate ?? null,
     city: customer.city ?? null,
+    lastactive: customer.lastActive ? new Date(customer.lastActive).toISOString() : null,
+    credit_period: customer.credit_period ?? 0,
+    credit_limit: customer.credit_limit ?? 0,
   };
 }
 

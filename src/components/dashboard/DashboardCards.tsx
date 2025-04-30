@@ -13,6 +13,8 @@ import { useQuery } from '@tanstack/react-query';
 import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
 import { DashboardCardProps, DashboardSummaryProps } from './DashboardCardProps';
 import { useEffect, useState } from 'react';
+import { formatNumberEn } from '@/lib/utils';
+import { useCustomers } from '@/hooks/useCustomers';
 
 interface CardData extends Omit<DashboardCardProps, 'value'> {
   value: number | string;
@@ -26,20 +28,7 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     return () => setIsMounted(false);
   }, []);
   
-  const { data: customers, isLoading: isLoadingCustomers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      try {
-        return await customersService.getAll();
-      } catch (error) {
-        console.error('Error fetching customers:', error);
-        return [];
-      }
-    },
-    enabled: isMounted && !summary,
-    staleTime: 60000,
-    retry: 2
-  });
+  const { customers, isLoading: isLoadingCustomers } = useCustomers();
   
   const { data: products, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
@@ -112,11 +101,8 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
   
   const calculateTotalOutstanding = () => {
     if (summary) return summary.totalOverdue || 0;
-    
-    if (!invoices) return 0;
-    return invoices
-      .filter(invoice => invoice.status !== 'مدفوع')
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+    if (!customers) return 0;
+    return customers.reduce((sum, customer) => sum + (Number(customer.creditBalance) || 0), 0);
   };
   
   const cardDataDefault: CardData[] = [
@@ -160,15 +146,9 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     },
     {
       title: 'المبالغ المستحقة',
-      value: formatCurrency 
-        ? formatCurrency(calculateTotalOutstanding())
-        : new Intl.NumberFormat('ar-EG', { 
-            style: 'currency', 
-            currency: 'EGP',
-            maximumFractionDigits: 0 
-          }).format(calculateTotalOutstanding()),
-      icon: <CreditCard className="h-5 w-5 text-red-600" />,
-      loading: !summary && isLoadingInvoices,
+      value: formatNumberEn(calculateTotalOutstanding()) + ' EGP',
+      icon: <CreditCard className="h-5 w-5 text-red-600" />, 
+      loading: !summary && isLoadingCustomers,
       trend: '-2.5%',
       description: 'منذ الشهر الماضي'
     },

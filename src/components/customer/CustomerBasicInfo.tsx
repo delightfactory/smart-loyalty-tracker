@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { User, Phone, Building, CreditCard } from 'lucide-react';
 import { Customer } from '@/lib/types';
@@ -8,10 +7,10 @@ interface CustomerBasicInfoProps {
 }
 
 const CustomerBasicInfo = ({ customer }: CustomerBasicInfoProps) => {
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
+  const formatNumberEn = (value: number) => {
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
-  
+
   return (
     <Card className="col-span-1 md:col-span-2">
       <CardHeader className="pb-2">
@@ -55,9 +54,21 @@ const CustomerBasicInfo = ({ customer }: CustomerBasicInfoProps) => {
               <CreditCard className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">رصيد الآجل</p>
-                <p className="font-medium">{formatCurrency(customer.creditBalance)}</p>
+                <p className="font-medium">{formatNumberEn(customer.creditBalance)} ج.م</p>
               </div>
             </div>
+            {customer.credit_period !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="font-medium">مدة الائتمان:</span>
+                <span>{formatNumberEn(customer.credit_period)} يوم</span>
+              </div>
+            )}
+            {customer.credit_limit !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="font-medium">قيمة الائتمان:</span>
+                <span>{formatNumberEn(customer.credit_limit)} EGP</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

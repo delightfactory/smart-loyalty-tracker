@@ -38,6 +38,7 @@ import BusinessTypeDistribution from '@/components/dashboard/BusinessTypeDistrib
 import TopRedemptionCustomersTable from '@/components/dashboard/TopRedemptionCustomersTable';
 import ProductsDashboard from '@/components/dashboard/ProductsDashboard';
 import PointsSummary from '@/components/dashboard/PointsSummary';
+import OutstandingSummaryCards from '@/components/customer/OutstandingSummaryCards';
 
 // Utility functions
 // 1. Filter data by date range
@@ -392,11 +393,27 @@ const Dashboard = () => {
             totalRemaining={summary.totalPointsIssued - totalPointsRedeemed}
             loading={!isMounted || isRedemptionsLoading}
           />
-          <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <InvoiceStatusChart />
-            <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} />
-          </div>
+          <DashboardCards
+            summary={{
+              totalProducts: products.length,
+              totalCustomers: customers.length,
+              totalInvoices: invoices.length,
+              totalRevenue: invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0),
+              totalOverdue: customers.reduce((sum, c) => sum + (Number(c.creditBalance) || 0), 0),
+              totalPointsIssued: customers.reduce((sum, c) => sum + (Number(c.pointsEarned) || 0), 0),
+              totalPointsRedeemed: customers.reduce((sum, c) => sum + (Number(c.pointsRedeemed) || 0), 0),
+            }}
+            view="overview"
+            formatCurrency={formatCurrency}
+          />
+          <OutstandingSummaryCards
+            customers={customers}
+            invoices={invoices}
+            loading={!customers.length || !invoices.length}
+          />
+          <InvoiceStatusChart data={undefined} />
+          <RevenueChart data={[]} formatCurrency={formatCurrency} />
+          <PointsRedemptionChart data={undefined} />
         </TabsContent>
         <TabsContent value="sales">
           {/* تحليلات المبيعات */}

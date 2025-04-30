@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { 
   ChartContainer, 
@@ -96,7 +95,52 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
 
   // Colors for charts
   const COLORS = ['#8B5CF6', '#10B981', '#F59E0B', '#3B82F6', '#EF4444'];
-  
+
+  // --- SUMMARY CARDS LOGIC ---
+  // Calculate active/inactive customers (active = last invoice within 30 days)
+  const now = new Date();
+  const customerActivity = useMemo(() => {
+    if (isLoading || !customers.length) return { active: 0, inactive: 0, activePercentage: 0, inactivePercentage: 0 };
+    let active = 0, inactive = 0;
+    customers.forEach(customer => {
+      // Find latest invoice for customer
+      const custInvoices = invoices.filter(inv => inv.customerId === customer.id);
+      let lastActiveDate = null;
+      if (custInvoices.length) {
+        lastActiveDate = custInvoices.reduce((latest, inv) => {
+          const d = new Date(inv.date);
+          return (!latest || d > latest) ? d : latest;
+        }, null);
+      } else if (customer.lastActive) {
+        lastActiveDate = new Date(customer.lastActive);
+      }
+      if (lastActiveDate && (now.getTime() - lastActiveDate.getTime()) / (1000*60*60*24) <= 30) {
+        active++;
+      } else {
+        inactive++;
+      }
+    });
+    const total = active + inactive;
+    return {
+      active,
+      inactive,
+      activePercentage: total > 0 ? Math.round((active / total) * 100) : 0,
+      inactivePercentage: total > 0 ? Math.round((inactive / total) * 100) : 0
+    };
+  }, [customers, invoices, isLoading]);
+
+  // Calculate average customer value (total purchase / total customers)
+  const avgCustomerValue = useMemo(() => {
+    if (isLoading || !customers.length) return 0;
+    const totalPurchase = customers.reduce((sum, customer) => {
+      const custInvoices = invoices.filter(inv => inv.customerId === customer.id);
+      return sum + custInvoices.reduce((s, inv) => s + (inv.totalAmount || 0), 0);
+    }, 0);
+    return customers.length > 0 ? totalPurchase / customers.length : 0;
+  }, [customers, invoices, isLoading]);
+
+  // --- END SUMMARY CARDS LOGIC ---
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64">جاري تحميل البيانات...</div>;
   }
@@ -117,6 +161,73 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
         </Select>
       </div>
       
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Customers</p>
+                <h2 className="text-2xl font-bold">{customerActivity.active.toLocaleString('en-US')}</h2>
+              </div>
+              <div className="bg-green-100 p-2 rounded-full">
+                <span role="img" aria-label="active">🟢</span>
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Active %</span>
+                <span>{customerActivity.activePercentage}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">Inactive Customers</p>
+                <h2 className="text-2xl font-bold">{customerActivity.inactive.toLocaleString('en-US')}</h2>
+              </div>
+              <div className="bg-amber-100 p-2 rounded-full">
+                <span role="img" aria-label="inactive">🟡</span>
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Inactive %</span>
+                <span>{customerActivity.inactivePercentage}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">Average Customer Value</p>
+                <h2 className="text-2xl font-bold">{avgCustomerValue.toLocaleString('en-US', { maximumFractionDigits: 0 })} EGP</h2>
+              </div>
+              <div className="bg-purple-100 p-2 rounded-full">
+                <span role="img" aria-label="wallet">💰</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Customers</p>
+                <h2 className="text-2xl font-bold">{customers.length.toLocaleString('en-US')}</h2>
+              </div>
+              <div className="bg-primary/10 p-2 rounded-full">
+                <span role="img" aria-label="users">👥</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>

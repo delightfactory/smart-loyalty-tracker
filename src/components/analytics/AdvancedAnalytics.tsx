@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { 
   Card, 
@@ -73,9 +72,20 @@ interface AdvancedAnalyticsProps {
   isLoading: boolean;
 }
 
-// Helper function to extract month and year from date
+// Helper to ensure English numbers and ISO date for all UI (per user preference)
+function formatNumberEn(num: number | string) {
+  if (typeof num === 'string') num = Number(num);
+  return num.toLocaleString('en-US');
+}
+function formatDateEn(date: string | Date) {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+// Helper function to extract month and year from date (in English)
 const getMonthYear = (date: Date) => {
-  const month = date.toLocaleString('ar-EG', { month: 'short' });
+  const month = date.toLocaleString('en-US', { month: 'short' });
   const year = date.getFullYear();
   return `${month} ${year}`;
 };
@@ -100,6 +110,8 @@ const groupByMonth = (data: any[], dateKey: string, valueKey: string) => {
 };
 
 const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: AdvancedAnalyticsProps) => {
+  console.log('AdvancedAnalytics props', { customers, invoices, products, isLoading });
+  
   const [timeRange, setTimeRange] = useState('all');
   
   // Filter data based on time range
@@ -179,12 +191,12 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         if (!invoice.items) return total;
         
         const item = invoice.items.find((item: any) => item.productId === product.id);
-        return total + (item ? item.quantity : 0);
+        return total + (item && typeof item.quantity === 'number' ? item.quantity : 0);
       }, 0);
       
       return {
-        name: product.name,
-        price: product.price,
+        name: product.name || 'غير معرف',
+        price: typeof product.price === 'number' ? product.price : 0,
         sales: totalSold,
         // Add a small random variation for better visualization in scatter plot
         z: Math.floor(Math.random() * 10) + 1
@@ -210,9 +222,9 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
       invoice.items.forEach((item: any) => {
         const product = products.find(p => p.id === item.productId);
         if (product && categoryData[product.category]) {
-          categoryData[product.category].sales += item.quantity;
+          categoryData[product.category].sales += item.quantity || 0;
           categoryData[product.category].count += 1;
-          categoryData[product.category].totalValue += item.totalPrice;
+          categoryData[product.category].totalValue += item.totalPrice || 0;
         }
       });
     });
@@ -247,7 +259,7 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now);
       date.setMonth(date.getMonth() - i);
-      const monthYear = date.toLocaleString('ar-EG', { month: 'short' });
+      const monthYear = date.toLocaleString('en-US', { month: 'short' });
       monthsData[monthYear] = { new: 0, active: 0, inactive: 0 };
     }
     
@@ -256,7 +268,7 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
       if (!customer.created_at) return;
       
       const createdAt = new Date(customer.created_at);
-      const monthYear = createdAt.toLocaleString('ar-EG', { month: 'short' });
+      const monthYear = createdAt.toLocaleString('en-US', { month: 'short' });
       
       if (monthsData[monthYear]) {
         monthsData[monthYear].new++;
@@ -275,7 +287,7 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         );
         
         const invoiceDate = new Date(lastInvoice.date);
-        const monthYear = invoiceDate.toLocaleString('ar-EG', { month: 'short' });
+        const monthYear = invoiceDate.toLocaleString('en-US', { month: 'short' });
         
         // If invoice is in the last 6 months
         if (monthsData[monthYear]) {
@@ -301,6 +313,72 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
   // Define colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
   
+  // --- إصلاح عداد العملاء النشطين وغير النشطين وإجمالي العملاء ومتوسط قيمة العميل ---
+  // 1. إجمالي العملاء هو جميع العملاء من قاعدة البيانات
+  const totalCustomers = useMemo(() => {
+    if (isLoading || !customers.length) return 0;
+    return customers.length;
+  }, [customers, isLoading]);
+
+  // 2. العملاء النشطين: لديهم فاتورة خلال آخر 30 يوم
+  const activeCustomersCount = useMemo(() => {
+    if (isLoading || !customers.length || !filteredInvoices.length) return 0;
+    const now = new Date();
+    return customers.filter(customer => {
+      const customerInvoices = filteredInvoices.filter(inv => inv.customerId === customer.id);
+      if (!customerInvoices.length) return false;
+      const lastInvoice = customerInvoices.reduce((latest, inv) => new Date(inv.date) > new Date(latest.date) ? inv : latest, customerInvoices[0]);
+      const daysSinceLast = Math.floor((now.getTime() - new Date(lastInvoice.date).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSinceLast <= 30;
+    }).length;
+  }, [customers, filteredInvoices, isLoading]);
+
+  // 3. العملاء غير النشطين: ليس لديهم أي فاتورة أو آخر فاتورة أقدم من 30 يوم
+  const inactiveCustomersCount = useMemo(() => {
+    if (isLoading || !customers.length) return 0;
+    const now = new Date();
+    return customers.filter(customer => {
+      const customerInvoices = filteredInvoices.filter(inv => inv.customerId === customer.id);
+      if (!customerInvoices.length) return true;
+      const lastInvoice = customerInvoices.reduce((latest, inv) => new Date(inv.date) > new Date(latest.date) ? inv : latest, customerInvoices[0]);
+      const daysSinceLast = Math.floor((now.getTime() - new Date(lastInvoice.date).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSinceLast > 30;
+    }).length;
+  }, [customers, filteredInvoices, isLoading]);
+
+  // 4. متوسط قيمة العميل: إجمالي قيمة الفواتير ÷ عدد العملاء الذين لديهم فواتير
+  const averageCustomerValue = useMemo(() => {
+    if (isLoading || !filteredInvoices.length) return 0;
+    // العملاء الذين لديهم فواتير فقط
+    const customersWithInvoices = customers.filter(customer => filteredInvoices.some(inv => inv.customerId === customer.id));
+    if (!customersWithInvoices.length) return 0;
+    const totalValue = filteredInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    return totalValue / customersWithInvoices.length;
+  }, [customers, filteredInvoices, isLoading]);
+
+  // 5. حساب النسب
+  const activePercentage = totalCustomers > 0 ? Math.round((activeCustomersCount / totalCustomers) * 100) : 0;
+  const inactivePercentage = totalCustomers > 0 ? Math.round((inactiveCustomersCount / totalCustomers) * 100) : 0;
+
+  // حساب قيمة الائتمان تلقائياً لكل عميل بناءً على متوسط مسحوباته آخر 3 شهور
+  const calculateCreditLimit = (customerId: string, invoices: any[]): number => {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now);
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const recentInvoices = invoices.filter(inv => inv.customerId === customerId && new Date(inv.date) >= threeMonthsAgo);
+    if (!recentInvoices.length) return 0;
+    const total = recentInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    return Math.round(total / 3);
+  };
+
+  // إضافة بيانات الائتمان للعملاء
+  const customersWithCredit = useMemo(() => {
+    return customers.map(customer => ({
+      ...customer,
+      credit_limit: calculateCreditLimit(customer.id, invoices),
+    }));
+  }, [customers, invoices]);
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64">جاري تحميل البيانات...</div>;
   }
@@ -349,6 +427,59 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         </TabsList>
         
         <TabsContent value="trends">
+          {(salesData.length === 0) && (
+            <div className="bg-yellow-100 text-yellow-900 p-2 rounded mb-4 text-sm">
+              ⚠️ بعض البيانات غير مكتملة أو مفقودة، قد لا تظهر النتائج بشكل دقيق. يرجى التأكد من إدخال جميع البيانات الأساسية.
+            </div>
+          )}
+          {/* بطاقات احصائية سريعة */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي العملاء</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-700">{formatNumberEn(totalCustomers)}</div>
+                <div className="text-xs text-muted-foreground">من قاعدة البيانات</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">العملاء النشطين</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-700">{formatNumberEn(activeCustomersCount)}</div>
+                <div className="text-xs text-muted-foreground">{activePercentage}% من الإجمالي (آخر 30 يوم)</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">العملاء غير النشطين</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-700">{formatNumberEn(inactiveCustomersCount)}</div>
+                <div className="text-xs text-muted-foreground">{inactivePercentage}% من الإجمالي</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">مدة الائتمان (يوم)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-700">{formatNumberEn(customersWithCredit.reduce((sum, c) => sum + (c.credit_period ?? 0), 0) / (customersWithCredit.length || 1))}</div>
+                <div className="text-xs text-muted-foreground">متوسط مدة الائتمان</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">قيمة الائتمان (EGP)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-700">{formatNumberEn(customersWithCredit.reduce((sum, c) => sum + (c.credit_limit ?? 0), 0) / (customersWithCredit.length || 1))} EGP</div>
+                <div className="text-xs text-muted-foreground">متوسط قيمة الائتمان آخر 3 شهور</div>
+              </CardContent>
+            </Card>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -370,8 +501,8 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`${value.toLocaleString('ar-EG')} ج.م`, 'قيمة المبيعات']} />
+                      <YAxis tickFormatter={formatNumberEn} />
+                      <Tooltip formatter={(value: any) => `${formatNumberEn(value)} EGP`} />
                       <Legend />
                       <Area type="monotone" dataKey="value" name="قيمة المبيعات" fill="url(#colorSales)" stroke="#8884d8" />
                       <Line type="monotone" dataKey="value" name="قيمة المبيعات" stroke="#8884d8" dot={{ r: 4 }} />
@@ -430,8 +561,8 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => value ? [`${value.toLocaleString('ar-EG')} ج.م`, 'قيمة المبيعات'] : ['', '']} />
+                      <YAxis tickFormatter={formatNumberEn} />
+                      <Tooltip formatter={(value: any) => value ? `${formatNumberEn(value)} EGP` : ''} />
                       <Legend />
                       <Line 
                         type="monotone" 
@@ -474,6 +605,11 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         </TabsContent>
         
         <TabsContent value="correlations">
+          {(priceVsSales.length === 0) && (
+            <div className="bg-yellow-100 text-yellow-900 p-2 rounded mb-4 text-sm">
+              ⚠️ بعض البيانات غير مكتملة أو مفقودة، قد لا تظهر النتائج بشكل دقيق. يرجى التأكد من إدخال جميع البيانات الأساسية.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -491,15 +627,15 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
                       <XAxis 
                         dataKey="price" 
                         name="السعر" 
-                        tickFormatter={value => `${value.toLocaleString('ar-EG')}`} 
+                        tickFormatter={formatNumberEn} 
                       />
                       <YAxis dataKey="sales" name="المبيعات" />
                       <ZAxis dataKey="z" range={[30, 100]} />
                       <Tooltip 
-                        formatter={(value, name) => {
-                          if (name === 'price') return [`${value.toLocaleString('ar-EG')} ج.م`, 'السعر'];
-                          if (name === 'sales') return [`${value}`, 'المبيعات'];
-                          return [value, name];
+                        formatter={(value: any, name?: string) => {
+                          if (name === 'price') return `${formatNumberEn(value)} EGP`;
+                          if (name === 'sales') return `${formatNumberEn(value)}`;
+                          return String(value);
                         }} 
                         cursor={{ strokeDasharray: '3 3' }}
                       />
@@ -582,6 +718,11 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         </TabsContent>
         
         <TabsContent value="segments">
+          {(customersByType.length === 0) && (
+            <div className="bg-yellow-100 text-yellow-900 p-2 rounded mb-4 text-sm">
+              ⚠️ بعض البيانات غير مكتملة أو مفقودة، قد لا تظهر النتائج بشكل دقيق. يرجى التأكد من إدخال جميع البيانات الأساسية.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -609,7 +750,7 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [`${value} عميل`, 'عدد العملاء']} />
+                      <Tooltip formatter={(value: any) => `${formatNumberEn(value)} عميل`} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -674,6 +815,11 @@ const AdvancedAnalytics = ({ customers, invoices, products, isLoading }: Advance
         </TabsContent>
         
         <TabsContent value="predictions">
+          {(salesData.length === 0) && (
+            <div className="bg-yellow-100 text-yellow-900 p-2 rounded mb-4 text-sm">
+              ⚠️ بعض البيانات غير مكتملة أو مفقودة، قد لا تظهر النتائج بشكل دقيق. يرجى التأكد من إدخال جميع البيانات الأساسية.
+            </div>
+          )}
           <div className="space-y-6">
             <Card>
               <CardHeader>

@@ -1,9 +1,9 @@
-
 import { Button } from '@/components/ui/button';
 import { MoonIcon, SunIcon, Menu as MenuIcon } from 'lucide-react';
 import { useTheme } from '@/components/ui/theme-provider';
 import { useSidebar } from '@/components/ui/sidebar';
 import { UserMenu } from '@/components/auth/UserMenu';
+import UpdateCustomersButton from './UpdateCustomersButton';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -36,6 +36,7 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
         <h1 className="text-lg font-semibold lg:block hidden">نظام الولاء</h1>
 
         <div className="flex items-center gap-2">
+          <UpdateCustomersButton />
           <Button
             variant="ghost"
             size="icon"
@@ -44,7 +45,6 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </Button>
-          
           <UserMenu />
         </div>
       </div>

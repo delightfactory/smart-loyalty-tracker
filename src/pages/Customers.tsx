@@ -40,7 +40,7 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 import { getInvoicesByCustomerId, getProductById } from '@/lib/data';
-import { getOnTimePaymentRate, calculateCustomerImportance, importanceScoreToLevel } from '@/lib/calculations';
+import { calculateClassificationAndLevel } from '@/lib/customerClassification';
 import { egyptGovernorates } from '../lib/egyptLocations';
 import { customersToCSV, csvToCustomers, customersToExcel, excelToCustomers } from '../lib/customerImportExport';
 import { saveAs } from 'file-saver';
@@ -52,6 +52,7 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { usePayments } from '@/hooks/usePayments';
 import { useRedemptions } from '@/hooks/useRedemptions';
 import { useMemo } from 'react';
+import { formatNumberEn } from '@/lib/utils';
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -133,41 +134,10 @@ const Customers = () => {
     : Array.from(new Set(customers.map(c => c.city).filter(Boolean)));
 
   // تحديث التصنيف (عدد النجوم) بناءً على تنوع المشتريات من الأقسام الأساسية فقط
-  const MAIN_CATEGORIES = [
-    ProductCategory.DASHBOARD_CARE,
-    ProductCategory.ENGINE_CARE,
-    ProductCategory.EXTERIOR_CARE,
-    ProductCategory.TIRE_CARE,
-    ProductCategory.INTERIOR_CARE,
-  ];
+  // (تم نقل المنطق إلى دالة مشتركة)
   const customersWithLevel = customers.map(c => {
     const invoices = getInvoicesByCustomerId(c.id);
-    const totalAmount = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const frequency = invoices.length;
-    const pointsEarned = Number(c.pointsEarned || 0);
-    const onTimePaymentRate = getOnTimePaymentRate(c.id) / 100;
-    const importance = calculateCustomerImportance({
-      totalAmount,
-      frequency,
-      pointsEarned,
-      onTimePaymentRate,
-      maxAmount,
-      maxFrequency,
-      maxPoints
-    });
-    const level = importanceScoreToLevel(importance);
-    // حساب التصنيف: عدد الأقسام الرئيسية التي اشترى منها العميل (بدون SUPPLIES)
-    const purchasedMainCategories = new Set<string>();
-    invoices.forEach(inv => {
-      inv.items.forEach(item => {
-        const product = getProductById(item.productId);
-        if (product && MAIN_CATEGORIES.includes(product.category as ProductCategory)) {
-          purchasedMainCategories.add(product.category);
-        }
-      });
-    });
-    // إذا كان هناك مشتريات من قسم رئيسي واحد على الأقل، يجب أن تظهر نجمة واحدة على الأقل
-    const classification = purchasedMainCategories.size > 0 ? purchasedMainCategories.size : (invoices.length > 0 ? 1 : 0);
+    const { classification, level } = calculateClassificationAndLevel(c, invoices);
     return { ...c, level, classification };
   });
 
@@ -255,9 +225,6 @@ const Customers = () => {
     const emptyStars = Array(5 - classification).fill('☆').join('');
     return stars + emptyStars;
   };
-
-  // تنسيق الأرقام بالإنجليزية فقط
-  const formatNumber = (num: number | string) => Number(num).toLocaleString('en-US');
 
   // ✅ تعديل عميل: يفتح نافذة التعديل بدلاً من رسالة قريبا
   const handleEditCustomer = (customer: Customer) => {
@@ -412,7 +379,7 @@ const Customers = () => {
     if (invoicesQuery.isError || redemptionsQuery.isError) {
       return <span className="text-destructive">خطأ</span>;
     }
-    return <>{formatNumber(points)}</>;
+    return <>{formatNumberEn(points)}</>;
   }
 
   // --- Real-time balance cell ---
@@ -434,7 +401,7 @@ const Customers = () => {
     if (invoicesQuery.isError || paymentsQuery.isError) {
       return <span className="text-destructive">خطأ</span>;
     }
-    return <>{formatNumber(totalBalance)} ج.م</>;
+    return <>{formatNumberEn(totalBalance)} ج.م</>;
   }
 
   return (
@@ -578,6 +545,8 @@ const Customers = () => {
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المدينة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">النقاط الحالية</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">رصيد العميل</TableHead>
+                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">مدة الائتمان (يوم)</TableHead>
+                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">قيمة الائتمان (EGP)</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">التصنيف</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المستوى</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">إجراءات</TableHead>
@@ -586,7 +555,7 @@ const Customers = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center">
+                  <TableCell colSpan={13} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Loader2 className="h-10 w-10 mb-2 animate-spin" />
                       <p>جاري تحميل البيانات...</p>
@@ -604,7 +573,7 @@ const Customers = () => {
                     )}
                     onClick={() => handleCustomerClick(customer.id)}
                   >
-                    <TableCell className="font-medium text-primary/90 text-sm dark:text-zinc-100">{customer.id}</TableCell>
+                    <TableCell className="font-medium text-primary/90 text-sm dark:text-zinc-100">{formatNumberEn(customer.id)}</TableCell>
                     <TableCell className="font-semibold text-lg dark:text-zinc-100">{customer.name}</TableCell>
                     <TableCell className="text-gray-700 dark:text-zinc-200">{customer.contactPerson}</TableCell>
                     <TableCell>
@@ -626,6 +595,16 @@ const Customers = () => {
                         <CustomerBalanceCell customerId={customer.id} />
                       </span>
                     </TableCell>
+                    <TableCell className="text-center align-middle">
+                      <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-cyan-50 dark:bg-zinc-800 text-cyan-700 dark:text-cyan-300 font-bold border border-cyan-200 dark:border-cyan-700">
+                        {formatNumberEn(customer.credit_period)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center align-middle">
+                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-fuchsia-50 dark:bg-zinc-800 text-fuchsia-700 dark:text-fuchsia-300 font-bold border border-fuchsia-200 dark:border-fuchsia-700">
+                        {formatNumberEn(customer.credit_limit)}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center text-amber-500 text-lg dark:text-amber-400">
                         {getClassificationDisplay(customer.classification)}
@@ -638,7 +617,7 @@ const Customers = () => {
                         customer.level >= 4 ? "scale-110 border-2" : "",
                         "dark:text-zinc-100"
                       )}>
-                        المستوى {formatNumber(customer.level)}
+                        المستوى {formatNumberEn(customer.level)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -665,7 +644,7 @@ const Customers = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center">
+                  <TableCell colSpan={13} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground dark:text-zinc-400">
                       <Users className="h-10 w-10 mb-2" />
                       <p>لا يوجد عملاء</p>
@@ -693,7 +672,6 @@ const Customers = () => {
                 onDelete={handleDeleteCustomer}
                 getLevelBadgeClass={getLevelBadgeClass}
                 getClassificationDisplay={getClassificationDisplay}
-                formatNumber={formatNumber}
               />
             ))
           ) : (
@@ -740,15 +718,9 @@ const Customers = () => {
               <Label htmlFor="phone">هاتف</Label>
               <Input 
                 id="phone" 
-                value={String(newCustomer.phone).replace(/[^0-9+\-]/g, '')}
-                onChange={(e) => {
-                  // Always display and store phone as English numbers
-                  setNewCustomer({ ...newCustomer, phone: e.target.value.replace(/[^0-9+\-]/g, '') });
-                }}
-                className="mt-1 text-left ltr"
-                inputMode="tel"
-                pattern="[0-9+\-]*"
-                style={{ direction: 'ltr' }}
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                className="mt-1"
               />
             </div>
             <div>

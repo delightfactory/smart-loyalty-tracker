@@ -328,10 +328,13 @@ const Invoices = () => {
                       <TableCell className="text-center text-gray-800 dark:text-gray-100">{customer?.name || ''}</TableCell>
                       <TableCell className="text-center font-bold text-blue-700 dark:text-blue-300 text-[15px]">{formatCurrency(invoice.totalAmount)}</TableCell>
                       <TableCell className="text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] bg-gray-100 dark:bg-gray-800`}>
-                          <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500' : 'bg-blue-400'}`}></span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                          <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500 animate-pulse' : 'bg-blue-400'}`}></span>
                           {invoice.status === InvoiceStatus.PAID ? 'مدفوع' : invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' : 'متأخر'}
                         </span>
+                        {invoice.status === InvoiceStatus.OVERDUE && (
+                          <div className="text-xs text-red-600 font-bold mt-1">Overdue</div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 font-bold text-[15px]">
@@ -394,10 +397,13 @@ const Invoices = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-[17px] font-extrabold text-blue-900 dark:text-blue-100">
                       <span>فاتورة #{invoice.id}</span>
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] bg-gray-100 dark:bg-gray-800">
-                        <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500' : 'bg-blue-400'}`}></span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500 animate-pulse' : 'bg-blue-400'}`}></span>
                         {invoice.status === InvoiceStatus.PAID ? 'مدفوع' : invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' : 'متأخر'}
                       </span>
+                      {invoice.status === InvoiceStatus.OVERDUE && (
+                        <span className="ml-2 text-xs text-red-600 font-bold animate-pulse">Overdue</span>
+                      )}
                     </CardTitle>
                     <CardDescription className="text-gray-800 dark:text-gray-200 text-[15px]">
                       {customer?.name || '---'} | {formatDate(invoice.date)}

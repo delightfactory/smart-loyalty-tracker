@@ -139,6 +139,29 @@ const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditD
                 className="mt-1"
               />
             </div>
+            <div>
+              <Label htmlFor="credit_period">مدة الائتمان (بالأيام)</Label>
+              <Input 
+                id="credit_period"
+                type="number"
+                min={0}
+                value={editedCustomer.credit_period ?? ''}
+                onChange={(e) => handleChange('credit_period', Number(e.target.value))}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="credit_limit">قيمة الائتمان (EGP)</Label>
+              <Input 
+                id="credit_limit"
+                type="number"
+                min={0}
+                step={0.01}
+                value={editedCustomer.credit_limit ?? ''}
+                onChange={(e) => handleChange('credit_limit', Number(e.target.value))}
+                className="mt-1"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
