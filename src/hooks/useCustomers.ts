@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
@@ -29,6 +30,10 @@ export function useCustomers() {
       }
     }
   });
+  
+  // Make direct access to data and loading state easier
+  const customers = getAll.data || [];
+  const isLoading = getAll.isLoading;
   
   const getById = (id: string) => useQuery({
     queryKey: ['customers', id],
@@ -121,6 +126,8 @@ export function useCustomers() {
   });
   
   return {
+    customers,
+    isLoading,
     getAll,
     getById,
     addCustomer,

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,9 @@ import { Badge } from '@/components/ui/badge';
 const CustomerFollowup = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const { customers, isLoading } = useCustomers();
+  const customersQuery = useCustomers().getAll;
+  const customers = customersQuery.data || [];
+  const isLoading = customersQuery.isLoading;
   
   // فلاتر تتبع العملاء
   const [period, setPeriod] = useState<string>('30');
@@ -174,7 +175,7 @@ const CustomerFollowup = () => {
       title="متابعة العملاء" 
       subtitle="تحليل وتتبع نشاط العملاء ومتابعة تفاعلهم مع النظام"
       searchPlaceholder="البحث عن عميل..."
-      onSearch={handleSearch}
+      onSearchChange={handleSearch}
     >
       <div className="space-y-6">
         {/* فلتر فترة عدم النشاط */}
@@ -253,7 +254,7 @@ const CustomerFollowup = () => {
           <TabsContent value="inactive" className="mt-0">
             <InactiveCustomersTable 
               customers={filteredCustomers}
-              isLoading={isLoading}
+              loading={isLoading}
             />
           </TabsContent>
           
@@ -265,7 +266,7 @@ const CustomerFollowup = () => {
                 const daysDiff = Math.floor((new Date().getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
                 return daysDiff >= 30 && daysDiff <= 90;
               })}
-              isLoading={isLoading}
+              loading={isLoading}
               title="العملاء المعرضين للفقد"
               description="قائمة العملاء الذين لم يتفاعلوا مع النظام منذ 30-90 يومًا"
               emptyMessage="لا يوجد عملاء معرضين للفقد حاليًا"
@@ -281,7 +282,7 @@ const CustomerFollowup = () => {
                 const daysDiff = Math.floor((new Date().getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
                 return daysDiff > 90;
               })}
-              isLoading={isLoading}
+              loading={isLoading}
               title="العملاء المفقودين"
               description="قائمة العملاء الذين لم يتفاعلوا مع النظام منذ أكثر من 90 يومًا"
               emptyMessage="لا يوجد عملاء مفقودين حاليًا"

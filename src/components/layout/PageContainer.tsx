@@ -1,59 +1,44 @@
 
 import { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
-import SmartSearch from '@/components/search/SmartSearch';
-import { Card } from '@/components/ui/card';
-import { useTheme } from '@/components/ui/theme-provider';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 
 interface PageContainerProps {
   children: ReactNode;
   title: string;
   subtitle?: string;
-  className?: string;
-  showSearch?: boolean;
   searchPlaceholder?: string;
-  extra?: ReactNode;
-  noPadding?: boolean;
+  onSearchChange?: (term: string) => void;
 }
 
-const PageContainer = ({ 
-  children, 
-  title, 
-  subtitle, 
-  className,
-  showSearch = false,
-  searchPlaceholder = "بحث...",
-  extra,
-  noPadding = false
+const PageContainer = ({
+  children,
+  title,
+  subtitle,
+  searchPlaceholder,
+  onSearchChange
 }: PageContainerProps) => {
-  const { theme } = useTheme();
-  
   return (
-    <div className={cn(
-      "container transition-colors duration-300",
-      noPadding ? "" : "py-6",
-      className
-    )}>
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="animate-fade-in">
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
           <h1 className="text-3xl font-bold">{title}</h1>
           {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
         </div>
-        <div className="flex items-center gap-4 animate-fade-in">
-          {showSearch && (
-            <SmartSearch placeholder={searchPlaceholder} className="w-[300px]" />
-          )}
-          {extra}
-        </div>
+        
+        {searchPlaceholder && onSearchChange && (
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={searchPlaceholder}
+              className="pl-10"
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        )}
       </div>
       
-      <div className={cn(
-        "relative rounded-xl overflow-hidden transition-colors duration-300",
-        theme === 'dark' ? 'bg-card/50' : 'bg-transparent',
-        "animate-fade-in"
-      )}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 };

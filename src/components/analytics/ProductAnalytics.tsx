@@ -545,6 +545,34 @@ const getLowSellingProducts = (products: Product[], invoices: Invoice[]): any[] 
     .slice(0, 5);
 };
 
+const findLatestInvoiceId = (invoices: any[]) => {
+  // Use numeric IDs if possible, otherwise use string comparison
+  let maxId = "0";
+  let latestInvoice = null;
+
+  for (const invoice of invoices) {
+    // Check if ID can be converted to a number
+    const currentIdNum = Number(invoice.id);
+    const maxIdNum = Number(maxId);
+    
+    // If both can be treated as numbers
+    if (!isNaN(currentIdNum) && !isNaN(maxIdNum)) {
+      if (currentIdNum > maxIdNum) {
+        maxId = invoice.id;
+        latestInvoice = invoice;
+      }
+    } else {
+      // Fall back to string comparison
+      if (String(invoice.id).localeCompare(String(maxId)) > 0) {
+        maxId = invoice.id;
+        latestInvoice = invoice;
+      }
+    }
+  }
+  
+  return latestInvoice;
+};
+
 const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: ProductAnalyticsProps) => {
   const [timeRange, setTimeRange] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -770,7 +798,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                   <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
                   <p className="text-sm">
                     {topProducts.length > 0 
-                      ? `تمثل هذه المنتجات نسبة كبيرة من إجمالي المبيعات. يُنصح بضمان توفرها دائمًا.`
+                      ? `تمثل هذه ا��منتجات نسبة كبيرة من إجمالي المبيعات. يُنصح بضمان توفرها دائمًا.`
                       : 'قم بإضافة منتجات وفواتير لرؤية التحليلات.'}
                   </p>
                 </div>

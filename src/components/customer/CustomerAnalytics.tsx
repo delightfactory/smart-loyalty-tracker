@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,7 +34,8 @@ import {
   Wallet,
   TrendingUp,
   Clock,
-  Star
+  Star,
+  Lightbulb
 } from 'lucide-react';
 import { Customer } from '@/lib/types';
 import { addDays, format, differenceInDays } from 'date-fns';
@@ -48,6 +48,43 @@ interface CustomerAnalyticsProps {
 const CustomerAnalytics = ({ customers }: CustomerAnalyticsProps) => {
   const [activeMetric, setActiveMetric] = useState<string>('activity');
 
+  // Calculate inactivity stats
+  const calculateInactivityStats = () => {
+    const now = new Date();
+    const criticalInactive = customers.filter(customer => {
+      if (!customer.lastActive) return true;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff > 90;
+    }).length;
+    
+    const warningInactive = customers.filter(customer => {
+      if (!customer.lastActive) return false;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff >= 30 && daysDiff <= 90;
+    }).length;
+    
+    const recentInactive = customers.filter(customer => {
+      if (!customer.lastActive) return false;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff < 30 && daysDiff > 7;
+    }).length;
+    
+    return {
+      critical: criticalInactive,
+      warning: warningInactive,
+      recent: recentInactive,
+      total: customers.length,
+      percentage: customers.length > 0 
+        ? Math.round(((criticalInactive + warningInactive + recentInactive) / customers.length) * 100)
+        : 0
+    };
+  };
+
+  const inactivityStats = calculateInactivityStats();
+  
   // حساب توزيع العملاء حسب المناطق
   const calculateRegionDistribution = () => {
     const regions: { [key: string]: number } = {};

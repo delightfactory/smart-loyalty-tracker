@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -11,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { updateCurrentUserPassword } from '@/services/users';
+import { updateCurrentUserPassword } from '@/services/users-api';
 
 // تعريف نموذج تحديث كلمة المرور
 const passwordFormSchema = z

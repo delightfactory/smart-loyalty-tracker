@@ -1,102 +1,152 @@
 
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
-import { Phone, Mail, ArrowUpRight, Clock } from 'lucide-react';
+import { Customer } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { StatusBadge } from './StatusBadge';
-
-interface Customer {
-  id: string;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  avatar: string;
-  lastPurchase: Date;
-  inactiveDays: number;
-  loyaltyPoints: number;
-}
+import { Phone, Mail, AlertCircle, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface InactiveCustomersTableProps {
   customers: Customer[];
+  loading?: boolean;
+  title?: string;
+  description?: string;
+  emptyMessage?: string;
+  warningLevel?: 'default' | 'warning' | 'destructive';
 }
 
-const InactiveCustomersTable = ({ customers }: InactiveCustomersTableProps) => {
+const InactiveCustomersTable = ({
+  customers,
+  loading = false,
+  title = 'العملاء غير النشطين',
+  description = 'قائمة العملاء الذين لم يتفاعلوا مع النظام مؤخراً',
+  emptyMessage = 'لا يوجد عملاء غير نشطين في الوقت الحالي',
+  warningLevel = 'default'
+}: InactiveCustomersTableProps) => {
+  // Calculate inactivity days
+  const calculateInactivityDays = (lastActive?: string) => {
+    if (!lastActive) return Infinity; // If no activity date, consider as infinite inactivity
+    const lastActiveDate = new Date(lastActive);
+    const now = new Date();
+    return Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
+  
+  // Get appropriate icon based on inactivity period
+  const getInactivityIcon = (days: number) => {
+    if (days > 90) return <AlertCircle className="h-4 w-4 text-destructive" />;
+    if (days > 30) return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+    return <Clock className="h-4 w-4 text-slate-500" />;
+  };
+  
+  // Get appropriate badge color based on inactivity period
+  const getInactivityBadge = (days: number) => {
+    if (days > 90) return "destructive";
+    if (days > 30) return "warning";
+    return "secondary";
+  };
+  
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[400px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (customers.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-12">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className={`rounded-full p-3 ${warningLevel === 'destructive' ? 'bg-destructive/10' : warningLevel === 'warning' ? 'bg-amber-100' : 'bg-secondary/50'}`}>
+              {warningLevel === 'destructive' ? (
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              ) : warningLevel === 'warning' ? (
+                <AlertTriangle className="h-6 w-6 text-amber-500" />
+              ) : (
+                <Clock className="h-6 w-6 text-slate-500" />
+              )}
+            </div>
+            <div className="text-lg font-medium">{emptyMessage}</div>
+            <div className="text-sm text-muted-foreground">لا توجد بيانات لعرضها</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
     <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[80px]">الرقم</TableHead>
-              <TableHead>اسم العميل</TableHead>
-              <TableHead>آخر شراء</TableHead>
-              <TableHead>مدة الغياب</TableHead>
-              <TableHead>نقاط العميل</TableHead>
-              <TableHead>حالة العميل</TableHead>
-              <TableHead>اتصال</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {customers.length === 0 ? (
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  لا يوجد عملاء تطابق معايير البحث
-                </TableCell>
+                <TableHead>اسم العميل</TableHead>
+                <TableHead>نوع النشاط</TableHead>
+                <TableHead>آخر نشاط</TableHead>
+                <TableHead>مدة عدم النشاط</TableHead>
+                <TableHead>معلومات الاتصال</TableHead>
+                <TableHead>الإجراءات</TableHead>
               </TableRow>
-            ) : (
-              customers.map(customer => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.id}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={customer.avatar} alt={customer.name} />
-                        <AvatarFallback>{customer.name.substring(0, 2)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="text-xs text-muted-foreground">{customer.email}</div>
+            </TableHeader>
+            <TableBody>
+              {customers.map(customer => {
+                const inactivityDays = calculateInactivityDays(customer.lastActive);
+                
+                return (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell>{customer.businessType}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                        {customer.lastActive ? formatDate(customer.lastActive) : "لم يسجل نشاط"}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      <span>{format(customer.lastPurchase, 'PPP', { locale: ar })}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={customer.inactiveDays > 90 ? "destructive" : customer.inactiveDays > 30 ? "outline" : "secondary"}>
-                      {customer.inactiveDays} يوم
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{customer.loyaltyPoints} نقطة</TableCell>
-                  <TableCell>
-                    <StatusBadge days={customer.inactiveDays} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getInactivityBadge(inactivityDays)} className="flex items-center gap-1 w-fit">
+                        {getInactivityIcon(inactivityDays)}
+                        {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" title="الاتصال">
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                        {customer.email && (
+                          <Button variant="outline" size="icon" title="إرسال بريد إلكتروني">
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">عرض التفاصيل</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

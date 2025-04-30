@@ -55,6 +55,9 @@ export interface Customer {
   created_at?: string;
   governorate?: string;
   city?: string;
+  lastActive?: string; // Date of last activity
+  totalSpent?: number; // Total amount spent by customer
+  email?: string; // Optional email for customer
 }
 
 // Invoice Item Interface

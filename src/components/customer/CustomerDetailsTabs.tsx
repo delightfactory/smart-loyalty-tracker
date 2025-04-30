@@ -1,3 +1,4 @@
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CustomerPurchasesTable from './CustomerPurchasesTable';
 import CustomerPaymentHistory from './CustomerPaymentHistory';
@@ -43,7 +44,7 @@ const CustomerDetailsTabs = ({ customer, invoices }: CustomerDetailsTabsProps) =
       </TabsContent>
 
       <TabsContent value="analysis">
-        <CustomerAnalytics customerId={customer.id} />
+        <CustomerAnalytics customers={[customer]} />
       </TabsContent>
 
       <TabsContent value="recommendations">
