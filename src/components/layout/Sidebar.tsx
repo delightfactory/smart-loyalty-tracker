@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -18,6 +17,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const [hovering, setHovering] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const location = useLocation();
 
   // إغلاق الشريط الجانبي عند النقر خارجه على الأجهزة المحمولة
   useEffect(() => {
@@ -32,6 +32,14 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMobile, isOpen, onClose]);
+
+  // إغلاق الشريط الجانبي تلقائياً عند تغيير المسار على الشاشات الصغيرة
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // التحقق مما إذا كان الشريط الجانبي مفتوحًا بشكل فعال
   const isEffectivelyOpen = isOpen || hovering;
@@ -57,7 +65,6 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           )}>
             القائمة الرئيسية
           </h2>
-          
           {/* زر التبديل للأجهزة المحمولة والحواسيب */}
           <Button 
             variant="ghost" 
@@ -73,8 +80,10 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             )}
           </Button>
         </div>
-        
-        <SidebarContent isSidebarOpen={isEffectivelyOpen} />
+        {/* جعل القائمة الجانبية قابلة للتمرير العمودي دائماً */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <SidebarContent isSidebarOpen={isEffectivelyOpen} />
+        </div>
       </div>
     </aside>
   );

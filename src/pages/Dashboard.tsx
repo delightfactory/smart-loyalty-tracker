@@ -14,7 +14,7 @@ import PageContainer from '@/components/layout/PageContainer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { InvoiceStatus } from '@/lib/types';
 import { useQuery } from '@tanstack/react-query';
-import { productsService, customersService, invoicesService, paymentsService } from '@/services/database';
+import { productsService, customersService, invoicesService, paymentsService, redemptionsService } from '@/services/database';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import type { DateRange } from 'react-day-picker';
 import { ar, enGB } from 'date-fns/locale';
@@ -37,6 +37,7 @@ import ChurnRiskTable from '@/components/dashboard/ChurnRiskTable';
 import BusinessTypeDistribution from '@/components/dashboard/BusinessTypeDistribution';
 import TopRedemptionCustomersTable from '@/components/dashboard/TopRedemptionCustomersTable';
 import ProductsDashboard from '@/components/dashboard/ProductsDashboard';
+import PointsSummary from '@/components/dashboard/PointsSummary';
 
 // Utility functions
 // 1. Filter data by date range
@@ -151,11 +152,25 @@ const Dashboard = () => {
     },
     enabled: isMounted
   });
-  
+
+  const { data: redemptionsData, isLoading: isRedemptionsLoading } = useQuery({
+    queryKey: ['redemptions'],
+    queryFn: async () => {
+      try {
+        return await redemptionsService.getAll();
+      } catch (error) {
+        console.error('Error fetching redemptions:', error);
+        return [];
+      }
+    },
+    enabled: isMounted
+  });
+
   const products = productsData || [];
   const customers = customersData || [];
   const invoices = invoicesData || [];
   const payments = paymentsData || [];
+  const redemptions = redemptionsData || [];
 
   // Handle time range change
   const handleTimeRangeChange = (value: TimeRangeType) => {
@@ -179,6 +194,7 @@ const Dashboard = () => {
   // Filter invoices based on time range
   const filteredInvoices = getFilteredData(invoices, 'date');
   const filteredPayments = getFilteredData(payments, 'date');
+  const filteredRedemptions = getFilteredData(redemptions, 'date');
 
   // Calculate monthly revenue data
   const getMonthlyRevenueData = () => {
@@ -286,10 +302,13 @@ const Dashboard = () => {
         totalPaid,
         totalOverdue,
         totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0),
-        totalPointsRedeemed: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsRedeemed || 0), 0)
+        totalPointsRedeemed: filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0)
       });
     }
-  }, [filteredInvoices, products, customers, isMounted]);
+  }, [filteredInvoices, products, customers, filteredRedemptions, isMounted]);
+
+  // Calculate total redeemed points from all filtered redemptions
+  const totalPointsRedeemed = filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0);
 
   // حل نهائي لمقارنة union type وتجنب خطأ TypeScript
   const isNotAll = timeRange !== 'all';
@@ -367,6 +386,12 @@ const Dashboard = () => {
         </div>
         <TabsContent value="overview">
           {/* ملخص النظام: بطاقات + رسوم بيانية عامة */}
+          <PointsSummary
+            totalEarned={summary.totalPointsIssued}
+            totalRedeemed={totalPointsRedeemed}
+            totalRemaining={summary.totalPointsIssued - totalPointsRedeemed}
+            loading={!isMounted || isRedemptionsLoading}
+          />
           <DashboardCards summary={summary} view="overview" formatCurrency={formatCurrency} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <InvoiceStatusChart />
