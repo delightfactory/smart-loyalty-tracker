@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
@@ -45,29 +44,16 @@ export function useCustomers() {
           description: `حدث خطأ أثناء جلب العميل: ${error.message}`,
           variant: 'destructive',
         });
-        return null;
+        throw error;
       }
     },
     enabled: !!id
   });
   
   const addCustomer = useMutation({
-    mutationFn: (customer: Omit<Customer, 'id'>) => {
-      console.log('Adding customer (before normalization):', customer);
-      
-      // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
-      const normalizedCustomer: Omit<Customer, 'id'> = {
-        ...customer,
-        currentPoints: Number(customer.currentPoints || 0),
-        pointsEarned: Number(customer.pointsEarned || 0),
-        pointsRedeemed: Number(customer.pointsRedeemed || 0),
-        classification: Number(customer.classification || 0),
-        level: Number(customer.level || 0),
-        creditBalance: Number(customer.creditBalance || 0)
-      };
-      
-      console.log('Adding customer (normalized):', normalizedCustomer);
-      return customersService.create(normalizedCustomer);
+    mutationFn: async (customerData: Omit<Customer, "id">) => {
+      console.log('Adding customer:', customerData);
+      return await customersService.create(customerData as Customer);
     },
     onSuccess: (data) => {
       console.log('Customer added successfully:', data);
@@ -88,22 +74,9 @@ export function useCustomers() {
   });
   
   const updateCustomer = useMutation({
-    mutationFn: (customer: Customer) => {
-      console.log('Updating customer (before normalization):', customer);
-      
-      // التأكد من أن جميع القيم العددية هي أرقام وليست سلاسل نصية
-      const normalizedCustomer: Customer = {
-        ...customer,
-        currentPoints: Number(customer.currentPoints || 0),
-        pointsEarned: Number(customer.pointsEarned || 0),
-        pointsRedeemed: Number(customer.pointsRedeemed || 0),
-        classification: Number(customer.classification || 0),
-        level: Number(customer.level || 0),
-        creditBalance: Number(customer.creditBalance || 0)
-      };
-      
-      console.log('Updating customer (normalized):', normalizedCustomer);
-      return customersService.update(normalizedCustomer);
+    mutationFn: async (customer: Customer) => {
+      console.log('Updating customer:', customer);
+      return await customersService.update(customer);
     },
     onSuccess: (data) => {
       console.log('Customer updated successfully:', data);
@@ -125,9 +98,9 @@ export function useCustomers() {
   });
   
   const deleteCustomer = useMutation({
-    mutationFn: (id: string) => {
+    mutationFn: async (id: string) => {
       console.log('Deleting customer:', id);
-      return customersService.delete(id);
+      return await customersService.delete(id);
     },
     onSuccess: (_, variables) => {
       console.log('Customer deleted successfully:', variables);

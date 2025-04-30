@@ -1,108 +1,122 @@
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { customersService, invoicesService, productsService } from '@/services/database';
-import { ProductCategory, Customer, Invoice, Product } from '@/lib/types';
-import { useEffect, useState } from 'react';
-import { formatNumberEn } from '@/lib/formatters';
 
-interface CategoryDiversityTableProps {
-  customers?: Customer[];
-  invoices?: Invoice[];
-  products?: Product[];
-  loading?: boolean;
-}
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Customer, Invoice, Product, ProductCategory } from "@/lib/types";
+import { formatAmountEn, formatNumberEn } from "@/lib/formatters";
 
-function getCustomerCategoryCounts(customers: Customer[], invoices: Invoice[], products: Product[]) {
-  // Map productId to category
-  const productCategoryMap: Record<string, ProductCategory> = {};
-  products.forEach((p) => {
-    productCategoryMap[p.id] = p.category;
-  });
-  return customers.map((customer) => {
-    const customerInvoices = invoices.filter((inv) => inv.customerId === customer.id);
-    const categories = new Set<ProductCategory>();
-    customerInvoices.forEach((inv) => {
-      inv.items.forEach((item) => {
-        const cat = productCategoryMap[item.productId];
-        if (cat) categories.add(cat);
-      });
-    });
-    return {
-      id: customer.id,
-      name: customer.name,
-      businessType: customer.businessType,
-      categoryCount: categories.size,
-      categories: Array.from(categories)
+export default function CategoryDiversityTable({
+  customers,
+  invoices,
+  products,
+}: {
+  customers: Customer[];
+  invoices: Invoice[];
+  products: Product[];
+}) {
+  // Create a map of product categories to track their stats
+  const categoryStats: Record<string, {
+    category: ProductCategory;
+    productCount: number;
+    customerCount: number;
+    totalRevenue: number;
+  }> = {};
+  
+  // Initialize categories
+  Object.values(ProductCategory).forEach(category => {
+    categoryStats[category] = {
+      category: category as ProductCategory,
+      productCount: 0,
+      customerCount: 0,
+      totalRevenue: 0
     };
   });
-}
-
-const CategoryDiversityTable = (props: CategoryDiversityTableProps) => {
-  const [isMounted, setIsMounted] = useState(false);
-  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => await customersService.getAll(),
-    enabled: isMounted && !props.customers,
+  
+  // Count products by category
+  products.forEach(product => {
+    if (product.category && categoryStats[product.category]) {
+      categoryStats[product.category].productCount += 1;
+    }
   });
-  const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: async () => await invoicesService.getAll(),
-    enabled: isMounted && !props.invoices,
+  
+  // Create a set to track unique customers per category
+  const categoryCustomers: Record<string, Set<string>> = {};
+  Object.values(ProductCategory).forEach(category => {
+    categoryCustomers[category] = new Set();
   });
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => await productsService.getAll(),
-    enabled: isMounted && !props.products,
+  
+  // Process invoices to get customer diversity and revenue
+  invoices.forEach(invoice => {
+    if (!invoice.items) return;
+    
+    const categoriesSeen = new Set<string>();
+    
+    invoice.items.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product && product.category) {
+        // Track revenue
+        if (categoryStats[product.category]) {
+          categoryStats[product.category].totalRevenue += item.totalPrice;
+          categoriesSeen.add(product.category);
+        }
+      }
+    });
+    
+    // Add customer to each category they purchased from
+    if (invoice.customerId) {
+      categoriesSeen.forEach(category => {
+        if (categoryCustomers[category]) {
+          categoryCustomers[category].add(invoice.customerId);
+        }
+      });
+    }
   });
-  useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
-
-  const finalCustomers = props.customers || customers;
-  const finalInvoices = props.invoices || invoices;
-  const finalProducts = props.products || products;
-  const loading = props.loading || loadingCustomers || loadingInvoices || loadingProducts;
-
-  const customerCategoryCounts = getCustomerCategoryCounts(finalCustomers, finalInvoices, finalProducts);
+  
+  // Update customer counts
+  Object.entries(categoryCustomers).forEach(([category, customerSet]) => {
+    if (categoryStats[category]) {
+      categoryStats[category].customerCount = customerSet.size;
+    }
+  });
+  
+  // Convert to array and sort by revenue
+  const categoriesArray = Object.values(categoryStats).sort(
+    (a, b) => b.totalRevenue - a.totalRevenue
+  );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>تنوع مشتريات العملاء حسب الفئات</CardTitle>
+        <CardTitle>تنوع الفئات</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2">#</th>
-                <th className="p-2">اسم العميل</th>
-                <th className="p-2">نوع النشاط</th>
-                <th className="p-2">عدد الفئات</th>
-                <th className="p-2">الفئات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} className="text-center">جارٍ التحميل...</td></tr>
-              ) : (
-                customerCategoryCounts.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-green-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-green-700">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold">{c.name}</td>
-                    <td className="p-2">{c.businessType}</td>
-                    <td className="p-2 text-blue-700 font-bold">{formatNumberEn(c.categoryCount)}</td>
-                    <td className="p-2">{c.categories.map((cat) => <span key={cat} className="inline-block bg-blue-100 rounded px-2 mx-1 text-xs text-blue-800 font-semibold">{cat}</span>)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>الفئة</TableHead>
+              <TableHead className="text-right">عدد المنتجات</TableHead>
+              <TableHead className="text-right">عدد العملاء</TableHead>
+              <TableHead className="text-right">الإيرادات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {categoriesArray.map((stat) => (
+              <TableRow key={stat.category}>
+                <TableCell className="font-medium">{stat.category}</TableCell>
+                <TableCell className="text-right">{formatNumberEn(stat.productCount)}</TableCell>
+                <TableCell className="text-right">{formatNumberEn(stat.customerCount)}</TableCell>
+                <TableCell className="text-right">{formatAmountEn(stat.totalRevenue)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
-};
-
-export default CategoryDiversityTable;
+}

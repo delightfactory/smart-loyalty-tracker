@@ -48,7 +48,11 @@ const Analytics = () => {
             </TabsList>
             
             <TabsContent value="products">
-              <ProductAnalytics products={products} invoices={invoices} isLoading={isLoading} />
+              <ProductAnalytics 
+                products={products} 
+                invoices={invoices} 
+                isLoading={isLoading} 
+              />
             </TabsContent>
             
             <TabsContent value="customers">

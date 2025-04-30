@@ -1,287 +1,222 @@
 
-import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from '@/hooks/useAuth';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LogIn } from "lucide-react";
-import { adminCredentials, ensureUserHasAdminRole } from '@/services/admin';
-import { UserRole } from '@/lib/auth-types';
-import { createDefaultAdmin } from '@/services/users';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import * as z from 'zod';
+import { usersService } from '@/services/users';
 import { supabase } from '@/integrations/supabase/client';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-interface CreateAdminAccountProps {
-  onSuccess?: () => void;
-}
+// Define the form schema
+const formSchema = z.object({
+  email: z.string().email({
+    message: 'يرجى إدخال بريد إلكتروني صالح',
+  }),
+  password: z.string().min(6, {
+    message: 'كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل',
+  }),
+  confirmPassword: z.string(),
+  fullName: z.string().min(1, {
+    message: 'يرجى إدخال الاسم الكامل',
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'كلمات المرور غير متطابقة',
+  path: ['confirmPassword'],
+});
 
-export const CreateAdminAccount: React.FC<CreateAdminAccountProps> = ({ onSuccess }) => {
-  const [email, setEmail] = useState(adminCredentials.email);
-  const [password, setPassword] = useState(adminCredentials.password);
-  const [fullName, setFullName] = useState(adminCredentials.fullName);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type FormValues = z.infer<typeof formSchema>;
+
+const CreateAdminAccount: React.FC = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { signIn, user } = useAuth();
   const navigate = useNavigate();
-  
-  // التحقق من وجود مستخدم مسؤول بالفعل
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        setIsCheckingAdmin(true);
-        
-        // التحقق من وجود مستخدمين لديهم دور المسؤول
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', UserRole.ADMIN);
-          
-        if (error) throw error;
-        
-        // إذا كان هناك مستخدم مسؤول موجود بالفعل
-        if (data && data.length > 0) {
-          console.log('Admin users exist:', data);
-          setSuccess(true);
-        }
-      } catch (err) {
-        console.error("Error checking if admin exists:", err);
-      } finally {
-        setIsCheckingAdmin(false);
-      }
-    };
-    
-    checkAdmin();
-  }, []);
-  
-  // إذا كان المستخدم مسجل الدخول حالياً، التحقق مما إذا كان لديه صلاحيات المسؤول
-  useEffect(() => {
-    if (user?.id) {
-      const checkCurrentUserAdmin = async () => {
-        try {
-          await ensureUserHasAdminRole(user.id);
-          setSuccess(true);
-        } catch (err) {
-          console.error("Error checking current user admin status:", err);
-        }
-      };
-      
-      checkCurrentUserAdmin();
-    }
-  }, [user]);
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // استخدام وظيفة إنشاء المدير الافتراضي
-      const result = await createDefaultAdmin(email, password, fullName);
-      
-      setSuccess(true);
-      toast({
-        title: "تم إنشاء حساب المسؤول بنجاح",
-        description: "يمكنك الآن تسجيل الدخول باستخدام بيانات الحساب.",
-      });
-      
-      onSuccess?.();
-    } catch (error: any) {
-      setError(error.message || "حدث خطأ أثناء إنشاء حساب المسؤول");
-      toast({
-        variant: "destructive",
-        title: "فشل إنشاء حساب المسؤول",
-        description: error.message || "حدث خطأ أثناء إنشاء حساب المسؤول. يرجى المحاولة مرة أخرى.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleLoginWithCredentials = async () => {
-    setIsLoading(true);
-    setError(null);
-    
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+      fullName: '',
+    },
+  });
+
+  const onSubmit = async (values: FormValues) => {
     try {
-      console.log("تسجيل الدخول باستخدام بيانات الاعتماد:", email, password);
-      await signIn(email, password);
+      setLoading(true);
       
-      // التحقق من صلاحيات المستخدم والتأكد من أن لديه دور المسؤول
-      if (user?.id) {
-        await ensureUserHasAdminRole(user.id);
-      }
-      
-      toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: "سيتم توجيهك إلى لوحة التحكم",
+      // Create the admin user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+          },
+        },
       });
       
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
-    } catch (error: any) {
-      setError(error.message || "حدث خطأ أثناء تسجيل الدخول");
-      console.error("خطأ في تسجيل الدخول:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const handleFixAdminPermissions = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // البحث عن مستخدم بالبريد الإلكتروني المحدد
-      const { data, error: userError } = await supabase.auth.admin.listUsers();
+      if (signUpError) throw signUpError;
       
-      if (userError) throw userError;
-      
-      // تصحيح القضية: تعريف نوع البيانات وفحص وجودها
-      if (data && data.users && data.users.length > 0) {
-        // يجب التصريح بنوع البيانات بشكل صحيح
-        const adminUser = data.users.find(user => {
-          return typeof user.email === 'string' && user.email === email;
-        });
+      if (signUpData && signUpData.user) {
+        // Assign admin role to the user
+        const adminRoleResult = await usersService.assignAdminRole(signUpData.user.id);
         
-        if (!adminUser) {
-          throw new Error("لم يتم العثور على مستخدم بهذا البريد الإلكتروني");
+        if (!adminRoleResult.success) {
+          throw new Error(adminRoleResult.message || 'فشل في إضافة دور المدير');
         }
-        
-        // التأكد من أن المستخدم لديه دور المسؤول
-        await ensureUserHasAdminRole(adminUser.id);
         
         toast({
-          title: "تم إصلاح صلاحيات المسؤول بنجاح",
-          description: "يمكنك الآن تسجيل الدخول بصلاحيات كاملة",
+          title: "تم إنشاء حساب المدير بنجاح",
+          description: "يمكنك الآن تسجيل الدخول باستخدام هذه البيانات",
         });
-        
-        setSuccess(true);
-      } else {
-        throw new Error("لم يتم العثور على أي مستخدمين");
+
+        // Check if email confirmation is required
+        if (signUpData && signUpData.user && signUpData.user.email) {
+          toast({
+            title: "تحقق من بريدك الإلكتروني",
+            description: `تم إرسال رابط التأكيد إلى ${signUpData.user.email}`,
+          });
+        }
+
+        navigate('/auth');
       }
     } catch (error: any) {
-      setError(error.message || "حدث خطأ أثناء إصلاح صلاحيات المسؤول");
-      console.error("خطأ في إصلاح صلاحيات المسؤول:", error);
+      console.error('Error creating admin account:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في إنشاء الحساب",
+        description: error.message || "حدث خطأ أثناء إنشاء حساب المدير. يرجى المحاولة مرة أخرى.",
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
-  if (isCheckingAdmin) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex justify-center items-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-            <span>جاري التحقق من وجود مستخدم مسؤول...</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
+  };
+
   return (
-    <Card>
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>إنشاء حساب مسؤول جديد</CardTitle>
+        <CardTitle>إنشاء حساب المدير</CardTitle>
         <CardDescription>
-          أدخل بيانات المستخدم لإنشاء حساب مسؤول جديد.
+          أنشئ حساب المدير الأول للنظام. سيتم منح هذا الحساب صلاحيات كاملة.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4">
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>خطأ</AlertTitle>
-            <AlertDescription>
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
-        {success && (
-          <Alert>
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertTitle>تم إنشاء الحساب!</AlertTitle>
-            <AlertDescription>
-              تم إنشاء حساب المسؤول بنجاح. يمكنك الآن تسجيل الدخول باستخدام بيانات الحساب.
-            </AlertDescription>
-          </Alert>
-        )}
 
-        <div className="rounded-md bg-secondary p-4">
-          <div className="text-sm font-semibold mb-2">بيانات الدخول الافتراضية:</div>
-          <div className="text-sm"><span className="font-semibold">البريد الإلكتروني:</span> {adminCredentials.email}</div>
-          <div className="text-sm"><span className="font-semibold">كلمة المرور:</span> {adminCredentials.password}</div>
-          <div className="text-sm"><span className="font-semibold">الاسم:</span> {adminCredentials.fullName}</div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={handleLoginWithCredentials}
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-              تسجيل الدخول بهذا الحساب
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>الاسم الكامل</FormLabel>
+                  <FormControl>
+                    <Input placeholder="أدخل الاسم الكامل" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>البريد الإلكتروني</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="أدخل البريد الإلكتروني" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>كلمة المرور</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="أدخل كلمة المرور"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute inset-y-0 left-0 px-3 flex items-center"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>تأكيد كلمة المرور</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="أعد إدخال كلمة المرور"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleConfirmPasswordVisibility}
+                        className="absolute inset-y-0 left-0 px-3 flex items-center"
+                      >
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => navigate('/auth')}>
+              العودة للخلف
             </Button>
-            
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleFixAdminPermissions}
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              إصلاح صلاحيات المسؤول
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              إنشاء الحساب
             </Button>
-          </div>
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="email">البريد الإلكتروني</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="admin@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="password">كلمة المرور</Label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="fullName">الاسم الكامل</Label>
-          <Input
-            id="fullName"
-            type="text"
-            placeholder="اسم المسؤول"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button disabled={isLoading} onClick={handleSubmit} className="w-full">
-          {isLoading && (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          )}
-          إنشاء حساب
-          <ArrowRight className="mr-2 h-4 w-4" />
-        </Button>
-      </CardFooter>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 };
+
+export default CreateAdminAccount;

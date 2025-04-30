@@ -3,9 +3,7 @@ import { useState } from 'react';
 import { 
   ChartContainer, 
   ChartTooltip, 
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent
+  ChartLegend
 } from '@/components/ui/chart';
 import { 
   BarChart, 
@@ -51,88 +49,46 @@ import {
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { products, invoices, getProductById } from '@/lib/data';
-import { ProductCategory } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ProductCategory, Product, Invoice } from '@/lib/types';
+import { formatNumberEn, formatAmountEn } from '@/lib/formatters';
 
-const ProductAnalytics = () => {
+interface ProductAnalyticsProps {
+  products: Product[];
+  invoices: Invoice[];
+  isLoading: boolean;
+}
+
+const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: ProductAnalyticsProps) => {
   const [timeRange, setTimeRange] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  
+  if (isLoading) {
+    return <AnalyticsLoadingState />;
+  }
   
   // Filter products by selected category
   const filteredProducts = selectedCategory === 'all' 
     ? products 
     : products.filter(product => product.category === selectedCategory);
   
-  // Get product sales data
-  const productSalesData = filteredProducts.map(product => {
-    const productSales = invoices.reduce((total, invoice) => {
-      const item = invoice.items.find(item => item.productId === product.id);
-      return total + (item ? item.quantity : 0);
-    }, 0);
-    
-    const revenue = invoices.reduce((total, invoice) => {
-      const item = invoice.items.find(item => item.productId === product.id);
-      return total + (item ? item.totalPrice : 0);
-    }, 0);
-    
-    return {
-      id: product.id,
-      name: product.name,
-      sales: productSales,
-      revenue: revenue,
-      price: product.price,
-      category: product.category,
-      pointsEarned: product.pointsEarned,
-      brand: product.brand
-    };
-  }).sort((a, b) => b.sales - a.sales);
+  // Filter invoices based on time range
+  const filteredInvoices = filterInvoicesByTimeRange(invoices, timeRange);
+  
+  // Get product sales data from real DB data
+  const productSalesData = calculateProductSalesData(filteredProducts, filteredInvoices);
   
   // Top 5 products by sales
-  const topProducts = productSalesData.slice(0, 5);
+  const topProducts = [...productSalesData].sort((a, b) => b.sales - a.sales).slice(0, 5);
   
   // Top 5 products by revenue
   const topRevenueProducts = [...productSalesData].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   
   // Category distribution
-  const categoryData = Object.values(ProductCategory).map(category => {
-    const categoryProducts = products.filter(product => product.category === category);
-    const categorySales = productSalesData
-      .filter(product => categoryProducts.some(p => p.id === product.id))
-      .reduce((sum, product) => sum + product.sales, 0);
-    
-    const categoryRevenue = productSalesData
-      .filter(product => categoryProducts.some(p => p.id === product.id))
-      .reduce((sum, product) => sum + product.revenue, 0);
-    
-    return {
-      name: category,
-      sales: categorySales,
-      revenue: categoryRevenue,
-      products: categoryProducts.length
-    };
-  });
+  const categoryData = calculateCategoryData(products, productSalesData);
   
   // Brand performance data
-  const brandData = productSalesData.reduce((acc, product) => {
-    if (!acc[product.brand]) {
-      acc[product.brand] = {
-        name: product.brand,
-        sales: 0,
-        revenue: 0,
-        products: 0
-      };
-    }
-    
-    acc[product.brand].sales += product.sales;
-    acc[product.brand].revenue += product.revenue;
-    acc[product.brand].products += 1;
-    
-    return acc;
-  }, {} as Record<string, { name: string, sales: number, revenue: number, products: number }>);
-  
-  const brandPerformanceData = Object.values(brandData)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
+  const brandPerformanceData = calculateBrandPerformanceData(productSalesData);
   
   // Price vs. Sales correlation data
   const priceVsSalesData = productSalesData.map(product => ({
@@ -145,36 +101,10 @@ const ProductAnalytics = () => {
   }));
   
   // Radar chart data for category analysis
-  const categoryRadarData = Object.values(ProductCategory).map(category => {
-    const categoryProducts = products.filter(product => product.category === category);
-    const avgPrice = categoryProducts.reduce((sum, product) => sum + product.price, 0) / categoryProducts.length;
-    const totalSales = productSalesData
-      .filter(product => categoryProducts.some(p => p.id === product.id))
-      .reduce((sum, product) => sum + product.sales, 0);
-    const totalRevenue = productSalesData
-      .filter(product => categoryProducts.some(p => p.id === product.id))
-      .reduce((sum, product) => sum + product.revenue, 0);
-    const avgPoints = categoryProducts.reduce((sum, product) => sum + product.pointsEarned, 0) / categoryProducts.length;
-    
-    return {
-      category,
-      price: Math.min(100, avgPrice), // Scale for radar chart
-      sales: Math.min(100, totalSales / 5), // Scale for radar chart
-      revenue: Math.min(100, totalRevenue / 500), // Scale for radar chart
-      points: Math.min(100, avgPoints * 2) // Scale for radar chart
-    };
-  });
+  const categoryRadarData = calculateCategoryRadarData(products, productSalesData);
   
-  // Monthly sales trend (mock data for visualization)
-  const monthlyTrendData = [
-    { name: 'يناير', sales: 65, revenue: 9800 },
-    { name: 'فبراير', sales: 59, revenue: 8900 },
-    { name: 'مارس', sales: 80, revenue: 12000 },
-    { name: 'أبريل', sales: 81, revenue: 12200 },
-    { name: 'مايو', sales: 56, revenue: 8400 },
-    { name: 'يونيو', sales: 55, revenue: 8300 },
-    { name: 'يوليو', sales: 40, revenue: 6000 }
-  ];
+  // Monthly sales trend from real invoice data
+  const monthlyTrendData = calculateMonthlyTrendData(filteredInvoices, products);
   
   // Calculate total revenue
   const totalRevenue = productSalesData.reduce((sum, product) => sum + product.revenue, 0);
@@ -228,10 +158,10 @@ const ProductAnalytics = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي المبيعات</CardTitle>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold">{totalSales} وحدة</div>
+              <div className="text-2xl font-bold">{formatNumberEn(totalSales)} وحدة</div>
               <Badge variant="outline" className="text-green-500">
                 <TrendingUp className="h-3.5 w-3.5 mr-1" />
-                +15%
+                {calculateGrowthRate(invoices, 'sales')}
               </Badge>
             </div>
           </CardHeader>
@@ -244,10 +174,10 @@ const ProductAnalytics = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي الإيرادات</CardTitle>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold">{totalRevenue.toLocaleString('ar-EG')} ج.م</div>
+              <div className="text-2xl font-bold">{formatAmountEn(totalRevenue)} ج.م</div>
               <Badge variant="outline" className="text-green-500">
                 <TrendingUp className="h-3.5 w-3.5 mr-1" />
-                +18%
+                {calculateGrowthRate(invoices, 'revenue')}
               </Badge>
             </div>
           </CardHeader>
@@ -261,11 +191,11 @@ const ProductAnalytics = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">متوسط قيمة المنتج</CardTitle>
             <div className="flex items-baseline justify-between">
               <div className="text-2xl font-bold">
-                {(totalRevenue / totalSales).toFixed(1)} ج.م
+                {totalSales > 0 ? formatAmountEn(totalRevenue / totalSales) : '0'} ج.م
               </div>
               <Badge variant="outline" className="text-amber-500">
                 <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
-                +3%
+                {calculateAverageGrowth(invoices, products)}
               </Badge>
             </div>
           </CardHeader>
@@ -306,47 +236,57 @@ const ProductAnalytics = () => {
                 <CardDescription>ترتيب المنتجات حسب عدد الوحدات المباعة</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ChartContainer
-                  config={{
-                    sales: {
-                      label: "المبيعات",
-                      color: "#8B5CF6"
-                    }
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topProducts} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis type="category" dataKey="name" width={130} />
-                      <ChartTooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="font-medium">المنتج:</div>
-                                  <div>{payload[0].payload.name}</div>
-                                  <div className="font-medium">المبيعات:</div>
-                                  <div>{payload[0].value} وحدة</div>
-                                  <div className="font-medium">الإيرادات:</div>
-                                  <div>{payload[0].payload.revenue.toLocaleString('ar-EG')} ج.م</div>
+                {topProducts.length > 0 ? (
+                  <ChartContainer
+                    config={{
+                      sales: {
+                        label: "المبيعات",
+                        color: "#8B5CF6"
+                      }
+                    }}
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={topProducts} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis type="category" dataKey="name" width={130} />
+                        <ChartTooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="font-medium">المنتج:</div>
+                                    <div>{payload[0].payload.name}</div>
+                                    <div className="font-medium">المبيعات:</div>
+                                    <div>{payload[0].value} وحدة</div>
+                                    <div className="font-medium">الإيرادات:</div>
+                                    <div>{formatAmountEn(payload[0].payload.revenue)} ج.م</div>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="sales" fill="#8B5CF6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="sales" fill="#8B5CF6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات متاحة</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-purple-50 text-purple-700 p-3 rounded-lg w-full">
                   <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">تمثل هذه المنتجات 60% من إجمالي المبيعات. يُنصح بضمان توفرها دائمًا.</p>
+                  <p className="text-sm">
+                    {topProducts.length > 0 
+                      ? `تمثل هذه المنتجات نسبة كبيرة من إجمالي المبيعات. يُنصح بضمان توفرها دائمًا.`
+                      : 'قم بإضافة منتجات وفواتير لرؤية التحليلات.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -360,24 +300,34 @@ const ProductAnalytics = () => {
                 <CardDescription>ترتيب المنتجات حسب إجمالي قيمة المبيعات</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topRevenueProducts}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value: number) => `${value.toLocaleString('ar-EG')} ج.م`}
-                      labelFormatter={(label) => `المنتج: ${label}`}
-                    />
-                    <Legend />
-                    <Bar name="الإيرادات" dataKey="revenue" fill="#10B981" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {topRevenueProducts.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topRevenueProducts}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value: number) => `${formatAmountEn(value)} ج.م`}
+                        labelFormatter={(label) => `المنتج: ${label}`}
+                      />
+                      <Legend />
+                      <Bar name="الإيرادات" dataKey="revenue" fill="#10B981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات متاحة</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-green-50 text-green-700 p-3 rounded-lg w-full">
                   <TrendingUp className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">تمثل هذه المنتجات 75% من إجمالي الإيرادات. تركيز جهود التسويق عليها سيزيد الأرباح.</p>
+                  <p className="text-sm">
+                    {topRevenueProducts.length > 0 
+                      ? 'تمثل هذه المنتجات نسبة كبيرة من إجمالي الإيرادات. تركيز جهود التسويق عليها سيزيد الأرباح.'
+                      : 'قم بإضافة منتجات وفواتير لرؤية التحليلات.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -391,23 +341,33 @@ const ProductAnalytics = () => {
                 <CardDescription>تطور المبيعات والإيرادات على مر الأشهر</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis yAxisId="left" orientation="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip />
-                    <Legend />
-                    <Line yAxisId="left" type="monotone" dataKey="sales" name="المبيعات (وحدة)" stroke="#8884d8" activeDot={{ r: 8 }} />
-                    <Line yAxisId="right" type="monotone" dataKey="revenue" name="الإيرادات (ج.م)" stroke="#82ca9d" />
-                  </LineChart>
-                </ResponsiveContainer>
+                {monthlyTrendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis yAxisId="left" orientation="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Line yAxisId="left" type="monotone" dataKey="sales" name="المبيعات (وحدة)" stroke="#8884d8" activeDot={{ r: 8 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="revenue" name="الإيرادات (ج.م)" stroke="#82ca9d" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات كافية لعرض الاتجاهات الشهرية</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-blue-50 text-blue-700 p-3 rounded-lg w-full">
                   <Clock className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">لوحظ ارتفاع في المبيعات خلال شهري مارس وأبريل، ويُنصح بزيادة المخزون قبل هذه الفترة.</p>
+                  <p className="text-sm">
+                    {monthlyTrendData.length > 0 
+                      ? getMonthlyTrendInsight(monthlyTrendData)
+                      : 'أضف المزيد من الفواتير بتواريخ مختلفة لرؤية تحليل الاتجاهات الشهرية.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -419,40 +379,50 @@ const ProductAnalytics = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <PieChart className="h-5 w-5 mr-2" />
+                  <PieChartIcon className="h-5 w-5 mr-2" />
                   توزيع المبيعات حسب الأقسام
                 </CardTitle>
                 <CardDescription>نسبة مبيعات كل قسم من أقسام المنتجات</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="sales"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => `${value} وحدة`}
-                      labelFormatter={(label) => `القسم: ${label}`}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                {categoryData.length > 0 && categoryData.some(c => c.sales > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="sales"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => `${value} وحدة`}
+                        labelFormatter={(label) => `القسم: ${label}`}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات مبيعات كافية لعرض التوزيع</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-purple-50 text-purple-700 p-3 rounded-lg w-full">
                   <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">قسم {Object.values(ProductCategory)[0]} هو الأكثر مبيعًا، بينما قسم {Object.values(ProductCategory)[4]} يحتاج تعزيز.</p>
+                  <p className="text-sm">
+                    {categoryData.length > 0 && categoryData.some(c => c.sales > 0)
+                      ? getCategoryDistributionInsight(categoryData)
+                      : 'قم بإضافة فواتير تحتوي على منتجات من فئات مختلفة لرؤية تحليلات توزيع المبيعات.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -466,24 +436,34 @@ const ProductAnalytics = () => {
                 <CardDescription>مقارنة بين أداء أقسام المنتجات المختلفة</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart outerRadius={80} data={categoryRadarData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="category" />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                    <Radar name="السعر" dataKey="price" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                    <Radar name="المبيعات" dataKey="sales" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
-                    <Radar name="الإيرادات" dataKey="revenue" stroke="#ffc658" fill="#ffc658" fillOpacity={0.6} />
-                    <Radar name="النقاط" dataKey="points" stroke="#ff8042" fill="#ff8042" fillOpacity={0.6} />
-                    <Legend />
-                    <Tooltip />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {categoryRadarData.length > 0 && categoryRadarData.some(c => c.sales > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart outerRadius={80} data={categoryRadarData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="category" />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                      <Radar name="السعر" dataKey="price" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Radar name="المبيعات" dataKey="sales" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
+                      <Radar name="الإيرادات" dataKey="revenue" stroke="#ffc658" fill="#ffc658" fillOpacity={0.6} />
+                      <Radar name="النقاط" dataKey="points" stroke="#ff8042" fill="#ff8042" fillOpacity={0.6} />
+                      <Legend />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات كافية لعرض التحليل متعدد الأبعاد</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-amber-50 text-amber-700 p-3 rounded-lg w-full">
                   <AlertCircle className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">منتجات العناية بالمحرك تتمتع بمبيعات عالية وسعر عالٍ، بينما منتجات العناية بالتابلوه عالية في النقاط.</p>
+                  <p className="text-sm">
+                    {categoryRadarData.length > 0 && categoryRadarData.some(c => c.sales > 0)
+                      ? getCategoryMultiDimensionalAnalysisInsight(categoryRadarData)
+                      : 'أضف المزيد من المنتجات والفواتير لرؤية التحليل متعدد الأبعاد للأقسام.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -497,30 +477,40 @@ const ProductAnalytics = () => {
                 <CardDescription>مقارنة بين العلامات التجارية المختلفة</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={brandPerformanceData}
-                    margin={{
-                      top: 20,
-                      right: 30,
-                      left: 20,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar name="المبيعات" dataKey="sales" stackId="a" fill="#8884d8" />
-                    <Bar name="المنتجات" dataKey="products" stackId="a" fill="#82ca9d" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {brandPerformanceData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={brandPerformanceData}
+                      margin={{
+                        top: 20,
+                        right: 30,
+                        left: 20,
+                        bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar name="المبيعات" dataKey="sales" stackId="a" fill="#8884d8" />
+                      <Bar name="المنتجات" dataKey="products" stackId="a" fill="#82ca9d" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات كافية لعرض أداء العلامات التجارية</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-green-50 text-green-700 p-3 rounded-lg w-full">
                   <Star className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">العلامة التجارية "{brandPerformanceData[0]?.name}" هي الأكثر مبيعًا ويمكن التفاوض على شروط أفضل معها.</p>
+                  <p className="text-sm">
+                    {brandPerformanceData.length > 0
+                      ? getBrandPerformanceInsight(brandPerformanceData)
+                      : 'أضف المزيد من المنتجات ذات علامات تجارية مختلفة وفواتير لرؤية تحليل أداء العلامات التجارية.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -534,29 +524,39 @@ const ProductAnalytics = () => {
                 <CardDescription>تحليل تأثير سعر المنتج على المبيعات</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart
-                    margin={{
-                      top: 20,
-                      right: 20,
-                      bottom: 20,
-                      left: 20,
-                    }}
-                  >
-                    <CartesianGrid />
-                    <XAxis type="number" dataKey="price" name="السعر" unit=" ج.م" />
-                    <YAxis type="number" dataKey="sales" name="المبيعات" unit=" وحدة" />
-                    <ZAxis type="number" dataKey="z" range={[40, 160]} />
-                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                    <Legend />
-                    <Scatter name="المنتجات" data={priceVsSalesData} fill="#8884d8" />
-                  </ScatterChart>
-                </ResponsiveContainer>
+                {priceVsSalesData.length > 0 && priceVsSalesData.some(item => item.sales > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart
+                      margin={{
+                        top: 20,
+                        right: 20,
+                        bottom: 20,
+                        left: 20,
+                      }}
+                    >
+                      <CartesianGrid />
+                      <XAxis type="number" dataKey="price" name="السعر" unit=" ج.م" />
+                      <YAxis type="number" dataKey="sales" name="المبيعات" unit=" وحدة" />
+                      <ZAxis type="number" dataKey="z" range={[40, 160]} />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                      <Legend />
+                      <Scatter name="المنتجات" data={priceVsSalesData} fill="#8884d8" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات مبيعات كافية لعرض العلاقة بين السعر والمبيعات</p>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <div className="flex items-center bg-blue-50 text-blue-700 p-3 rounded-lg w-full">
                   <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                  <p className="text-sm">المنتجات ذات السعر المتوسط (50-100 ج.م) تحقق أعلى معدلات مبيعات. يُنصح بمراجعة تسعير المنتجات الأخرى.</p>
+                  <p className="text-sm">
+                    {priceVsSalesData.length > 0 && priceVsSalesData.some(item => item.sales > 0)
+                      ? getPriceVsSalesInsight(priceVsSalesData)
+                      : 'أضف المزيد من الفواتير لمنتجات بأسعار متنوعة لرؤية تحليل العلاقة بين السعر والمبيعات.'}
+                  </p>
                 </div>
               </CardFooter>
             </Card>
@@ -583,7 +583,7 @@ const ProductAnalytics = () => {
                           <p className="text-sm text-muted-foreground">{product.category}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium">{product.revenue.toLocaleString('ar-EG')} ج.م</p>
+                          <p className="font-medium">{formatAmountEn(product.revenue)} ج.م</p>
                           <p className="text-sm text-muted-foreground">{product.sales} وحدة</p>
                         </div>
                       </div>
@@ -591,11 +591,11 @@ const ProductAnalytics = () => {
                         <div className="flex justify-between text-sm">
                           <span>المبيعات</span>
                           <span className="font-medium">
-                            {Math.round((product.sales / topProducts[0].sales) * 100)}%
+                            {topProducts[0].sales > 0 ? Math.round((product.sales / topProducts[0].sales) * 100) : 0}%
                           </span>
                         </div>
                         <Progress 
-                          value={Math.round((product.sales / topProducts[0].sales) * 100)} 
+                          value={topProducts[0].sales > 0 ? Math.round((product.sales / topProducts[0].sales) * 100) : 0} 
                           className="h-2"
                           indicatorClassName="bg-blue-500" 
                         />
@@ -604,11 +604,11 @@ const ProductAnalytics = () => {
                         <div className="flex justify-between text-sm">
                           <span>الإيرادات</span>
                           <span className="font-medium">
-                            {Math.round((product.revenue / topRevenueProducts[0].revenue) * 100)}%
+                            {topRevenueProducts[0]?.revenue > 0 ? Math.round((product.revenue / topRevenueProducts[0].revenue) * 100) : 0}%
                           </span>
                         </div>
                         <Progress 
-                          value={Math.round((product.revenue / topRevenueProducts[0].revenue) * 100)} 
+                          value={topRevenueProducts[0]?.revenue > 0 ? Math.round((product.revenue / topRevenueProducts[0].revenue) * 100) : 0} 
                           className="h-2"
                           indicatorClassName="bg-green-500" 
                         />
@@ -628,6 +628,12 @@ const ProductAnalytics = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  {topProducts.length === 0 && (
+                    <div className="p-6 text-center">
+                      <p className="text-muted-foreground">لا توجد بيانات أداء متاحة، أضف منتجات وفواتير لرؤية تحليل الأداء.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4">
@@ -655,24 +661,34 @@ const ProductAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {["زيت محرك سوبر بريميوم", "ملمع إطارات", "منظف تابلوه"].map((productName, index) => (
+                    {getGrowingProducts(products, invoices).map((product, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <Badge className="mr-2 bg-green-100 text-green-800">
                             <ArrowUpRight className="h-3 w-3 mr-1" />
-                            {30 - index * 5}%
+                            {product.growthRate}%
                           </Badge>
-                          <span>{productName}</span>
+                          <span>{product.name}</span>
                         </div>
-                        <span className="text-sm font-medium">{150 - index * 25} وحدة</span>
+                        <span className="text-sm font-medium">{product.sales} وحدة</span>
                       </div>
                     ))}
+                    
+                    {getGrowingProducts(products, invoices).length === 0 && (
+                      <div className="p-4 text-center">
+                        <p className="text-muted-foreground">لا توجد بيانات كافية لتحديد المنتجات الأسرع نموًا</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                   <div className="flex items-center bg-green-50 text-green-700 p-3 rounded-lg w-full">
                     <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                    <p className="text-sm">هذه المنتجات تظهر نموًا سريعًا ويجب زيادة المخزون منها.</p>
+                    <p className="text-sm">
+                      {getGrowingProducts(products, invoices).length > 0
+                        ? 'هذه المنتجات تظهر نموًا سريعًا ويجب زيادة المخزون منها.'
+                        : 'أضف المزيد من الفواتير بتواريخ مختلفة لتحليل نمو المنتجات.'}
+                    </p>
                   </div>
                 </CardFooter>
               </Card>
@@ -687,23 +703,33 @@ const ProductAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {["معطر داخلي فاخر", "شامبو سيارات ممتاز", "فلتر زيت"].map((productName, index) => (
+                    {getLowSellingProducts(products, invoices).map((product, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <Badge variant="outline" className="mr-2 border-red-200 text-red-800">
-                            فقط {10 + index * 5} وحدة
+                            فقط {product.sales} وحدة
                           </Badge>
-                          <span>{productName}</span>
+                          <span>{product.name}</span>
                         </div>
-                        <span className="text-sm font-medium">{(10 + index * 5) * 45} ج.م</span>
+                        <span className="text-sm font-medium">{formatAmountEn(product.revenue)} ج.م</span>
                       </div>
                     ))}
+                    
+                    {getLowSellingProducts(products, invoices).length === 0 && (
+                      <div className="p-4 text-center">
+                        <p className="text-muted-foreground">لا توجد منتجات منخفضة المبيعات لعرضها</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                   <div className="flex items-center bg-red-50 text-red-700 p-3 rounded-lg w-full">
                     <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                    <p className="text-sm">هذه المنتجات تحتاج لعروض ترويجية وتسويق أفضل لتعزيز مبيعاتها.</p>
+                    <p className="text-sm">
+                      {getLowSellingProducts(products, invoices).length > 0
+                        ? 'هذه المنتجات تحتاج لعروض ترويجية وتسويق أفضل لتعزيز مبيعاتها.'
+                        : 'أضف المزيد من المنتجات والفواتير لتحليل المنتجات منخفضة المبيعات.'}
+                    </p>
                   </div>
                 </CardFooter>
               </Card>
@@ -718,24 +744,34 @@ const ProductAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {["زيت محرك سوبر بريميوم", "معطر داخلي فاخر", "ملمع إطارات"].map((productName, index) => (
+                    {getHighPointsProducts(products).map((product, index) => (
                       <div key={index} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <Badge className="mr-2 bg-purple-100 text-purple-800">
                             <Star className="h-3 w-3 mr-1" />
                             ممتاز
                           </Badge>
-                          <span>{productName}</span>
+                          <span>{product.name}</span>
                         </div>
-                        <span className="text-sm font-medium">{75 - index * 15} نقطة</span>
+                        <span className="text-sm font-medium">{product.pointsEarned} نقطة</span>
                       </div>
                     ))}
+                    
+                    {getHighPointsProducts(products).length === 0 && (
+                      <div className="p-4 text-center">
+                        <p className="text-muted-foreground">لا توجد منتجات ذات نقاط ولاء عالية</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                   <div className="flex items-center bg-purple-50 text-purple-700 p-3 rounded-lg w-full">
                     <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
-                    <p className="text-sm">هذه المنتجات تمنح نقاط ولاء عالية وتساهم في تحسين معدل احتفاظ العملاء.</p>
+                    <p className="text-sm">
+                      {getHighPointsProducts(products).length > 0
+                        ? 'هذه المنتجات تمنح نقاط ولاء عالية وتساهم في تحسين معدل احتفاظ العملاء.'
+                        : 'أضف منتجات ذات نقاط ولاء عالية لرؤية تأثيرها على ولاء العملاء.'}
+                    </p>
                   </div>
                 </CardFooter>
               </Card>
@@ -762,11 +798,11 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-blue-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-blue-500" />
-                      <span>زيادة مخزون المنتجات الأكثر مبيعًا بنسبة 25% استعدادًا لموسم الذروة.</span>
+                      <span>{getStockStrategyRecommendation(topProducts)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-blue-500" />
-                      <span>تخفيض مخزون المنتجات بطيئة الحركة لتقليل تكاليف التخزين.</span>
+                      <span>{getSlowMovingRecommendation(getLowSellingProducts(products, invoices))}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-blue-500" />
@@ -783,11 +819,11 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-green-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-green-500" />
-                      <span>رفع أسعار المنتجات ذات الطلب المرتفع والتي تتمتع بمرونة سعرية منخفضة.</span>
+                      <span>{getPricingRecommendation(topProducts)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-green-500" />
-                      <span>خفض أسعار المنتجات بطيئة الحركة بنسبة 10-15% لتحفيز المبيعات.</span>
+                      <span>{getSlowMovingPricingRecommendation(getLowSellingProducts(products, invoices))}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-green-500" />
@@ -804,11 +840,11 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-purple-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-purple-500" />
-                      <span>إضافة منتجات جديدة إلى قسم {ProductCategory.DASHBOARD_CARE} لتلبية طلب السوق.</span>
+                      <span>{getProductDevelopmentRecommendation(categoryData)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-purple-500" />
-                      <span>تحسين تغليف منتجات {ProductCategory.TIRE_CARE} لزيادة جاذبيتها.</span>
+                      <span>{getPackagingRecommendation(categoryData)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-purple-500" />
@@ -825,7 +861,7 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-amber-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-amber-500" />
-                      <span>زيادة نقاط الولاء على المنتجات الأقل مبيعًا لتحفيز الطلب.</span>
+                      <span>{getLoyaltyPointsRecommendation(getLowSellingProducts(products, invoices), products)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-amber-500" />
@@ -846,11 +882,11 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-red-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-red-500" />
-                      <span>منتجات في خطر نفاد المخزون: زيت محرك سوبر بريميوم، ملمع إطارات.</span>
+                      <span>{getProductAlerts(topProducts)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-red-500" />
-                      <span>منتجات بطيئة الحركة تحتاج إلى عروض: معطر داخلي فاخر، شامبو سيارات.</span>
+                      <span>{getSlowMovingAlerts(getLowSellingProducts(products, invoices))}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-red-500" />
@@ -867,7 +903,7 @@ const ProductAnalytics = () => {
                   <ul className="space-y-3 text-slate-700">
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-slate-500" />
-                      <span>أفضل وقت للعروض الترويجية: بداية الشهر عندما يكون الإقبال أعلى.</span>
+                      <span>{getTimingRecommendation(monthlyTrendData)}</span>
                     </li>
                     <li className="flex items-start">
                       <ArrowUpRight className="h-5 w-5 mr-2 mt-0.5 text-slate-500" />
@@ -891,5 +927,660 @@ const ProductAnalytics = () => {
     </div>
   );
 };
+
+// Loading state component
+const AnalyticsLoadingState = () => (
+  <div className="space-y-6">
+    <div className="flex justify-between">
+      <div>
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-[180px]" />
+        <Skeleton className="h-10 w-[180px]" />
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map(i => (
+        <Card key={i}>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24 mb-2" />
+            <Skeleton className="h-8 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-4 w-40" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    
+    <div>
+      <Skeleton className="h-10 w-full mb-6" />
+      <div className="h-80">
+        <Skeleton className="h-full w-full" />
+      </div>
+    </div>
+  </div>
+);
+
+// Helper functions to avoid large inline functions
+function filterInvoicesByTimeRange(invoices: Invoice[], timeRange: string): Invoice[] {
+  if (timeRange === 'all') return invoices;
+  
+  const now = new Date();
+  let startDate = new Date();
+  
+  switch (timeRange) {
+    case 'month':
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    case 'quarter':
+      startDate.setMonth(now.getMonth() - 3);
+      break;
+    case 'year':
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+    default:
+      return invoices;
+  }
+  
+  return invoices.filter(invoice => {
+    const invoiceDate = new Date(invoice.date);
+    return invoiceDate >= startDate && invoiceDate <= now;
+  });
+}
+
+function calculateProductSalesData(products: Product[], invoices: Invoice[]) {
+  return products.map(product => {
+    // Calculate sales data for each product from invoices
+    let totalSold = 0;
+    let totalRevenue = 0;
+    let lastSoldDate: Date | null = null;
+    
+    invoices.forEach(invoice => {
+      const items = invoice.items || [];
+      items.forEach(item => {
+        if (item.productId === product.id) {
+          totalSold += item.quantity;
+          totalRevenue += item.totalPrice;
+          
+          const invoiceDate = new Date(invoice.date);
+          if (!lastSoldDate || invoiceDate > lastSoldDate) {
+            lastSoldDate = invoiceDate;
+          }
+        }
+      });
+    });
+    
+    return {
+      id: product.id,
+      name: product.name,
+      sales: totalSold,
+      revenue: totalRevenue,
+      price: product.price,
+      category: product.category,
+      pointsEarned: product.pointsEarned,
+      lastSoldDate,
+      brand: product.brand || 'غير محدد'
+    };
+  });
+}
+
+function calculateCategoryData(products: Product[], productSalesData: any[]) {
+  return Object.values(ProductCategory).map(category => {
+    const categoryProducts = products.filter(product => product.category === category);
+    
+    const categorySales = productSalesData
+      .filter(product => product.category === category)
+      .reduce((sum, product) => sum + product.sales, 0);
+    
+    const categoryRevenue = productSalesData
+      .filter(product => product.category === category)
+      .reduce((sum, product) => sum + product.revenue, 0);
+    
+    return {
+      name: category,
+      sales: categorySales,
+      revenue: categoryRevenue,
+      products: categoryProducts.length
+    };
+  });
+}
+
+function calculateBrandPerformanceData(productSalesData: any[]) {
+  // Aggregate data by brand
+  const brandData: Record<string, any> = {};
+  
+  productSalesData.forEach(product => {
+    const brand = product.brand || 'غير محدد';
+    
+    if (!brandData[brand]) {
+      brandData[brand] = {
+        name: brand,
+        sales: 0,
+        revenue: 0,
+        products: 0
+      };
+    }
+    
+    brandData[brand].sales += product.sales;
+    brandData[brand].revenue += product.revenue;
+    brandData[brand].products += 1;
+  });
+  
+  // Convert to array and sort
+  return Object.values(brandData)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+}
+
+function calculateCategoryRadarData(products: Product[], productSalesData: any[]) {
+  return Object.values(ProductCategory).map(category => {
+    const categoryProducts = products.filter(product => product.category === category);
+    if (categoryProducts.length === 0) {
+      return {
+        category,
+        price: 0,
+        sales: 0,
+        revenue: 0,
+        points: 0
+      };
+    }
+    
+    const avgPrice = categoryProducts.reduce((sum, product) => sum + product.price, 0) / categoryProducts.length;
+    
+    const totalSales = productSalesData
+      .filter(product => product.category === category)
+      .reduce((sum, product) => sum + product.sales, 0);
+    
+    const totalRevenue = productSalesData
+      .filter(product => product.category === category)
+      .reduce((sum, product) => sum + product.revenue, 0);
+    
+    const avgPoints = categoryProducts.reduce((sum, product) => sum + (product.pointsEarned || 0), 0) / categoryProducts.length;
+    
+    return {
+      category,
+      // Scale values for radar chart display
+      price: Math.min(100, avgPrice > 0 ? (avgPrice / 5) : 0),
+      sales: Math.min(100, totalSales > 0 ? (totalSales / 10) : 0),
+      revenue: Math.min(100, totalRevenue > 0 ? (totalRevenue / 1000) : 0),
+      points: Math.min(100, avgPoints > 0 ? (avgPoints * 5) : 0)
+    };
+  });
+}
+
+function calculateMonthlyTrendData(invoices: Invoice[], products: Product[]) {
+  if (invoices.length === 0) return [];
+  
+  // Group invoices by month
+  const monthlyData: Record<string, { sales: number; revenue: number }> = {};
+  
+  // Sort invoices by date
+  const sortedInvoices = [...invoices].sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  
+  // Process only if we have invoices
+  if (sortedInvoices.length > 0) {
+    // Process each invoice
+    sortedInvoices.forEach(invoice => {
+      const date = new Date(invoice.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = new Intl.DateTimeFormat('ar-EG', { month: 'long' }).format(date);
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          sales: 0,
+          revenue: 0,
+          name: monthName
+        };
+      }
+      
+      // Sum up sales quantities and revenue
+      const items = invoice.items || [];
+      items.forEach(item => {
+        monthlyData[monthKey].sales += item.quantity;
+        monthlyData[monthKey].revenue += item.totalPrice;
+      });
+    });
+    
+    // Convert to array for the chart
+    return Object.keys(monthlyData)
+      .sort()
+      .slice(-6) // Last 6 months
+      .map(key => ({
+        name: monthlyData[key].name,
+        sales: monthlyData[key].sales,
+        revenue: monthlyData[key].revenue
+      }));
+  }
+  
+  return [];
+}
+
+function calculateGrowthRate(invoices: Invoice[], type: 'sales' | 'revenue'): string {
+  if (invoices.length === 0) return '+0%';
+  
+  // Get current and previous periods
+  const now = new Date();
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(now.getMonth() - 1);
+  const twoMonthsAgo = new Date();
+  twoMonthsAgo.setMonth(now.getMonth() - 2);
+  
+  // Current period invoices
+  const currentPeriodInvoices = invoices.filter(inv => {
+    const invDate = new Date(inv.date);
+    return invDate >= oneMonthAgo && invDate <= now;
+  });
+  
+  // Previous period invoices
+  const previousPeriodInvoices = invoices.filter(inv => {
+    const invDate = new Date(inv.date);
+    return invDate >= twoMonthsAgo && invDate < oneMonthAgo;
+  });
+  
+  // Calculate totals for current and previous periods
+  let currentTotal = 0;
+  let previousTotal = 0;
+  
+  if (type === 'sales') {
+    currentPeriodInvoices.forEach(inv => {
+      (inv.items || []).forEach(item => {
+        currentTotal += item.quantity;
+      });
+    });
+    
+    previousPeriodInvoices.forEach(inv => {
+      (inv.items || []).forEach(item => {
+        previousTotal += item.quantity;
+      });
+    });
+  } else {
+    currentTotal = currentPeriodInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+    previousTotal = previousPeriodInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+  }
+  
+  // Calculate growth rate
+  if (previousTotal === 0) return currentTotal > 0 ? '+100%' : '+0%';
+  
+  const growthRate = ((currentTotal - previousTotal) / previousTotal) * 100;
+  const sign = growthRate >= 0 ? '+' : '';
+  return `${sign}${Math.round(growthRate)}%`;
+}
+
+function calculateAverageGrowth(invoices: Invoice[], products: Product[]): string {
+  if (invoices.length === 0) return '+0%';
+  
+  // Get current and previous periods
+  const now = new Date();
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(now.getMonth() - 1);
+  const twoMonthsAgo = new Date();
+  twoMonthsAgo.setMonth(now.getMonth() - 2);
+  
+  // Calculate average unit price for current and previous periods
+  let currentTotalRevenue = 0;
+  let currentTotalQuantity = 0;
+  let previousTotalRevenue = 0;
+  let previousTotalQuantity = 0;
+  
+  // Current period
+  const currentPeriodInvoices = invoices.filter(inv => {
+    const invDate = new Date(inv.date);
+    return invDate >= oneMonthAgo && invDate <= now;
+  });
+  
+  currentPeriodInvoices.forEach(inv => {
+    (inv.items || []).forEach(item => {
+      currentTotalRevenue += item.totalPrice;
+      currentTotalQuantity += item.quantity;
+    });
+  });
+  
+  // Previous period
+  const previousPeriodInvoices = invoices.filter(inv => {
+    const invDate = new Date(inv.date);
+    return invDate >= twoMonthsAgo && invDate < oneMonthAgo;
+  });
+  
+  previousPeriodInvoices.forEach(inv => {
+    (inv.items || []).forEach(item => {
+      previousTotalRevenue += item.totalPrice;
+      previousTotalQuantity += item.quantity;
+    });
+  });
+  
+  // Calculate average unit prices
+  const currentAvgPrice = currentTotalQuantity > 0 ? currentTotalRevenue / currentTotalQuantity : 0;
+  const previousAvgPrice = previousTotalQuantity > 0 ? previousTotalRevenue / previousTotalQuantity : 0;
+  
+  // Calculate growth rate
+  if (previousAvgPrice === 0) return currentAvgPrice > 0 ? '+100%' : '+0%';
+  
+  const growthRate = ((currentAvgPrice - previousAvgPrice) / previousAvgPrice) * 100;
+  const sign = growthRate >= 0 ? '+' : '';
+  return `${sign}${Math.round(growthRate)}%`;
+}
+
+// Helper functions for insights
+function getMonthlyTrendInsight(monthlyTrendData: any[]): string {
+  if (monthlyTrendData.length < 2) return 'قم بإضافة المزيد من الفواتير لعرض تحليل الاتجاهات الشهرية.';
+  
+  const lastMonth = monthlyTrendData[monthlyTrendData.length - 1];
+  const previousMonth = monthlyTrendData[monthlyTrendData.length - 2];
+  
+  if (lastMonth.sales > previousMonth.sales) {
+    return `لوحظ ارتفاع في المبيعات خلال شهر ${lastMonth.name}، يُنصح بزيادة المخزون للشهر القادم.`;
+  } else {
+    return `لوحظ انخفاض في المبيعات خلال شهر ${lastMonth.name}، يمكن تعزيز المبيعات من خلال عروض ترويجية.`;
+  }
+}
+
+function getCategoryDistributionInsight(categoryData: any[]): string {
+  if (categoryData.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find top and bottom categories
+  const sortedCategories = [...categoryData].sort((a, b) => b.sales - a.sales);
+  const topCategory = sortedCategories[0];
+  const bottomCategory = sortedCategories[sortedCategories.length - 1];
+  
+  if (topCategory && bottomCategory) {
+    return `قسم ${topCategory.name} هو الأكثر مبيعًا، بينما قسم ${bottomCategory.name} يحتاج تعزيز.`;
+  }
+  
+  return 'قم بإضافة المزيد من المنتجات والفواتير لرؤية توصيات أكثر دقة.';
+}
+
+function getCategoryMultiDimensionalAnalysisInsight(categoryRadarData: any[]): string {
+  if (categoryRadarData.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find category with highest sales
+  const highestSalesCategory = [...categoryRadarData].sort((a, b) => b.sales - a.sales)[0];
+  
+  // Find category with highest points
+  const highestPointsCategory = [...categoryRadarData].sort((a, b) => b.points - a.points)[0];
+  
+  if (highestSalesCategory && highestPointsCategory) {
+    return `منتجات ${highestSalesCategory.category} تتمتع بمبيعات عالية، بينما منتجات ${highestPointsCategory.category} عالية في النقاط.`;
+  }
+  
+  return 'أضف المزيد من المنتجات المتنوعة والفواتير لرؤية تحليلات أكثر عمقًا.';
+}
+
+function getBrandPerformanceInsight(brandData: any[]): string {
+  if (brandData.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find top brand
+  const topBrand = brandData[0];
+  
+  if (topBrand) {
+    return `العلامة التجارية "${topBrand.name}" هي الأكثر مبيعًا ويمكن التفاوض على شروط أفضل معها.`;
+  }
+  
+  return 'أضف المزيد من المنتجات لعلامات تجارية مختلفة لرؤية تحليلات أكثر دقة.';
+}
+
+function getPriceVsSalesInsight(priceVsSalesData: any[]): string {
+  if (priceVsSalesData.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Group products by price ranges
+  const lowPrice = priceVsSalesData.filter(p => p.price < 50);
+  const midPrice = priceVsSalesData.filter(p => p.price >= 50 && p.price <= 100);
+  const highPrice = priceVsSalesData.filter(p => p.price > 100);
+  
+  // Calculate average sales for each price range
+  const lowPriceAvgSales = lowPrice.length > 0 ? lowPrice.reduce((sum, p) => sum + p.sales, 0) / lowPrice.length : 0;
+  const midPriceAvgSales = midPrice.length > 0 ? midPrice.reduce((sum, p) => sum + p.sales, 0) / midPrice.length : 0;
+  const highPriceAvgSales = highPrice.length > 0 ? highPrice.reduce((sum, p) => sum + p.sales, 0) / highPrice.length : 0;
+  
+  // Find the price range with highest average sales
+  const priceRanges = [
+    { range: 'المنخفض (أقل من 50 ج.م)', sales: lowPriceAvgSales },
+    { range: 'المتوسط (50-100 ج.م)', sales: midPriceAvgSales },
+    { range: 'المرتفع (أكثر من 100 ج.م)', sales: highPriceAvgSales }
+  ];
+  
+  const bestSellingRange = priceRanges.sort((a, b) => b.sales - a.sales)[0];
+  
+  if (bestSellingRange && bestSellingRange.sales > 0) {
+    return `المنتجات ذات السعر ${bestSellingRange.range} تحقق أعلى معدلات مبيعات. يُنصح بمراجعة تسعير المنتجات الأخرى.`;
+  }
+  
+  return 'أضف المزيد من الفواتير لمنتجات بأسعار متنوعة لرؤية نمط العلاقة بين السعر والمبيعات.';
+}
+
+// Utility functions for performance tab
+function getGrowingProducts(products: Product[], invoices: Invoice[]) {
+  if (products.length === 0 || invoices.length === 0) return [];
+  
+  // Get current and previous periods
+  const now = new Date();
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(now.getMonth() - 1);
+  const twoMonthsAgo = new Date();
+  twoMonthsAgo.setMonth(now.getMonth() - 2);
+  
+  // Calculate sales for each product in both periods
+  const productGrowth: Record<string, any> = {};
+  
+  // Process invoices
+  invoices.forEach(invoice => {
+    const invDate = new Date(invoice.date);
+    const isPreviousPeriod = invDate >= twoMonthsAgo && invDate < oneMonthAgo;
+    const isCurrentPeriod = invDate >= oneMonthAgo && invDate <= now;
+    
+    if (!isPreviousPeriod && !isCurrentPeriod) return;
+    
+    (invoice.items || []).forEach(item => {
+      if (!productGrowth[item.productId]) {
+        const product = products.find(p => p.id === item.productId);
+        productGrowth[item.productId] = {
+          id: item.productId,
+          name: product ? product.name : 'منتج غير معروف',
+          currentSales: 0,
+          previousSales: 0
+        };
+      }
+      
+      if (isCurrentPeriod) {
+        productGrowth[item.productId].currentSales += item.quantity;
+      } else if (isPreviousPeriod) {
+        productGrowth[item.productId].previousSales += item.quantity;
+      }
+    });
+  });
+  
+  // Calculate growth rates
+  const growingProducts = Object.values(productGrowth)
+    .filter(product => product.previousSales > 0 || product.currentSales > 0)
+    .map(product => {
+      // Handle case where previous sales were zero
+      let growthRate = 0;
+      if (product.previousSales === 0) {
+        growthRate = product.currentSales > 0 ? 100 : 0;
+      } else {
+        growthRate = Math.round(((product.currentSales - product.previousSales) / product.previousSales) * 100);
+      }
+      
+      return {
+        ...product,
+        growthRate,
+        sales: product.currentSales
+      };
+    })
+    .filter(product => product.growthRate > 0)
+    .sort((a, b) => b.growthRate - a.growthRate)
+    .slice(0, 3);
+  
+  return growingProducts;
+}
+
+function getLowSellingProducts(products: Product[], invoices: Invoice[]) {
+  // Get product sales data
+  const productSales: Record<string, number> = {};
+  
+  // Calculate total sales for each product
+  invoices.forEach(invoice => {
+    (invoice.items || []).forEach(item => {
+      if (!productSales[item.productId]) {
+        productSales[item.productId] = 0;
+      }
+      productSales[item.productId] += item.quantity;
+    });
+  });
+  
+  // Identify products with low sales
+  const lowSellingProducts = products
+    .map(product => {
+      const sales = productSales[product.id] || 0;
+      const revenue = sales * product.price;
+      return {
+        ...product,
+        sales,
+        revenue
+      };
+    })
+    .filter(product => productSales[product.id] !== undefined) // Only consider products that have been sold
+    .sort((a, b) => a.sales - b.sales)
+    .slice(0, 3);
+  
+  return lowSellingProducts;
+}
+
+function getHighPointsProducts(products: Product[]) {
+  // Sort products by points earned
+  return [...products]
+    .sort((a, b) => (b.pointsEarned || 0) - (a.pointsEarned || 0))
+    .slice(0, 3);
+}
+
+// Recommendation functions
+function getStockStrategyRecommendation(topProducts: any[]): string {
+  if (topProducts.length === 0) return 'قم بإضافة منتجات وفواتير لرؤية توصيات المخزون.';
+  
+  const firstProduct = topProducts[0];
+  if (firstProduct) {
+    return `زيادة مخزون ${firstProduct.name} بنسبة 25% استعدادًا لموسم الذروة.`;
+  }
+  
+  return 'زيادة مخزون المنتجات الأكثر مبيعًا بنسبة 25% استعدادًا لموسم الذروة.';
+}
+
+function getSlowMovingRecommendation(lowSellingProducts: any[]): string {
+  if (lowSellingProducts.length === 0) return 'تخفيض مخزون المنتجات بطيئة الحركة لتقليل تكاليف التخزين.';
+  
+  const firstProduct = lowSellingProducts[0];
+  if (firstProduct) {
+    return `تخفيض مخزون ${firstProduct.name} وغيرها من المنتجات بطيئة الحركة لتقليل تكاليف التخزين.`;
+  }
+  
+  return 'تخفيض مخزون المنتجات بطيئة الحركة لتقليل تكاليف التخزين.';
+}
+
+function getPricingRecommendation(topProducts: any[]): string {
+  if (topProducts.length === 0) return 'راجع استراتيجية التسعير بناءً على أداء المنتجات.';
+  
+  const firstProduct = topProducts[0];
+  if (firstProduct) {
+    return `يمكن زيادة سعر ${firstProduct.name} بنسبة 5-10% نظرًا للطلب المرتفع عليه.`;
+  }
+  
+  return 'رفع أسعار المنتجات ذات الطلب المرتفع والتي تتمتع بمرونة سعرية منخفضة.';
+}
+
+function getSlowMovingPricingRecommendation(lowSellingProducts: any[]): string {
+  if (lowSellingProducts.length === 0) return 'خفض أسعار المنتجات بطيئة الحركة بنسبة 10-15% لتحفيز المبيعات.';
+  
+  const firstProduct = lowSellingProducts[0];
+  if (firstProduct) {
+    return `خفض سعر ${firstProduct.name} بنسبة 10-15% لتحفيز المبيعات.`;
+  }
+  
+  return 'خفض أسعار المنتجات بطيئة الحركة بنسبة 10-15% لتحفيز المبيعات.';
+}
+
+function getProductDevelopmentRecommendation(categoryData: any[]): string {
+  if (categoryData.length === 0) return 'إضافة منتجات جديدة لتلبية طلب السوق.';
+  
+  // Find category with lowest sales
+  const lowestSalesCategory = [...categoryData]
+    .filter(category => category.products > 0) // Only consider categories with products
+    .sort((a, b) => a.sales - b.sales)[0];
+  
+  if (lowestSalesCategory) {
+    return `إضافة منتجات جديدة إلى قسم ${lowestSalesCategory.name} لتلبية طلب السوق.`;
+  }
+  
+  return 'إضافة منتجات جديدة لتلبية طلب السوق.';
+}
+
+function getPackagingRecommendation(categoryData: any[]): string {
+  if (categoryData.length === 0) return 'تحسين تغليف المنتجات لزيادة جاذبيتها.';
+  
+  // Find middle performing category
+  const sortedCategories = [...categoryData]
+    .filter(category => category.products > 0) // Only consider categories with products
+    .sort((a, b) => b.sales - a.sales);
+  
+  const middleCategory = sortedCategories[Math.floor(sortedCategories.length / 2)];
+  
+  if (middleCategory) {
+    return `تحسين تغليف منتجات ${middleCategory.name} لزيادة جاذبيتها.`;
+  }
+  
+  return 'تحسين تغليف المنتجات لزيادة جاذبيتها.';
+}
+
+function getLoyaltyPointsRecommendation(lowSellingProducts: any[], products: Product[]): string {
+  if (lowSellingProducts.length === 0) return 'زيادة نقاط الولاء على المنتجات الأقل مبيعًا لتحفيز الطلب.';
+  
+  const firstProduct = lowSellingProducts[0];
+  if (firstProduct) {
+    return `زيادة نقاط الولاء على ${firstProduct.name} من ${firstProduct.pointsEarned} إلى ${firstProduct.pointsEarned + 10} نقطة لتحفيز الطلب.`;
+  }
+  
+  return 'زيادة نقاط الولاء على المنتجات الأقل مبيعًا لتحفيز الطلب.';
+}
+
+function getProductAlerts(topProducts: any[]): string {
+  if (topProducts.length === 0) return 'لا توجد تنبيهات للمنتجات حاليًا.';
+  
+  const firstTwoProducts = topProducts.slice(0, 2).map(p => p.name).join('، ');
+  
+  if (firstTwoProducts) {
+    return `منتجات في خطر نفاد المخزون: ${firstTwoProducts}.`;
+  }
+  
+  return 'منتجات في خطر نفاد المخزون: تأكد من توفر المنتجات الأكثر مبيعًا.';
+}
+
+function getSlowMovingAlerts(lowSellingProducts: any[]): string {
+  if (lowSellingProducts.length === 0) return 'لا توجد منتجات بطيئة الحركة تحتاج لعروض حاليًا.';
+  
+  const firstTwoProducts = lowSellingProducts.slice(0, 2).map(p => p.name).join('، ');
+  
+  if (firstTwoProducts) {
+    return `منتجات بطيئة الحركة تحتاج إلى عروض: ${firstTwoProducts}.`;
+  }
+  
+  return 'منتجات بطيئة الحركة تحتاج إلى عروض ترويجية لتحسين مبيعاتها.';
+}
+
+function getTimingRecommendation(monthlyTrendData: any[]): string {
+  if (monthlyTrendData.length < 2) return 'أفضل وقت للعروض الترويجية: بداية الشهر عندما يكون الإقبال أعلى.';
+  
+  // Find month with highest sales
+  const highestSalesMonth = [...monthlyTrendData].sort((a, b) => b.sales - a.sales)[0];
+  
+  if (highestSalesMonth) {
+    return `أفضل وقت للعروض الترويجية: خلال شهر ${highestSalesMonth.name} حيث يكون الإقبال أعلى.`;
+  }
+  
+  return 'أفضل وقت للعروض الترويجية: بداية الشهر عندما يكون الإقبال أعلى.';
+}
 
 export default ProductAnalytics;

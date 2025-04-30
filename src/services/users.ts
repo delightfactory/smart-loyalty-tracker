@@ -640,3 +640,133 @@ export const ensureUserHasAdminRole = async (userId: string): Promise<void> => {
     throw error;
   }
 };
+
+export const usersService = {
+  async assignAdminRole(userId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('Assigning admin role to user:', userId);
+      
+      // Check if the user exists
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      
+      if (userError) {
+        console.error('Error finding user:', userError);
+        return { success: false, message: `خطأ في العثور على المستخدم: ${userError.message}` };
+      }
+      
+      // Add admin role to user_roles table
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert([
+          {
+            user_id: userId,
+            role: 'admin'
+          }
+        ]);
+      
+      if (roleError) {
+        console.error('Error assigning admin role:', roleError);
+        return { success: false, message: `خطأ في تعيين دور المدير: ${roleError.message}` };
+      }
+      
+      console.log('Admin role assigned successfully to user:', userId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Exception assigning admin role:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  /**
+   * Resets user password.
+   * @param email The email address of the user.
+   * @returns Promise with the operation result.
+   */
+  async resetPassword(email: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('Requesting password reset for:', email);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        console.error('Error requesting password reset:', error);
+        return { success: false, message: `خطأ في طلب إعادة تعيين كلمة المرور: ${error.message}` };
+      }
+      
+      console.log('Password reset email sent successfully to:', email);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Exception requesting password reset:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
+  /**
+   * Gets all users with their roles.
+   * @returns Promise with the list of users.
+   */
+  async getAllUsersWithRoles(): Promise<any[]> {
+    try {
+      console.log('Fetching all users with roles');
+      
+      // Get all users from auth schema (admin only API)
+      const { data: adminUsers, error: adminError } = await supabase.auth.admin.listUsers();
+      
+      if (adminError) {
+        console.error('Error fetching admin users list:', adminError);
+        // Return empty array on error
+        return [];
+      }
+      
+      // Get all user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, position, avatar_url');
+      
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError);
+        return [];
+      }
+      
+      // Get all user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        return [];
+      }
+      
+      // Map user data
+      const users = adminUsers.users.map(user => {
+        const profile = profiles?.find(p => p.id === user.id);
+        const userRoles = roles?.filter(r => r.user_id === user.id).map(r => r.role) || [];
+        
+        return {
+          id: user.id,
+          email: user.email,
+          fullName: profile?.full_name || user.email?.split('@')[0] || 'مستخدم',
+          position: profile?.position || '',
+          avatarUrl: profile?.avatar_url || '',
+          roles: userRoles,
+          createdAt: user.created_at,
+          lastSignIn: user.last_sign_in_at,
+          confirmed: !user.confirmation_sent_at || user.email_confirmed_at,
+        };
+      });
+      
+      console.log('Fetched users with roles:', users.length);
+      return users;
+    } catch (error: any) {
+      console.error('Exception fetching users with roles:', error);
+      return [];
+    }
+  },
+};
