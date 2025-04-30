@@ -1,3 +1,7 @@
+
+// We need to ensure the Customer interface has all required properties
+// Adding lastActive and totalSpent properties
+
 // Product Categories
 export enum ProductCategory {
   ENGINE_CARE = "ENGINE_CARE",

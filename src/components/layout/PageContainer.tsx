@@ -9,6 +9,7 @@ interface PageContainerProps {
   subtitle?: string;
   searchPlaceholder?: string;
   onSearchChange?: (term: string) => void;
+  extra?: ReactNode; // Added extra prop for additional content
 }
 
 const PageContainer = ({
@@ -16,7 +17,8 @@ const PageContainer = ({
   title,
   subtitle,
   searchPlaceholder,
-  onSearchChange
+  onSearchChange,
+  extra
 }: PageContainerProps) => {
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -26,16 +28,24 @@ const PageContainer = ({
           {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
         </div>
         
-        {searchPlaceholder && onSearchChange && (
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              className="pl-10"
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {searchPlaceholder && onSearchChange && (
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={searchPlaceholder}
+                className="pl-10"
+                onChange={(e) => onSearchChange(e.target.value)}
+              />
+            </div>
+          )}
+          
+          {extra && (
+            <div className="flex items-center">
+              {extra}
+            </div>
+          )}
+        </div>
       </div>
       
       {children}

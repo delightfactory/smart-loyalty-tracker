@@ -42,9 +42,17 @@ const InactiveCustomersTable = ({
   
   // Get appropriate badge color based on inactivity period
   const getInactivityBadge = (days: number) => {
+    // Change "warning" to "secondary" with appropriate styling
     if (days > 90) return "destructive";
-    if (days > 30) return "warning";
+    if (days > 30) return "secondary"; // Changed from "warning" to "secondary"
     return "secondary";
+  };
+  
+  // Get badge style class based on warning level to maintain amber color for "warning" level
+  const getWarningLevelClass = (level: string) => {
+    if (level === 'warning') return 'text-amber-500 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800';
+    if (level === 'destructive') return ''; // Use default destructive style
+    return ''; // Use default secondary style
   };
   
   if (loading) {
@@ -109,6 +117,8 @@ const InactiveCustomersTable = ({
             <TableBody>
               {customers.map(customer => {
                 const inactivityDays = calculateInactivityDays(customer.lastActive);
+                const badgeVariant = getInactivityBadge(inactivityDays);
+                const badgeCustomClass = inactivityDays > 30 && inactivityDays <= 90 ? getWarningLevelClass('warning') : '';
                 
                 return (
                   <TableRow key={customer.id}>
@@ -121,7 +131,7 @@ const InactiveCustomersTable = ({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getInactivityBadge(inactivityDays)} className="flex items-center gap-1 w-fit">
+                      <Badge variant={badgeVariant} className={`flex items-center gap-1 w-fit ${badgeCustomClass}`}>
                         {getInactivityIcon(inactivityDays)}
                         {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
                       </Badge>

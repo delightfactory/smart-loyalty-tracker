@@ -1,4 +1,6 @@
 
+// Update the useCustomers hook to properly expose customers and isLoading
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { Customer } from '@/lib/types';
@@ -126,9 +128,9 @@ export function useCustomers() {
   });
   
   return {
-    customers,
-    isLoading,
-    getAll,
+    customers,  // Direct access to customers data
+    isLoading,  // Direct access to loading state
+    getAll,     // For advanced usage
     getById,
     addCustomer,
     updateCustomer,

@@ -65,7 +65,7 @@ const CustomerFollowup = () => {
         customer.name.toLowerCase().includes(term) || 
         customer.email?.toLowerCase().includes(term) || 
         customer.phone?.includes(term) ||
-        customer.businessName?.toLowerCase().includes(term)
+        customer.businessType?.toLowerCase().includes(term)  // Changed from businessName to businessType
       );
     }
     
@@ -88,7 +88,7 @@ const CustomerFollowup = () => {
           return lastActivityDate >= fromDate;
         });
       } else if (toDate) {
-        // تصفية العملاء غير النشطين قبل تاريخ معين
+        // تصفية العملاء غير النشطين قبل ت��ريخ معين
         return filtered.filter(customer => {
           const lastActivityDate = customer.lastActive ? new Date(customer.lastActive) : new Date(0);
           return lastActivityDate <= toDate;
