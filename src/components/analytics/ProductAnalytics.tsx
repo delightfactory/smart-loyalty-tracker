@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { 
   ChartContainer, 
@@ -52,12 +53,621 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ProductCategory, Product, Invoice } from '@/lib/types';
 import { formatNumberEn, formatAmountEn } from '@/lib/formatters';
 
+// Define types for the analytics data
+interface ProductSalesData {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  sales: number;
+  revenue: number;
+  pointsEarned: number;
+  brand?: string;
+}
+
+interface CategoryData {
+  name: string;
+  sales: number;
+  revenue: number;
+}
+
+interface BrandPerformanceData {
+  name: string;
+  sales: number;
+  products: number;
+}
+
+interface MonthlyTrendData {
+  name: string;
+  sales: number;
+  revenue: number;
+}
+
+interface CategoryRadarData {
+  category: string;
+  price: number;
+  sales: number;
+  revenue: number;
+  points: number;
+}
+
 interface ProductAnalyticsProps {
   products: Product[];
   invoices: Invoice[];
   isLoading: boolean;
 }
 
+// Helper component for loading state
+const AnalyticsLoadingState = () => (
+  <div className="space-y-6">
+    <div className="flex justify-between items-center">
+      <Skeleton className="h-10 w-72" />
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-[180px]" />
+        <Skeleton className="h-10 w-[180px]" />
+      </div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map((i) => (
+        <Card key={i}>
+          <CardHeader>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-9 w-full" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-4 w-40" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <div className="h-[400px] w-full">
+      <Skeleton className="h-full w-full rounded-lg" />
+    </div>
+  </div>
+);
+
+// Utility functions for analytics calculations
+const filterInvoicesByTimeRange = (invoices: Invoice[], timeRange: string): Invoice[] => {
+  if (timeRange === 'all') return invoices;
+  
+  const now = new Date();
+  let cutoffDate = new Date();
+  
+  switch (timeRange) {
+    case 'month':
+      cutoffDate.setMonth(now.getMonth() - 1);
+      break;
+    case 'quarter':
+      cutoffDate.setMonth(now.getMonth() - 3);
+      break;
+    case 'year':
+      cutoffDate.setFullYear(now.getFullYear() - 1);
+      break;
+  }
+  
+  return invoices.filter(invoice => {
+    const invoiceDate = new Date(invoice.date || invoice.createdAt);
+    return invoiceDate >= cutoffDate;
+  });
+};
+
+const calculateProductSalesData = (products: Product[], invoices: Invoice[]): ProductSalesData[] => {
+  // Create a map to track sales data for each product
+  const productSalesMap = new Map<string, ProductSalesData>();
+  
+  // Initialize sales data for all products
+  products.forEach(product => {
+    productSalesMap.set(product.id, {
+      id: product.id,
+      name: product.name,
+      category: product.category,
+      price: product.price,
+      sales: 0,
+      revenue: 0,
+      pointsEarned: 0,
+      brand: product.brand
+    });
+  });
+  
+  // Calculate sales and revenue from invoices
+  invoices.forEach(invoice => {
+    invoice.items?.forEach(item => {
+      if (productSalesMap.has(item.productId)) {
+        const productData = productSalesMap.get(item.productId);
+        if (productData) {
+          const quantity = item.quantity || 0;
+          const itemTotal = item.total || (item.price * quantity);
+          
+          productSalesMap.set(item.productId, {
+            ...productData,
+            sales: productData.sales + quantity,
+            revenue: productData.revenue + itemTotal,
+            pointsEarned: productData.pointsEarned + (item.pointsEarned || 0)
+          });
+        }
+      }
+    });
+  });
+  
+  // Convert map to array
+  return Array.from(productSalesMap.values());
+};
+
+const calculateCategoryData = (products: Product[], productSalesData: ProductSalesData[]): CategoryData[] => {
+  const categoriesMap = new Map<string, CategoryData>();
+  
+  // Group product sales by category
+  productSalesData.forEach(product => {
+    const category = product.category || 'غير مصنف';
+    
+    if (!categoriesMap.has(category)) {
+      categoriesMap.set(category, {
+        name: category,
+        sales: 0,
+        revenue: 0
+      });
+    }
+    
+    const categoryData = categoriesMap.get(category);
+    if (categoryData) {
+      categoriesMap.set(category, {
+        ...categoryData,
+        sales: categoryData.sales + product.sales,
+        revenue: categoryData.revenue + product.revenue
+      });
+    }
+  });
+  
+  return Array.from(categoriesMap.values());
+};
+
+const calculateBrandPerformanceData = (productSalesData: ProductSalesData[]): BrandPerformanceData[] => {
+  const brandsMap = new Map<string, BrandPerformanceData>();
+  
+  // Group by brand
+  productSalesData.forEach(product => {
+    const brand = product.brand || 'غير محدد';
+    
+    if (!brandsMap.has(brand)) {
+      brandsMap.set(brand, {
+        name: brand,
+        sales: 0,
+        products: 0
+      });
+    }
+    
+    const brandData = brandsMap.get(brand);
+    if (brandData) {
+      brandsMap.set(brand, {
+        ...brandData,
+        sales: brandData.sales + product.sales,
+        products: brandData.products + 1
+      });
+    }
+  });
+  
+  return Array.from(brandsMap.values());
+};
+
+const calculateCategoryRadarData = (products: Product[], productSalesData: ProductSalesData[]): CategoryRadarData[] => {
+  const categoriesMap = new Map<string, CategoryRadarData>();
+  
+  // Calculate max values for normalization
+  let maxPrice = 0;
+  let maxSales = 0;
+  let maxRevenue = 0;
+  let maxPoints = 0;
+  
+  productSalesData.forEach(product => {
+    maxPrice = Math.max(maxPrice, product.price);
+    maxSales = Math.max(maxSales, product.sales);
+    maxRevenue = Math.max(maxRevenue, product.revenue);
+    maxPoints = Math.max(maxPoints, product.pointsEarned);
+  });
+  
+  // Group and normalize data by category
+  productSalesData.forEach(product => {
+    const category = product.category || 'غير مصنف';
+    
+    if (!categoriesMap.has(category)) {
+      categoriesMap.set(category, {
+        category: category,
+        price: 0,
+        sales: 0,
+        revenue: 0,
+        points: 0
+      });
+    }
+    
+    const currentData = categoriesMap.get(category);
+    if (currentData) {
+      const normalizedPrice = maxPrice > 0 ? (product.price / maxPrice) * 100 : 0;
+      const normalizedSales = maxSales > 0 ? (product.sales / maxSales) * 100 : 0;
+      const normalizedRevenue = maxRevenue > 0 ? (product.revenue / maxRevenue) * 100 : 0;
+      const normalizedPoints = maxPoints > 0 ? (product.pointsEarned / maxPoints) * 100 : 0;
+      
+      // Sum up normalized values
+      categoriesMap.set(category, {
+        ...currentData,
+        price: currentData.price + normalizedPrice / productSalesData.filter(p => p.category === category).length,
+        sales: currentData.sales + normalizedSales / productSalesData.filter(p => p.category === category).length,
+        revenue: currentData.revenue + normalizedRevenue / productSalesData.filter(p => p.category === category).length,
+        points: currentData.points + normalizedPoints / productSalesData.filter(p => p.category === category).length
+      });
+    }
+  });
+  
+  return Array.from(categoriesMap.values());
+};
+
+const calculateMonthlyTrendData = (invoices: Invoice[], products: Product[]): MonthlyTrendData[] => {
+  const monthlyData = new Map<string, { sales: number; revenue: number }>();
+  
+  // Process invoices for monthly data
+  invoices.forEach(invoice => {
+    const invoiceDate = new Date(invoice.date || invoice.createdAt);
+    const monthYear = `${invoiceDate.getMonth() + 1}/${invoiceDate.getFullYear()}`;
+    
+    if (!monthlyData.has(monthYear)) {
+      monthlyData.set(monthYear, { sales: 0, revenue: 0 });
+    }
+    
+    const currentData = monthlyData.get(monthYear);
+    if (currentData && invoice.items) {
+      let monthlySales = currentData.sales;
+      let monthlyRevenue = currentData.revenue;
+      
+      invoice.items.forEach(item => {
+        monthlySales += item.quantity || 0;
+        monthlyRevenue += item.total || (item.price * (item.quantity || 0));
+      });
+      
+      monthlyData.set(monthYear, { 
+        sales: monthlySales, 
+        revenue: monthlyRevenue 
+      });
+    }
+  });
+  
+  // Convert to array and sort by date
+  const result = Array.from(monthlyData.entries()).map(([month, data]) => ({
+    name: month,
+    sales: data.sales,
+    revenue: data.revenue
+  }));
+  
+  // Sort by date
+  return result.sort((a, b) => {
+    const [aMonth, aYear] = a.name.split('/');
+    const [bMonth, bYear] = b.name.split('/');
+    const dateA = new Date(parseInt(aYear), parseInt(aMonth) - 1);
+    const dateB = new Date(parseInt(bYear), parseInt(bMonth) - 1);
+    return dateA.getTime() - dateB.getTime();
+  });
+};
+
+const calculateGrowthRate = (invoices: Invoice[], metric: 'sales' | 'revenue'): string => {
+  if (invoices.length < 2) return '0%';
+  
+  // Group invoices by month
+  const monthData = new Map<string, { sales: number; revenue: number }>();
+  
+  invoices.forEach(invoice => {
+    const invoiceDate = new Date(invoice.date || invoice.createdAt);
+    const monthYear = `${invoiceDate.getMonth() + 1}/${invoiceDate.getFullYear()}`;
+    
+    if (!monthData.has(monthYear)) {
+      monthData.set(monthYear, { sales: 0, revenue: 0 });
+    }
+    
+    const currentData = monthData.get(monthYear);
+    if (currentData && invoice.items) {
+      let monthlySales = currentData.sales;
+      let monthlyRevenue = currentData.revenue;
+      
+      invoice.items.forEach(item => {
+        monthlySales += item.quantity || 0;
+        monthlyRevenue += item.total || (item.price * (item.quantity || 0));
+      });
+      
+      monthData.set(monthYear, { 
+        sales: monthlySales, 
+        revenue: monthlyRevenue 
+      });
+    }
+  });
+  
+  // Convert to array and sort by date
+  const sortedData = Array.from(monthData.entries())
+    .map(([month, data]) => ({
+      month,
+      ...data
+    }))
+    .sort((a, b) => {
+      const [aMonth, aYear] = a.month.split('/');
+      const [bMonth, bYear] = b.month.split('/');
+      const dateA = new Date(parseInt(aYear), parseInt(aMonth) - 1);
+      const dateB = new Date(parseInt(bYear), parseInt(bMonth) - 1);
+      return dateA.getTime() - dateB.getTime();
+    });
+  
+  if (sortedData.length < 2) return '0%';
+  
+  // Calculate growth rate (current - previous) / previous
+  const currentValue = sortedData[sortedData.length - 1][metric];
+  const previousValue = sortedData[sortedData.length - 2][metric];
+  
+  if (previousValue === 0) return '∞%';
+  
+  const growthRate = ((currentValue - previousValue) / previousValue) * 100;
+  return `${growthRate.toFixed(1)}%`;
+};
+
+const calculateAverageGrowth = (invoices: Invoice[], products: Product[]): string => {
+  if (invoices.length < 2) return '0%';
+  
+  // Group invoices by month and calculate average unit value
+  const monthData = new Map<string, { sales: number; revenue: number; average: number }>();
+  
+  invoices.forEach(invoice => {
+    const invoiceDate = new Date(invoice.date || invoice.createdAt);
+    const monthYear = `${invoiceDate.getMonth() + 1}/${invoiceDate.getFullYear()}`;
+    
+    if (!monthData.has(monthYear)) {
+      monthData.set(monthYear, { sales: 0, revenue: 0, average: 0 });
+    }
+    
+    const currentData = monthData.get(monthYear);
+    if (currentData && invoice.items) {
+      let monthlySales = currentData.sales;
+      let monthlyRevenue = currentData.revenue;
+      
+      invoice.items.forEach(item => {
+        monthlySales += item.quantity || 0;
+        monthlyRevenue += item.total || (item.price * (item.quantity || 0));
+      });
+      
+      const average = monthlySales > 0 ? monthlyRevenue / monthlySales : 0;
+      
+      monthData.set(monthYear, { 
+        sales: monthlySales, 
+        revenue: monthlyRevenue,
+        average
+      });
+    }
+  });
+  
+  // Convert to array and sort by date
+  const sortedData = Array.from(monthData.entries())
+    .map(([month, data]) => ({
+      month,
+      ...data
+    }))
+    .sort((a, b) => {
+      const [aMonth, aYear] = a.month.split('/');
+      const [bMonth, bYear] = b.month.split('/');
+      const dateA = new Date(parseInt(aYear), parseInt(aMonth) - 1);
+      const dateB = new Date(parseInt(bYear), parseInt(bMonth) - 1);
+      return dateA.getTime() - dateB.getTime();
+    });
+  
+  if (sortedData.length < 2) return '0%';
+  
+  // Calculate average unit value growth
+  const currentAvg = sortedData[sortedData.length - 1].average;
+  const previousAvg = sortedData[sortedData.length - 2].average;
+  
+  if (previousAvg === 0) return '0%';
+  
+  const growthRate = ((currentAvg - previousAvg) / previousAvg) * 100;
+  return `${growthRate.toFixed(1)}%`;
+};
+
+// Insight generation functions
+const getMonthlyTrendInsight = (data: MonthlyTrendData[]): string => {
+  if (data.length <= 1) return 'لا توجد بيانات كافية لتحليل الاتجاهات.';
+  
+  const lastMonthSales = data[data.length - 1].sales;
+  const secondLastMonthSales = data[data.length - 2].sales;
+  const salesDiff = lastMonthSales - secondLastMonthSales;
+  
+  if (salesDiff > 0) {
+    return `ارتفعت المبيعات بنسبة ${((salesDiff / secondLastMonthSales) * 100).toFixed(1)}% في الشهر الأخير. استمر في تطبيق استراتيجيات البيع الناجحة.`;
+  } else if (salesDiff < 0) {
+    return `انخفضت المبيعات بنسبة ${((Math.abs(salesDiff) / secondLastMonthSales) * 100).toFixed(1)}% في الشهر الأخير. قد تحتاج لمراجعة استراتيجيات البيع.`;
+  } else {
+    return 'استقرت المبيعات في الشهر الأخير. تابع مراقبة الأداء.';
+  }
+};
+
+const getCategoryDistributionInsight = (data: CategoryData[]): string => {
+  if (data.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find top category
+  let topCategory = data[0];
+  data.forEach(category => {
+    if (category.sales > topCategory.sales) {
+      topCategory = category;
+    }
+  });
+  
+  // Calculate percentage of top category
+  const totalSales = data.reduce((sum, category) => sum + category.sales, 0);
+  const topPercentage = totalSales > 0 ? (topCategory.sales / totalSales) * 100 : 0;
+  
+  if (topPercentage > 50) {
+    return `يمثل قسم "${topCategory.name}" نسبة ${topPercentage.toFixed(0)}% من المبيعات. قد تعتمد كثيرًا على هذا القسم، فكر في تنويع منتجاتك.`;
+  } else if (data.length === 1) {
+    return `جميع المبيعات تأتي من قسم واحد. التنويع قد يساعد في نمو الأعمال.`;
+  } else {
+    return `يوجد توازن جيد بين أقسام المنتجات. قسم "${topCategory.name}" هو الأكثر مبيعًا بنسبة ${topPercentage.toFixed(0)}%.`;
+  }
+};
+
+const getCategoryMultiDimensionalAnalysisInsight = (data: CategoryRadarData[]): string => {
+  if (data.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find best and worst performing categories
+  let bestCategory = data[0];
+  let worstCategory = data[0];
+  
+  data.forEach(category => {
+    const categoryScore = category.sales + category.revenue + category.points;
+    const bestScore = bestCategory.sales + bestCategory.revenue + bestCategory.points;
+    const worstScore = worstCategory.sales + worstCategory.revenue + worstCategory.points;
+    
+    if (categoryScore > bestScore) bestCategory = category;
+    if (categoryScore < worstScore) worstCategory = category;
+  });
+  
+  return `قسم "${bestCategory.category}" يقدم أفضل أداء شامل، بينما قسم "${worstCategory.category}" يحتاج إلى تحسين. قد يكون استهداف تحسين الأقسام الأقل أداءً أكثر فعالية لنمو الأعمال.`;
+};
+
+const getBrandPerformanceInsight = (data: BrandPerformanceData[]): string => {
+  if (data.length === 0) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Find best performing brand
+  let bestBrand = data[0];
+  data.forEach(brand => {
+    if (brand.sales > bestBrand.sales) {
+      bestBrand = brand;
+    }
+  });
+  
+  if (data.length === 1) {
+    return `جميع المبيعات تأتي من علامة تجارية واحدة. قد ترغب في تنويع العلامات التجارية.`;
+  } else {
+    return `العلامة التجارية "${bestBrand.name}" هي الأفضل أداءً مع ${bestBrand.sales} وحدة مباعة من ${bestBrand.products} منتجات. قد ترغب في زيادة المخزون من هذه العلامة.`;
+  }
+};
+
+const getPriceVsSalesInsight = (data: any[]): string => {
+  if (data.length < 3) return 'لا توجد بيانات كافية للتحليل.';
+  
+  // Calculate correlation coefficient
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+  const n = data.length;
+  
+  data.forEach(item => {
+    sumX += item.price;
+    sumY += item.sales;
+    sumXY += item.price * item.sales;
+    sumX2 += item.price * item.price;
+    sumY2 += item.sales * item.sales;
+  });
+  
+  const correlation = (n * sumXY - sumX * sumY) / 
+    Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  
+  if (correlation < -0.5) {
+    return 'هناك علاقة عكسية قوية بين السعر والمبيعات. خفض الأسعار قد يزيد المبيعات.';
+  } else if (correlation > 0.5) {
+    return 'هناك علاقة طردية قوية بين السعر والمبيعات. يبدو أن العملاء يقدرون المنتجات الأعلى سعرًا.';
+  } else {
+    return 'لا توجد علاقة واضحة بين السعر والمبيعات. قد تكون عوامل أخرى مثل الجودة أو العلامة التجارية أكثر تأثيرًا.';
+  }
+};
+
+const getGrowingProducts = (products: Product[], invoices: Invoice[]): any[] => {
+  const recentInvoices = invoices.sort((a, b) => {
+    const dateA = new Date(a.date || a.createdAt);
+    const dateB = new Date(b.date || b.createdAt);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  // Split invoices into two periods: recent and older
+  const midPoint = Math.floor(recentInvoices.length / 2);
+  const recentPeriod = recentInvoices.slice(0, midPoint);
+  const olderPeriod = recentInvoices.slice(midPoint);
+  
+  // Calculate sales for each period
+  const recentSales = new Map<string, number>();
+  const olderSales = new Map<string, number>();
+  
+  recentPeriod.forEach(invoice => {
+    invoice.items?.forEach(item => {
+      const currentSales = recentSales.get(item.productId) || 0;
+      recentSales.set(item.productId, currentSales + (item.quantity || 0));
+    });
+  });
+  
+  olderPeriod.forEach(invoice => {
+    invoice.items?.forEach(item => {
+      const currentSales = olderSales.get(item.productId) || 0;
+      olderSales.set(item.productId, currentSales + (item.quantity || 0));
+    });
+  });
+  
+  // Calculate growth rates
+  const growingProducts = products
+    .map(product => {
+      const recentSale = recentSales.get(product.id) || 0;
+      const olderSale = olderSales.get(product.id) || 0;
+      
+      let growthRate = 0;
+      if (olderSale > 0) {
+        growthRate = ((recentSale - olderSale) / olderSale) * 100;
+      } else if (recentSale > 0) {
+        growthRate = 100; // New product with sales
+      }
+      
+      return {
+        id: product.id,
+        name: product.name,
+        sales: recentSale + olderSale,
+        growthRate: Math.round(growthRate)
+      };
+    })
+    .filter(product => product.growthRate > 0 && product.sales > 0)
+    .sort((a, b) => b.growthRate - a.growthRate)
+    .slice(0, 5);
+  
+  return growingProducts;
+};
+
+const getLowSellingProducts = (products: Product[], invoices: Invoice[]): any[] => {
+  // Map to store product sales data
+  const productSales = new Map<string, { name: string; sales: number; revenue: number }>();
+  
+  // Initialize with all products at 0 sales
+  products.forEach(product => {
+    productSales.set(product.id, {
+      name: product.name,
+      sales: 0,
+      revenue: 0
+    });
+  });
+  
+  // Calculate sales from invoices
+  invoices.forEach(invoice => {
+    invoice.items?.forEach(item => {
+      if (productSales.has(item.productId)) {
+        const currentData = productSales.get(item.productId);
+        if (currentData) {
+          productSales.set(item.productId, {
+            ...currentData,
+            sales: currentData.sales + (item.quantity || 0),
+            revenue: currentData.revenue + (item.total || (item.price * (item.quantity || 0)))
+          });
+        }
+      }
+    });
+  });
+  
+  // Find products with sales below average
+  const productsArray = Array.from(productSales.values());
+  const totalSales = productsArray.reduce((sum, product) => sum + product.sales, 0);
+  const averageSales = totalSales / productsArray.length || 1;
+  
+  const lowSellingProducts = productsArray
+    .filter(product => product.sales > 0 && product.sales < averageSales * 0.5) // Products with sales below 50% of average
+    .sort((a, b) => a.sales - b.sales)
+    .slice(0, 5);
+  
+  return lowSellingProducts;
+};
+
+// Main component
 const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: ProductAnalyticsProps) => {
   const [timeRange, setTimeRange] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -723,4 +1333,180 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                   <div className="flex items-center bg-red-50 text-red-700 p-3 rounded-lg w-full">
-                    <Lightbulb className="
+                    <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
+                    <p className="text-sm">
+                      {getLowSellingProducts(products, invoices).length > 0
+                        ? 'هذه المنتجات تحتاج إلى استراتيجيات تسويق مخصصة أو تعديل في السعر لتحسين مبيعاتها.'
+                        : 'تبدو جميع المنتجات تؤدي أداءً جيدًا نسبيًا.'}
+                    </p>
+                  </div>
+                </CardFooter>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    المنتجات الموسمية
+                  </CardTitle>
+                  <CardDescription>المنتجات التي تظهر تباينًا موسميًا في المبيعات</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* هنا سيتم إضافة تحليل المنتجات الموسمية في المستقبل */}
+                    <div className="p-4 text-center">
+                      <p className="text-muted-foreground">لا يوجد تحليل للمنتجات الموسمية حاليًا، يرجى إضافة المزيد من الفواتير مع تواريخ متنوعة لتفعيل هذه الميزة.</p>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="border-t pt-4">
+                  <div className="flex items-center bg-blue-50 text-blue-700 p-3 rounded-lg w-full">
+                    <Clock className="h-5 w-5 ml-3 flex-shrink-0" />
+                    <p className="text-sm">
+                      معرفة الطلب الموسمي على المنتجات يساعد في تحسين إدارة المخزون وتوقيت الحملات الترويجية.
+                    </p>
+                  </div>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="insights">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Lightbulb className="h-5 w-5 mr-2" />
+                  توصيات تحسين المبيعات
+                </CardTitle>
+                <CardDescription>نصائح تحليلية لزيادة المبيعات والإيرادات</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">التركيز على المنتجات الأكثر مبيعًا</h4>
+                    <p className="text-sm">
+                      استمر في ضمان توفر المنتجات الأكثر مبيعًا وقم بتعزيز تسويقها للاستفادة من شعبيتها الحالية.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">تحسين أداء المنتجات منخفضة المبيعات</h4>
+                    <p className="text-sm">
+                      قم بمراجعة أسعار المنتجات منخفضة المبيعات وفكر في عروض ترويجية أو تخفيضات لتحفيز المبيعات.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-lg">
+                    <h4 className="font-medium text-purple-800 mb-2">تنويع الأقسام</h4>
+                    <p className="text-sm">
+                      {categoryData.length > 1 
+                        ? `تركز المبيعات على عدد محدود من الأقسام. فكر في تعزيز المنتجات من الأقسام الأقل مبيعًا.`
+                        : `وسع نطاق منتجاتك لتشمل أقسامًا متنوعة لجذب شرائح مختلفة من العملاء.`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="h-5 w-5 mr-2" />
+                  تحليل التسعير
+                </CardTitle>
+                <CardDescription>توصيات لتحسين استراتيجية التسعير</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 rounded-lg">
+                    <h4 className="font-medium text-amber-800 mb-2">متوسط سعر المنتجات</h4>
+                    <p className="text-sm">
+                      متوسط سعر المنتجات المباعة هو {totalSales > 0 ? formatAmountEn(totalRevenue / totalSales) : '0'} ج.م.
+                      {topProducts.length > 0 && ` أسعار المنتجات الأكثر مبيعًا تتراوح من ${formatAmountEn(Math.min(...topProducts.map(p => p.price)))} إلى ${formatAmountEn(Math.max(...topProducts.map(p => p.price)))} ج.م.`}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">العلاقة بين السعر والمبيعات</h4>
+                    <p className="text-sm">
+                      {priceVsSalesData.length > 3 
+                        ? getPriceVsSalesInsight(priceVsSalesData)
+                        : 'أضف المزيد من الفواتير لتحليل العلاقة بين السعر والمبيعات بدقة أكبر.'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">توصيات التسعير</h4>
+                    <p className="text-sm">
+                      جرب استراتيجيات تسعير مختلفة للمنتجات منخفضة المبيعات، مثل التخفيضات المؤقتة أو العروض الترويجية للحزم، لتقييم استجابة السوق.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Activity className="h-5 w-5 mr-2" />
+                  توقعات وتخطيط
+                </CardTitle>
+                <CardDescription>التخطيط للمستقبل بناءً على تحليلات المبيعات</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row gap-6">
+                    <div className="flex-1 p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-medium text-blue-800 mb-2 flex items-center">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        توقعات النمو
+                      </h4>
+                      <p className="text-sm">
+                        {monthlyTrendData.length >= 3 
+                          ? 'بناءً على اتجاهات المبيعات الحالية، يمكن توقع استمرار النمو إذا واصلت استراتيجيات البيع الناجحة.'
+                          : 'أضف المزيد من الفواتير بتواريخ متنوعة لتمكين نظام التوقعات من عمل تنبؤات دقيقة.'}
+                      </p>
+                    </div>
+                    <div className="flex-1 p-4 bg-purple-50 rounded-lg">
+                      <h4 className="font-medium text-purple-800 mb-2 flex items-center">
+                        <ShoppingBag className="h-4 w-4 mr-2" />
+                        إدارة المخزون
+                      </h4>
+                      <p className="text-sm">
+                        {topProducts.length > 0 
+                          ? 'تأكد من توفر مخزون كافٍ من المنتجات الأكثر مبيعًا، خاصة المنتجات ذات معدل النمو المرتفع.'
+                          : 'أضف بيانات المخزون والمبيعات لتفعيل توصيات إدارة المخزون.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-6">
+                    <div className="flex-1 p-4 bg-green-50 rounded-lg">
+                      <h4 className="font-medium text-green-800 mb-2 flex items-center">
+                        <Star className="h-4 w-4 mr-2" />
+                        التسويق والترويج
+                      </h4>
+                      <p className="text-sm">
+                        استهدف حملات التسويق نحو العلامات التجارية والأقسام الأفضل أداءً، مع تخصيص حملات ترويجية للمنتجات منخفضة المبيعات لتحسين أدائها.
+                      </p>
+                    </div>
+                    <div className="flex-1 p-4 bg-amber-50 rounded-lg">
+                      <h4 className="font-medium text-amber-800 mb-2 flex items-center">
+                        <Target className="h-4 w-4 mr-2" />
+                        التنويع والتوسع
+                      </h4>
+                      <p className="text-sm">
+                        {categoryData.length > 0 
+                          ? `استكشف فرص التوسع في أقسام جديدة أو زيادة تنوع المنتجات في الأقسام الحالية لتلبية احتياجات شرائح مختلفة من العملاء.`
+                          : 'أضف المزيد من المنتجات من أقسام متنوعة لتمكين توصيات التنويع والتوسع.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ProductAnalytics;
