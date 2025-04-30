@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   ChartContainer, 
@@ -872,7 +871,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 <CardDescription>نسبة مبيعات كل قسم من أقسام المنتجات</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                {categoryData.length > 0 && categoryData.some(c => c.sales > 0) ? (
+                {categoryData.length > 0 && categoryData.some(c => typeof c.sales === 'number' && c.sales > 0) ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -906,7 +905,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 <div className="flex items-center bg-purple-50 text-purple-700 p-3 rounded-lg w-full">
                   <Lightbulb className="h-5 w-5 ml-3 flex-shrink-0" />
                   <p className="text-sm">
-                    {categoryData.length > 0 && categoryData.some(c => c.sales > 0)
+                    {categoryData.length > 0 && categoryData.some(c => typeof c.sales === 'number' && c.sales > 0)
                       ? getCategoryDistributionInsight(categoryData)
                       : 'قم بإضافة فواتير تحتوي على منتجات من فئات مختلفة لرؤية تحليلات توزيع المبيعات.'}
                   </p>
@@ -923,7 +922,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 <CardDescription>مقارنة بين أداء أقسام المنتجات المختلفة</CardDescription>
               </CardHeader>
               <CardContent className="h-80">
-                {categoryRadarData.length > 0 && categoryRadarData.some(c => c.sales > 0) ? (
+                {categoryRadarData.length > 0 && categoryRadarData.some(c => typeof c.sales === 'number' && c.sales > 0) ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart outerRadius={80} data={categoryRadarData}>
                       <PolarGrid />
@@ -947,7 +946,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 <div className="flex items-center bg-amber-50 text-amber-700 p-3 rounded-lg w-full">
                   <AlertCircle className="h-5 w-5 ml-3 flex-shrink-0" />
                   <p className="text-sm">
-                    {categoryRadarData.length > 0 && categoryRadarData.some(c => c.sales > 0)
+                    {categoryRadarData.length > 0 && categoryRadarData.some(c => typeof c.sales === 'number' && c.sales > 0)
                       ? getCategoryMultiDimensionalAnalysisInsight(categoryRadarData)
                       : 'أضف المزيد من المنتجات والفواتير لرؤية التحليل متعدد الأبعاد للأقسام.'}
                   </p>
@@ -1335,7 +1334,7 @@ const ProductAnalytics = ({ products = [], invoices = [], isLoading = false }: P
                 ) : (
                   <div className="flex flex-col items-center justify-center p-8 text-center">
                     <Lightbulb className="h-12 w-12 text-amber-500 mb-4" />
-                    <h3 className="text-xl font-medium mb-2">لا توجد بيانات كافية</h3>
+                    <h3 className="text-xl font-medium mb-2">لا توجد بي��نات كافية</h3>
                     <p className="text-muted-foreground mb-6">
                       قم بإضافة منتجات وفواتير للحصول على تحليلات وتوصيات ذكية حول أداء منتجاتك.
                     </p>

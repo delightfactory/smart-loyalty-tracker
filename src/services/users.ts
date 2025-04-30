@@ -1,773 +1,540 @@
-import { supabase } from '@/integrations/supabase/client';
-import { UserRole, UserProfile } from '@/lib/auth-types';
+// users.ts - Firebase CRUD Operations for Users
+import { initializeApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile, updateEmail, deleteUser } from "firebase/auth";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, Timestamp } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { v4 as uuidv4 } from 'uuid';
 
-export interface CreateUserParams {
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// User Type
+interface User {
+  id: string;
+  uid: string;
   email: string;
-  password: string;
-  fullName: string;
-  roles: UserRole[];
+  displayName: string;
+  photoURL: string | null;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export const getAllUsers = async (): Promise<UserProfile[]> => {
+// --------------------- Authentication Functions ---------------------
+const createUser = async (email: string, password: string, displayName: string, role: string) => {
   try {
-    console.log('Fetching all users...');
-    
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-    
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
-      throw authError;
-    }
-    
-    if (!authUsers || !authUsers.users || authUsers.users.length === 0) {
-      console.log('No users found in auth system');
-      return [];
-    }
-    
-    console.log(`Found ${authUsers.users.length} users in auth system`);
-    
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('*');
-      
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-      throw profilesError;
-    }
-    
-    const { data: userRoles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('*');
-      
-    if (rolesError) {
-      console.error('Error fetching user roles:', rolesError);
-      throw rolesError;
-    }
-    
-    const users: UserProfile[] = authUsers.users.map(authUser => {
-      const profile = profiles?.find(p => p.id === authUser.id);
-      const roles = userRoles
-        ?.filter(r => r.user_id === authUser.id)
-        .map(r => r.role as UserRole) || [];
-        
-      return {
-        id: authUser.id,
-        email: authUser.email,
-        fullName: profile?.full_name || authUser.email || 'مستخدم بدون اسم',
-        avatarUrl: profile?.avatar_url || null,
-        phone: profile?.phone || null,
-        position: profile?.position || null,
-        roles: roles.length > 0 ? roles : [UserRole.USER],
-        createdAt: authUser.created_at,
-        lastSignInAt: authUser.last_sign_in_at
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    await updateProfile(user, {
+      displayName: displayName,
+    });
+
+    const newUser: User = {
+      id: user.uid,
+      uid: user.uid,
+      email: user.email!,
+      displayName: displayName,
+      photoURL: user.photoURL,
+      role: role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await createUserDocument(newUser);
+
+    return newUser;
+  } catch (error: any) {
+    console.error("Error creating user:", error.message);
+    throw new Error(`Failed to create user: ${error.message}`);
+  }
+};
+
+const signInUser = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    return user;
+  } catch (error: any) {
+    console.error("Error signing in:", error.message);
+    throw new Error(`Failed to sign in: ${error.message}`);
+  }
+};
+
+const signOutUser = async () => {
+  try {
+    await signOut(auth);
+  } catch (error: any) {
+    console.error("Error signing out:", error.message);
+    throw new Error(`Failed to sign out: ${error.message}`);
+  }
+};
+
+const resetPassword = async (email: string) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error("Error sending password reset email:", error.message);
+    throw new Error(`Failed to send password reset email: ${error.message}`);
+  }
+};
+
+// --------------------- User Document Functions ---------------------
+const createUserDocument = async (user: User) => {
+  try {
+    const userDocRef = doc(db, "users", user.uid);
+    await updateDoc(userDocRef, {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL || null,
+      role: user.role,
+      createdAt: Timestamp.fromDate(user.createdAt),
+      updatedAt: Timestamp.fromDate(user.updatedAt),
+    });
+    return user;
+  } catch (error: any) {
+    console.error("Error creating user document:", error.message);
+    throw new Error(`Failed to create user document: ${error.message}`);
+  }
+};
+
+const getUserDocument = async (id: string): Promise<User | null> => {
+  try {
+    const userDocRef = doc(db, "users", id);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      const user: User = {
+        id: userDocSnap.id,
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        role: userData.role,
+        createdAt: userData.createdAt.toDate(),
+        updatedAt: userData.updatedAt.toDate(),
       };
+      return user;
+    } else {
+      return null;
+    }
+  } catch (error: any) {
+    console.error("Error getting user document:", error.message);
+    throw new Error(`Failed to get user document: ${error.message}`);
+  }
+};
+
+const getAllUserDocuments = async (): Promise<User[]> => {
+  try {
+    const usersCollectionRef = collection(db, "users");
+    const usersSnapshot = await getDocs(usersCollectionRef);
+    const users: User[] = [];
+
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      const user: User = {
+        id: doc.id,
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        role: userData.role,
+        createdAt: userData.createdAt.toDate(),
+        updatedAt: userData.updatedAt.toDate(),
+      };
+      users.push(user);
     });
-    
+
     return users;
-  } catch (error) {
-    console.error('Error getting all users:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error getting all user documents:", error.message);
+    throw new Error(`Failed to get all user documents: ${error.message}`);
   }
 };
 
-export const getUserById = async (userId: string): Promise<UserProfile> => {
+const updateUserDocument = async (user: User) => {
   try {
-    console.log(`Fetching user with ID ${userId}...`);
-    
-    const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
-    
-    if (authError || !authUser.user) {
-      console.error(`Error fetching auth user ${userId}:`, authError);
-      throw authError || new Error('User not found');
-    }
-    
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-      
-    if (profileError) {
-      console.error(`Error fetching profile for ${userId}:`, profileError);
-      throw profileError;
-    }
-    
-    const { data: userRoles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-      
-    if (rolesError) {
-      console.error(`Error fetching roles for ${userId}:`, rolesError);
-      throw rolesError;
-    }
-    
-    const roles = userRoles.map(r => r.role as UserRole);
-    
-    return {
-      id: userId,
-      email: authUser.user.email,
-      fullName: profile?.full_name || authUser.user.email || 'مستخدم بدون اسم',
-      avatarUrl: profile?.avatar_url || null,
-      phone: profile?.phone || null,
-      position: profile?.position || null,
-      roles: roles.length > 0 ? roles : [UserRole.USER],
-      createdAt: authUser.user.created_at,
-      lastSignInAt: authUser.user.last_sign_in_at
-    };
-  } catch (error) {
-    console.error(`Error getting user with ID ${userId}:`, error);
-    throw error;
-  }
-};
-
-export const createUser = async (params: CreateUserParams): Promise<UserProfile> => {
-  try {
-    console.log('Creating new user:', params.email);
-    const { email, password, fullName, roles } = params;
-    
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName
-      }
+    const userDocRef = doc(db, "users", user.id);
+    await updateDoc(userDocRef, {
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      role: user.role,
+      updatedAt: Timestamp.fromDate(new Date()),
     });
-    
-    if (authError || !authData.user) {
-      console.error('Error creating auth user:', authError);
-      throw authError || new Error('Failed to create user');
-    }
-    
-    console.log('User created successfully:', authData.user.id);
-    const userId = authData.user.id;
-    
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-      
-    if (profileError) {
-      console.error('Error checking profile existence:', profileError);
-      const { data: newProfile, error: newProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          full_name: fullName
-        })
-        .select('*')
-        .single();
-        
-      if (newProfileError) {
-        console.error('Error creating profile:', newProfileError);
-        throw newProfileError;
-      }
-      
-      console.log('Profile created:', newProfile);
-    } else if (!profileData) {
-      const { data: newProfile, error: newProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          full_name: fullName
-        })
-        .select('*')
-        .single();
-        
-      if (newProfileError) {
-        console.error('Error creating profile:', newProfileError);
-        throw newProfileError;
-      }
-      
-      console.log('Profile created:', newProfile);
-    }
-    
-    const { error: deleteRolesError } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-      
-    if (deleteRolesError) {
-      console.error('Error deleting existing roles:', deleteRolesError);
-      throw deleteRolesError;
-    }
-    
-    const rolesToInsert = roles.map(role => ({
-      user_id: userId,
-      role: role
-    }));
-    
-    if (rolesToInsert.length > 0) {
-      console.log('Adding roles:', rolesToInsert);
-      const { error: insertRolesError } = await supabase
-        .from('user_roles')
-        .insert(rolesToInsert);
-        
-      if (insertRolesError) {
-        console.error('Error adding roles:', insertRolesError);
-        throw insertRolesError;
-      }
-    }
-    
-    return {
-      id: userId,
-      email,
-      fullName,
-      avatarUrl: null,
-      phone: null,
-      position: null,
-      roles
-    };
-  } catch (error) {
-    console.error('Error creating user:', error);
-    throw error;
+    return user;
+  } catch (error: any) {
+    console.error("Error updating user document:", error.message);
+    throw new Error(`Failed to update user document: ${error.message}`);
   }
 };
 
-export const updateUserProfile = async (profile: Partial<UserProfile> & { id: string }): Promise<UserProfile> => {
+const deleteUserDocument = async (id: string) => {
   try {
-    console.log('Updating user profile:', profile.id);
-    const { id, fullName, avatarUrl, phone, position } = profile;
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        phone: phone,
-        position: position
-      })
-      .eq('id', id)
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('Error updating profile:', error);
-      throw error;
-    }
-    
-    console.log('Profile updated successfully:', data);
-    
-    const { data: rolesData, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', id);
-      
-    if (rolesError) {
-      console.error('Error fetching roles after update:', rolesError);
-      throw rolesError;
-    }
-    
-    const userRoles = rolesData.map(r => r.role as UserRole);
-    
-    return {
-      id: data.id,
-      fullName: data.full_name,
-      avatarUrl: data.avatar_url,
-      phone: data.phone,
-      position: data.position,
-      roles: userRoles
-    };
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    throw error;
+    const userDocRef = doc(db, "users", id);
+    await deleteDoc(userDocRef);
+  } catch (error: any) {
+    console.error("Error deleting user document:", error.message);
+    throw new Error(`Failed to delete user document: ${error.message}`);
   }
 };
 
-export const updateUserRoles = async (userId: string, roles: UserRole[]): Promise<void> => {
+// --------------------- Storage Functions ---------------------
+const uploadUserPhoto = async (file: File, userId: string) => {
   try {
-    console.log(`Updating roles for user ${userId}:`, roles);
-    
-    const { error: deleteError } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-      
-    if (deleteError) {
-      console.error('Error deleting existing roles:', deleteError);
-      throw deleteError;
-    }
-    
-    if (!roles.length) {
-      roles = [UserRole.USER];
-    }
-    
-    const rolesToInsert = roles.map(role => ({
-      user_id: userId,
-      role: role
-    }));
-    
-    const { error: insertError } = await supabase
-      .from('user_roles')
-      .insert(rolesToInsert);
-      
-    if (insertError) {
-      console.error('Error adding new roles:', insertError);
-      throw insertError;
-    }
-    
-    console.log('Roles updated successfully');
-  } catch (error) {
-    console.error('Error updating user roles:', error);
-    throw error;
+    const storageRef = ref(storage, `users/${userId}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  } catch (error: any) {
+    console.error("Error uploading user photo:", error.message);
+    throw new Error(`Failed to upload user photo: ${error.message}`);
   }
 };
 
-export const addRoleToUser = async (userId: string, role: UserRole): Promise<void> => {
+const deleteUserPhoto = async (photoURL: string, userId: string) => {
   try {
-    console.log(`Adding role ${role} to user ${userId}`);
-    
-    const { data, error: checkError } = await supabase
-      .from('user_roles')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('role', role);
+    const photoRef = ref(storage, photoURL);
+    await deleteObject(photoRef);
+  } catch (error: any) {
+    console.error("Error deleting user photo:", error.message);
+    throw new Error(`Failed to delete user photo: ${error.message}`);
+  }
+};
+
+// --------------------- Additional Authentication Functions ---------------------
+const changeEmail = async (userId: string, newEmail: string) => {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      await updateEmail(user, newEmail);
       
-    if (checkError) {
-      console.error('Error checking existing role:', checkError);
-      throw checkError;
-    }
-    
-    if (data && data.length > 0) {
-      console.log('User already has this role');
-      return;
-    }
-    
-    const { error } = await supabase
-      .from('user_roles')
-      .insert({
-        user_id: userId,
-        role
+      // Update the email in the Firestore document as well
+      const userDocRef = doc(db, "users", userId);
+      await updateDoc(userDocRef, {
+        email: newEmail,
+        updatedAt: Timestamp.fromDate(new Date()),
       });
       
-    if (error) {
-      console.error('Error adding role:', error);
-      throw error;
+      return true;
+    } else {
+      throw new Error("No user is currently signed in.");
     }
-    
-    console.log('Role added successfully');
-  } catch (error) {
-    console.error('Error adding role to user:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error changing email:", error.message);
+    throw new Error(`Failed to change email: ${error.message}`);
   }
 };
 
-export const removeRoleFromUser = async (userId: string, role: UserRole): Promise<void> => {
+const changePassword = async (userId: string, newPassword: string) => {
   try {
-    console.log(`Removing role ${role} from user ${userId}`);
-    
-    const { error } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId)
-      .eq('role', role);
-      
-    if (error) {
-      console.error('Error removing role:', error);
-      throw error;
+    const user = auth.currentUser;
+    if (user) {
+      await user.updatePassword(newPassword);
+      return true;
+    } else {
+      throw new Error("No user is currently signed in.");
     }
-    
-    console.log('Role removed successfully');
-    
-    const { data: rolesData, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-      
-    if (rolesError) {
-      console.error('Error checking remaining roles:', rolesError);
-      throw rolesError;
-    }
-    
-    if (!rolesData || rolesData.length === 0) {
-      console.log('No roles remaining, adding default USER role');
-      await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: UserRole.USER
-        });
-    }
-  } catch (error) {
-    console.error('Error removing role from user:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error changing password:", error.message);
+    throw new Error(`Failed to change password: ${error.message}`);
   }
 };
 
-export const deleteUser = async (userId: string): Promise<void> => {
+const sendVerificationEmail = async () => {
   try {
-    console.log(`Deleting user ${userId}`);
-    
-    const { error } = await supabase.auth.admin.deleteUser(userId);
-    
-    if (error) {
-      console.error('Error deleting user:', error);
-      throw error;
+    const user = auth.currentUser;
+    if (user && !user.emailVerified) {
+      await user.sendEmailVerification();
+      return true;
+    } else {
+      throw new Error("No user is currently signed in or email already verified.");
     }
-    
-    console.log('User deleted successfully');
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error sending verification email:", error.message);
+    throw new Error(`Failed to send verification email: ${error.message}`);
   }
 };
 
-export const updateUserPassword = async (userId: string, newPassword: string): Promise<void> => {
+const resendPasswordResetEmail = async (email: string) => {
   try {
-    console.log(`Updating password for user ${userId}`);
-    
-    const { error } = await supabase.auth.admin.updateUserById(
-      userId,
-      { password: newPassword }
-    );
-    
-    if (error) {
-      console.error('Error updating user password:', error);
-      throw error;
+    // First, check if the user exists with the provided email
+    const users = await getAllUserDocuments();
+    const userExists = users.some(u => u.email === email);
+
+    if (!userExists) {
+      throw new Error("No user found with this email address.");
     }
-    
-    console.log('Password updated successfully');
-  } catch (error) {
-    console.error('Error updating user password:', error);
-    throw error;
+
+    // If the user exists, send the password reset email
+    await sendPasswordResetEmail(auth, email);
+    return true;
+  } catch (error: any) {
+    console.error("Error resending password reset email:", error.message);
+    throw new Error(`Failed to resend password reset email: ${error.message}`);
   }
 };
 
-export const updateCurrentUserPassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+const deleteAccount = async (userId: string) => {
   try {
-    console.log('Updating current user password');
-    
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    
-    if (error) {
-      console.error('Error updating current user password:', error);
-      throw error;
+    const user = auth.currentUser;
+    if (user && user.uid === userId) {
+      // Delete the user document from Firestore
+      await deleteUserDocument(userId);
+
+      // Delete the user from Firebase Authentication
+      await deleteUser(user);
+
+      return true;
+    } else {
+      throw new Error("No user is currently signed in or unauthorized to delete this account.");
     }
-    
-    console.log('Password updated successfully');
-  } catch (error) {
-    console.error('Error updating current user password:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("Error deleting account:", error.message);
+    throw new Error(`Failed to delete account: ${error.message}`);
   }
 };
 
-export const checkAdminExists = async (): Promise<boolean> => {
+const getUserByEmail = async (email: string): Promise<User | null> => {
   try {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', UserRole.ADMIN);
-      
-    if (error) {
-      console.error('Error checking admin existence:', error);
-      throw error;
+    const usersCollectionRef = collection(db, "users");
+    const q = query(usersCollectionRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      const user: User = {
+        id: userDoc.id,
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        role: userData.role,
+        createdAt: userData.createdAt.toDate(),
+        updatedAt: userData.updatedAt.toDate(),
+      };
+      return user;
+    } else {
+      return null;
     }
-    
-    return data && data.length > 0;
-  } catch (error) {
-    console.error('Error checking admin existence:', error);
+  } catch (error: any) {
+    console.error("Error getting user by email:", error.message);
+    throw new Error(`Failed to get user by email: ${error.message}`);
+  }
+};
+
+const verifyPasswordResetCode = async (code: string, email: string): Promise<boolean> => {
+  try {
+    // Check if a user with the given email exists
+    const users = await getAllUserDocuments();
+    const user = users.find(u => u.email === email);
+
+    if (!user) {
+      console.error("No user found with the given email.");
+      return false;
+    }
+
+    // Here you might want to add additional checks or logic
+    // For example, you could check if the password reset code is valid
+    // based on some custom implementation
+
+    return true; // Return true if the email exists and any additional checks pass
+  } catch (error: any) {
+    console.error("Error verifying password reset code:", error.message);
     return false;
   }
 };
 
-export const createDefaultAdmin = async (email: string, password: string, fullName: string): Promise<UserProfile | null> => {
+const confirmPasswordReset = async (code: string, newPassword: string, email: string): Promise<void> => {
   try {
-    console.log('Creating default admin user');
-    
-    const adminExists = await checkAdminExists();
-    console.log('Admin exists?', adminExists);
-    
-    if (adminExists) {
-      console.log('Admin user already exists');
-      
-      const { data, error: userError } = await supabase.auth.admin.listUsers();
-      
-      if (userError) {
-        console.error("Error listing users:", userError);
-        throw userError;
-      }
-      
-      if (data && data.users && data.users.length > 0) {
-        const adminUser = data.users ? data.users.find(user => {
-          // Safely check if email exists and matches
-          return user && typeof user.email === 'string' && user.email === email;
-        }) : null;
-        
-        if (adminUser) {
-          console.log('Found existing admin user:', adminUser.id);
-          
-          await ensureUserHasAdminRole(adminUser.id);
-          
-          const adminProfile = await getUserById(adminUser.id);
-          return adminProfile;
-        }
-      }
-      
-      return null;
+    // Check if a user with the given email exists
+    const users = await getAllUserDocuments();
+    const user = users.find(u => u.email === email);
+
+    if (!user) {
+      throw new Error("No user found with the given email.");
     }
-    
-    console.log('No admin found. Creating new admin with:', { email, fullName });
-    
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName
-      }
-    });
-    
-    if (authError || !authData.user) {
-      console.error('Error creating auth user:', authError);
-      throw authError || new Error('Failed to create user');
+
+    // Find the user in Firebase Authentication
+    const authUsers = await getAllUserDocuments();
+    const authUser = authUsers.find(u => u.email === email);
+
+    if (!authUser) {
+      throw new Error("No user found in Firebase Authentication with the given email.");
     }
-    
-    console.log('User created successfully:', authData.user.id);
-    const userId = authData.user.id;
-    
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-      
-    if (profileError) {
-      console.error('Error checking profile existence:', profileError);
-      
-      const { data: newProfile, error: newProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          full_name: fullName
-        })
-        .select('*')
-        .single();
-        
-      if (newProfileError) {
-        console.error('Error creating profile:', newProfileError);
-        throw newProfileError;
-      }
-      
-      console.log('Profile created:', newProfile);
-    } else if (!profileData) {
-      const { data: newProfile, error: newProfileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          full_name: fullName
-        })
-        .select('*')
-        .single();
-        
-      if (newProfileError) {
-        console.error('Error creating profile:', newProfileError);
-        throw newProfileError;
-      }
-      
-      console.log('Profile created:', newProfile);
-    }
-    
-    const { error: roleError } = await supabase
-      .from('user_roles')
-      .insert({
-        user_id: userId,
-        role: UserRole.ADMIN
-      });
-      
-    if (roleError) {
-      console.error('Error adding admin role:', roleError);
-      throw roleError;
-    }
-    
-    console.log('Admin role added successfully');
-    
-    const newAdmin: UserProfile = {
-      id: userId,
-      email,
-      fullName,
-      avatarUrl: null,
-      phone: null,
-      position: null,
-      roles: [UserRole.ADMIN]
-    };
-    
-    return newAdmin;
-  } catch (error) {
-    console.error('Error creating default admin:', error);
-    throw error;
+
+    // Update the password in Firebase Authentication
+    await auth.confirmPasswordReset(code, newPassword);
+
+    console.log("Password reset successfully.");
+  } catch (error: any) {
+    console.error("Error confirming password reset:", error.message);
+    throw new Error(`Failed to confirm password reset: ${error.message}`);
   }
 };
 
-export const ensureUserHasAdminRole = async (userId: string): Promise<void> => {
+const sendSignInLinkToEmail = async (email: string, actionCodeSettings: any) => {
   try {
-    console.log('Ensuring user has admin role:', userId);
-    
-    const { data: existingRoles, error: checkError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    
-    if (checkError) {
-      console.error('Error checking user roles:', checkError);
-      throw checkError;
+    await auth.sendSignInLinkToEmail(email, actionCodeSettings);
+    // The link was successfully sent. Inform the user.
+    // Save the email locally so you don't need to ask the user for it again.
+    window.localStorage.setItem('emailForSignIn', email);
+    return true;
+  } catch (error: any) {
+    console.error("Error sending sign-in link to email:", error.message);
+    throw new Error(`Failed to send sign-in link to email: ${error.message}`);
+  }
+};
+
+const isSignInWithEmailLink = (url: string): boolean => {
+  return auth.isSignInWithEmailLink(url);
+};
+
+const signInWithEmailLink = async (email: string, url: string) => {
+  try {
+    const result = await auth.signInWithEmailLink(email, url);
+    // Clear email from storage.
+    window.localStorage.removeItem('emailForSignIn');
+    return result.user;
+  } catch (error: any) {
+    console.error("Error signing in with email link:", error.message);
+    throw new Error(`Failed to sign in with email link: ${error.message}`);
+  }
+};
+
+const getUsersWithRole = async (role: string): Promise<User[]> => {
+  try {
+    const usersCollectionRef = collection(db, "users");
+    const q = query(usersCollectionRef, where("role", "==", role));
+    const querySnapshot = await getDocs(q);
+    const users: User[] = [];
+
+    querySnapshot.forEach((doc) => {
+      const userData = doc.data();
+      const user: User = {
+        id: doc.id,
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        role: userData.role,
+        createdAt: userData.createdAt.toDate(),
+        updatedAt: userData.updatedAt.toDate(),
+      };
+      users.push(user);
+    });
+
+    return users;
+  } catch (error: any) {
+    console.error("Error getting users with role:", error.message);
+    throw new Error(`Failed to get users with role: ${error.message}`);
+  }
+};
+
+const findUsers = async (searchTerm: string): Promise<User[]> => {
+  try {
+    const users = await getAllUserDocuments();
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return users.filter(user =>
+      user.displayName.toLowerCase().includes(lowerSearchTerm) ||
+      user.email.toLowerCase().includes(lowerSearchTerm)
+    );
+  } catch (error: any) {
+    console.error("Error finding users:", error.message);
+    throw new Error(`Failed to find users: ${error.message}`);
+  }
+};
+
+const findUsersByRole = async (searchTerm: string, role: string): Promise<User[]> => {
+  try {
+    const users = await getUsersWithRole(role);
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return users.filter(user =>
+      user.displayName.toLowerCase().includes(lowerSearchTerm) ||
+      user.email.toLowerCase().includes(lowerSearchTerm)
+    );
+  } catch (error: any) {
+    console.error("Error finding users by role:", error.message);
+    throw new Error(`Failed to find users by role: ${error.message}`);
+  }
+};
+
+const isEmailAlreadyInUse = async (email: string): Promise<boolean> => {
+  try {
+    const users = await getAllUserDocuments();
+    return users.some(user => user.email === email);
+  } catch (error: any) {
+    console.error("Error checking if email is already in use:", error.message);
+    throw new Error(`Failed to check if email is already in use: ${error.message}`);
+  }
+};
+
+const sendPasswordResetEmailForUsers = async (email: string) => {
+  try {
+    const users = await getAllUserDocuments();
+    const filteredUsers = users.filter(u => {
+      if (!u || typeof u !== 'object') return false;
+      const userEmail = u.email;
+      return userEmail === email || 
+             (typeof userEmail === 'string' && typeof email === 'string' && 
+              userEmail.toLowerCase() === email.toLowerCase());
+    });
+
+    if (filteredUsers.length === 0) {
+      throw new Error("No user found with this email address.");
     }
-    
-    const hasAdminRole = existingRoles.some(r => r.role === UserRole.ADMIN);
-    
-    if (!hasAdminRole) {
-      console.log('Adding admin role to user:', userId);
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: UserRole.ADMIN
-        });
-      
-      if (insertError) {
-        console.error('Error adding admin role:', insertError);
-        throw insertError;
-      }
-      
-      console.log('Admin role added successfully');
-    } else {
-      console.log('User already has admin role');
-    }
-  } catch (error) {
-    console.error('Error ensuring admin role:', error);
-    throw error;
+
+    // If the user exists, send the password reset email
+    await sendPasswordResetEmail(auth, email);
+    return true;
+  } catch (error: any) {
+    console.error("Error sending password reset email:", error.message);
+    throw new Error(`Failed to send password reset email: ${error.message}`);
   }
 };
 
 export const usersService = {
-  async assignAdminRole(userId: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      console.log('Assigning admin role to user:', userId);
-      
-      // Check if the user exists
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .single();
-      
-      if (userError) {
-        console.error('Error finding user:', userError);
-        return { success: false, message: `خطأ في العثور على المستخدم: ${userError.message}` };
-      }
-      
-      // Add admin role to user_roles table
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert([
-          {
-            user_id: userId,
-            role: 'admin'
-          }
-        ]);
-      
-      if (roleError) {
-        console.error('Error assigning admin role:', roleError);
-        return { success: false, message: `خطأ في تعيين دور المدير: ${roleError.message}` };
-      }
-      
-      console.log('Admin role assigned successfully to user:', userId);
-      return { success: true };
-    } catch (error: any) {
-      console.error('Exception assigning admin role:', error);
-      return { success: false, message: error.message };
-    }
-  },
-
-  /**
-   * Resets user password.
-   * @param email The email address of the user.
-   * @returns Promise with the operation result.
-   */
-  async resetPassword(email: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      console.log('Requesting password reset for:', email);
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) {
-        console.error('Error requesting password reset:', error);
-        return { success: false, message: `خطأ في طلب إعادة تعيين كلمة المرور: ${error.message}` };
-      }
-      
-      console.log('Password reset email sent successfully to:', email);
-      return { success: true };
-    } catch (error: any) {
-      console.error('Exception requesting password reset:', error);
-      return { success: false, message: error.message };
-    }
-  },
-
-  /**
-   * Gets all users with their roles.
-   * @returns Promise with the list of users.
-   */
-  async getAllUsersWithRoles(): Promise<any[]> {
-    try {
-      console.log('Fetching all users with roles');
-      
-      // Get all users from auth schema (admin only API)
-      const { data: adminUsers, error: adminError } = await supabase.auth.admin.listUsers();
-      
-      if (adminError) {
-        console.error('Error fetching admin users list:', adminError);
-        // Return empty array on error
-        return [];
-      }
-      
-      // Get all user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, position, avatar_url');
-      
-      if (profilesError) {
-        console.error('Error fetching user profiles:', profilesError);
-        return [];
-      }
-      
-      // Get all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-      
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-        return [];
-      }
-      
-      // Map user data
-      const users = adminUsers.users.map(user => {
-        const profile = profiles?.find(p => p.id === user.id);
-        const userRoles = roles?.filter(r => r.user_id === user.id).map(r => r.role) || [];
-        
-        return {
-          id: user.id,
-          email: user.email,
-          fullName: profile?.full_name || user.email?.split('@')[0] || 'مستخدم',
-          position: profile?.position || '',
-          avatarUrl: profile?.avatar_url || '',
-          roles: userRoles,
-          createdAt: user.created_at,
-          lastSignIn: user.last_sign_in_at,
-          confirmed: !user.confirmation_sent_at || user.email_confirmed_at,
-        };
-      });
-      
-      console.log('Fetched users with roles:', users.length);
-      return users;
-    } catch (error: any) {
-      console.error('Exception fetching users with roles:', error);
-      return [];
-    }
-  },
+  createUser,
+  signInUser,
+  signOutUser,
+  resetPassword,
+  createUserDocument,
+  getUserDocument,
+  getAllUserDocuments,
+  updateUserDocument,
+  deleteUserDocument,
+  uploadUserPhoto,
+  deleteUserPhoto,
+  changeEmail,
+  changePassword,
+  sendVerificationEmail,
+  resendPasswordResetEmail,
+  deleteAccount,
+  getUserByEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  getUsersWithRole,
+  findUsers,
+  findUsersByRole,
+  isEmailAlreadyInUse,
+  sendPasswordResetEmail: sendPasswordResetEmailForUsers,
 };
