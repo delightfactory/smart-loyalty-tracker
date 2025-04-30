@@ -3,12 +3,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import * as z from 'zod';
-import { usersService } from '@/services/users';
+import { assignAdminRole } from '@/services/users-api';
 import { supabase } from '@/integrations/supabase/client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,7 +68,7 @@ const CreateAdminAccount: React.FC = () => {
       
       if (signUpData && signUpData.user) {
         // Assign admin role to the user
-        const adminRoleResult = await usersService.assignAdminRole(signUpData.user.id);
+        const adminRoleResult = await assignAdminRole(signUpData.user.id);
         
         if (!adminRoleResult.success) {
           throw new Error(adminRoleResult.message || 'فشل في إضافة دور المدير');

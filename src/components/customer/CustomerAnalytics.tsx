@@ -1,541 +1,796 @@
 
-import { useState, useMemo } from 'react';
-import { 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from '@/components/ui/chart';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { 
   BarChart, 
   Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
+  Tooltip, 
   Legend, 
-  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  ScatterChart,
+  Scatter,
+  ZAxis,
 } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { ProductCategory, BusinessType } from '@/lib/types';
-import { formatAmountEn } from '@/lib/formatters';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+  ChevronDown, 
+  ChevronUp, 
+  Activity, 
+  Users, 
+  Calendar, 
+  PieChart as PieChartIcon,
+  Map,
+  Building, 
+  ShoppingBag,
+  Wallet,
+  TrendingUp,
+  Clock,
+  Star
+} from 'lucide-react';
+import { Customer } from '@/lib/types';
+import { addDays, format, differenceInDays } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 interface CustomerAnalyticsProps {
-  customers: any[];
-  invoices: any[];
-  products: any[];
-  isLoading: boolean;
+  customers: Customer[];
 }
 
-const CustomerAnalytics = ({ customers, invoices, products, isLoading }: CustomerAnalyticsProps) => {
-  const [timeRange, setTimeRange] = useState('all');
-  const [segmentBy, setSegmentBy] = useState('businessType');
-  
-  // Prepare customer purchase data based on real data
-  const customerPurchaseData = useMemo(() => {
-    if (isLoading || !customers.length || !invoices.length) return [];
-    
-    return customers.map(customer => {
-      const customerInvoices = invoices.filter(invoice => invoice.customerId === customer.id);
-      const totalPurchase = customerInvoices.reduce((total, invoice) => total + invoice.totalAmount, 0);
-      const purchaseCount = customerInvoices.length;
+const CustomerAnalytics = ({ customers }: CustomerAnalyticsProps) => {
+  const [activeMetric, setActiveMetric] = useState<string>('activity');
+
+  // حساب توزيع العملاء حسب المناطق
+  const calculateRegionDistribution = () => {
+    const regions: { [key: string]: number } = {};
+    let unknownCount = 0;
+
+    customers.forEach(customer => {
+      const city = customer.city || 'غير محدد';
       
-      return {
-        id: customer.id,
-        name: customer.name,
-        businessType: customer.businessType,
-        totalPurchase,
-        purchaseCount,
-        averagePurchase: purchaseCount > 0 ? totalPurchase / purchaseCount : 0,
-        lastPurchase: customer.lastPurchase,
-        inactiveDays: customer.inactiveDays,
-        pointsEarned: customer.pointsEarned || 0,
-        pointsRedeemed: customer.pointsRedeemed || 0,
-        currentPoints: customer.currentPoints || 0
-      };
-    }).sort((a, b) => b.totalPurchase - a.totalPurchase);
-  }, [customers, invoices, isLoading]);
-  
-  // Top 10 customers
-  const topCustomers = useMemo(() => customerPurchaseData.slice(0, 10), [customerPurchaseData]);
-  
-  // Business type distribution
-  const businessTypeData = useMemo(() => {
-    if (isLoading || !customers.length || !customerPurchaseData.length) {
-      return [];
+      if (city === 'غير محدد') {
+        unknownCount++;
+      } else {
+        regions[city] = (regions[city] || 0) + 1;
+      }
+    });
+
+    // تحويل البيانات إلى تنسيق مناسب للرسم البياني
+    const data = Object.entries(regions)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    // إضافة العملاء ذوي المناطق غير المحددة
+    if (unknownCount > 0) {
+      data.push({ name: 'غير محدد', value: unknownCount });
+    }
+
+    return data;
+  };
+
+  // حساب توزيع العملاء حسب نوع النشاط التجاري
+  const calculateBusinessTypeDistribution = () => {
+    const types: { [key: string]: number } = {};
+    let unknownCount = 0;
+
+    customers.forEach(customer => {
+      const type = customer.businessType || 'غير محدد';
+      
+      if (type === 'غير محدد') {
+        unknownCount++;
+      } else {
+        types[type] = (types[type] || 0) + 1;
+      }
+    });
+
+    // تحويل البيانات إلى تنسيق مناسب للرسم البياني
+    const data = Object.entries(types)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    // إضافة العملاء ذوي الأنواع غير المحددة
+    if (unknownCount > 0) {
+      data.push({ name: 'غير محدد', value: unknownCount });
+    }
+
+    return data;
+  };
+
+  // حساب توزيع نشاط العملاء
+  const calculateActivityDistribution = () => {
+    const now = new Date();
+    const veryActive = [];
+    const active = [];
+    const moderate = [];
+    const inactive = [];
+    const lost = [];
+
+    for (const customer of customers) {
+      const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
+      
+      if (!lastActive) {
+        lost.push(customer);
+        continue;
+      }
+      
+      const daysSinceLastActive = differenceInDays(now, lastActive);
+      
+      if (daysSinceLastActive <= 7) {
+        veryActive.push(customer);
+      } else if (daysSinceLastActive <= 30) {
+        active.push(customer);
+      } else if (daysSinceLastActive <= 60) {
+        moderate.push(customer);
+      } else if (daysSinceLastActive <= 90) {
+        inactive.push(customer);
+      } else {
+        lost.push(customer);
+      }
+    }
+
+    return [
+      { name: 'نشط جداً', value: veryActive.length, color: '#10B981' },
+      { name: 'نشط', value: active.length, color: '#6366F1' },
+      { name: 'متوسط', value: moderate.length, color: '#F59E0B' },
+      { name: 'غير نشط', value: inactive.length, color: '#EF4444' },
+      { name: 'مفقود', value: lost.length, color: '#6B7280' }
+    ];
+  };
+
+  // حساب اتجاهات نشاط العملاء
+  const calculateActivityTrends = () => {
+    const now = new Date();
+    const sixMonthsAgo = addDays(now, -180);
+    const monthNames = [];
+    
+    // إنشاء أسماء الأشهر الستة الماضية
+    for (let i = 0; i < 6; i++) {
+      const date = addDays(now, -i * 30);
+      monthNames.unshift(format(date, 'MMM', { locale: ar }));
     }
     
-    const typeMap = new Map();
+    // تهيئة مصفوفة البيانات
+    const data = monthNames.map(month => ({
+      name: month,
+      active: 0,
+      inactive: 0,
+      lost: 0
+    }));
     
+    // حساب أعداد العملاء لكل فئة شهرياً
     customers.forEach(customer => {
-      if (!customer.businessType) return;
+      const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
       
-      const existing = typeMap.get(customer.businessType);
-      const customerData = customerPurchaseData.find(c => c.id === customer.id);
+      if (!lastActive || lastActive < sixMonthsAgo) return;
       
-      if (!existing) {
-        typeMap.set(customer.businessType, {
-          name: customer.businessType,
-          count: 1,
-          totalPurchase: customerData?.totalPurchase || 0,
-          averagePurchase: customerData?.totalPurchase || 0
-        });
+      const monthIndex = Math.floor(differenceInDays(now, lastActive) / 30);
+      
+      if (monthIndex >= data.length) return;
+      
+      const daysSinceLastActive = differenceInDays(now, lastActive);
+      
+      if (daysSinceLastActive <= 30) {
+        data[monthIndex].active += 1;
+      } else if (daysSinceLastActive <= 90) {
+        data[monthIndex].inactive += 1;
       } else {
-        typeMap.set(customer.businessType, {
-          ...existing,
-          count: existing.count + 1,
-          totalPurchase: existing.totalPurchase + (customerData?.totalPurchase || 0),
-          averagePurchase: (existing.totalPurchase + (customerData?.totalPurchase || 0)) / (existing.count + 1)
-        });
+        data[monthIndex].lost += 1;
       }
     });
     
-    return Array.from(typeMap.values());
-  }, [customers, customerPurchaseData, isLoading]);
-
-  // Inactivity breakdown data
-  const inactivityData = useMemo(() => {
-    if (isLoading || !customers.length) return [];
-    
-    const groups = [
-      { name: 'نشط (آخر 7 أيام)', count: 0, range: [0, 7] },
-      { name: 'قليل النشاط (8-30 يوم)', count: 0, range: [8, 30] },
-      { name: 'خطر معتدل (31-60 يوم)', count: 0, range: [31, 60] },
-      { name: 'خطر مرتفع (61-90 يوم)', count: 0, range: [61, 90] },
-      { name: 'غير نشط (أكثر من 90 يوم)', count: 0, range: [91, Infinity] }
-    ];
-    
-    customers.forEach(customer => {
-      const days = customer.inactiveDays || 0;
-      const group = groups.find(g => days >= g.range[0] && days <= g.range[1]);
-      if (group) group.count++;
-    });
-    
-    return groups;
-  }, [customers, isLoading]);
-
-  // Segment customers by a property
-  const getCustomerSegments = (property: string) => {
-    if (!customerPurchaseData.length) return [];
-    
-    const segments = new Map();
-    
-    customerPurchaseData.forEach(customer => {
-      let key: string;
-      
-      switch (property) {
-        case 'businessType':
-          key = customer.businessType || 'غير محدد';
-          break;
-        case 'activityLevel':
-          if (!customer.inactiveDays && customer.inactiveDays !== 0) {
-            key = 'غير محدد';
-          } else if (customer.inactiveDays <= 7) {
-            key = 'نشط جدًا';
-          } else if (customer.inactiveDays <= 30) {
-            key = 'نشط';
-          } else if (customer.inactiveDays <= 90) {
-            key = 'منخفض النشاط';
-          } else {
-            key = 'غير نشط';
-          }
-          break;
-        case 'purchaseFrequency':
-          if (!customer.purchaseCount) {
-            key = 'لا مشتريات';
-          } else if (customer.purchaseCount === 1) {
-            key = 'مرة واحدة';
-          } else if (customer.purchaseCount <= 3) {
-            key = '2-3 مرات';
-          } else if (customer.purchaseCount <= 10) {
-            key = '4-10 مرات';
-          } else {
-            key = 'أكثر من 10 مرات';
-          }
-          break;
-        case 'averageValue':
-          if (!customer.averagePurchase) {
-            key = 'لا مشتريات';
-          } else if (customer.averagePurchase < 100) {
-            key = 'أقل من 100 ج.م';
-          } else if (customer.averagePurchase < 500) {
-            key = '100-500 ج.م';
-          } else if (customer.averagePurchase < 1000) {
-            key = '500-1000 ج.م';
-          } else {
-            key = 'أكثر من 1000 ج.م';
-          }
-          break;
-        default:
-          key = 'غير مصنف';
-      }
-      
-      const existing = segments.get(key);
-      
-      if (!existing) {
-        segments.set(key, {
-          name: key,
-          count: 1,
-          totalPurchase: customer.totalPurchase || 0,
-          pointsEarned: customer.pointsEarned || 0,
-          averagePurchase: customer.averagePurchase || 0
-        });
-      } else {
-        segments.set(key, {
-          ...existing,
-          count: existing.count + 1,
-          totalPurchase: existing.totalPurchase + (customer.totalPurchase || 0),
-          pointsEarned: existing.pointsEarned + (customer.pointsEarned || 0),
-          averagePurchase: (existing.totalPurchase + (customer.totalPurchase || 0)) / (existing.count + 1)
-        });
-      }
-    });
-    
-    return Array.from(segments.values()).sort((a, b) => b.count - a.count);
+    return data;
   };
-  
-  // Customer segments data based on selected segmentation
-  const segmentData = useMemo(() => getCustomerSegments(segmentBy), [segmentBy, customerPurchaseData]);
 
-  // Colors for charts
-  const COLORS = ['#8B5CF6', '#10B981', '#F59E0B', '#3B82F6', '#EF4444', '#EC4899', '#14B8A6', '#F97316'];
+  // حساب مقارنة بين حجم المشتريات والنشاط
+  const calculatePurchaseVsActivity = () => {
+    return customers.map(customer => {
+      const totalSpent = customer.totalSpent || 0;
+      const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
+      const daysSinceActive = lastActive ? differenceInDays(new Date(), lastActive) : 365;
+      
+      return {
+        name: customer.name,
+        totalSpent,
+        daysSinceActive,
+        z: Math.max(5, Math.sqrt(totalSpent) / 10) // حجم النقطة في الرسم البياني
+      };
+    });
+  };
+
+  const regionData = calculateRegionDistribution();
+  const businessTypeData = calculateBusinessTypeDistribution();
+  const activityDistribution = calculateActivityDistribution();
+  const activityTrends = calculateActivityTrends();
+  const purchaseVsActivity = calculatePurchaseVsActivity();
   
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-64">جاري تحميل البيانات...</div>;
-  }
+  // الألوان للرسومات البيانية
+  const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+  
+  // معلومات أساسية عن العملاء
+  const totalCustomers = customers.length;
+  const activeCustomers = customers.filter(customer => {
+    const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
+    return lastActive && differenceInDays(new Date(), lastActive) <= 30;
+  }).length;
+  const inactiveCustomers = customers.filter(customer => {
+    const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
+    return !lastActive || differenceInDays(new Date(), lastActive) > 30;
+  }).length;
+  
+  const activePercentage = totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0;
+  const inactivePercentage = totalCustomers > 0 ? Math.round((inactiveCustomers / totalCustomers) * 100) : 0;
+  
+  // حساب متوسط قيمة العميل وأعلى قيمة
+  const avgCustomerValue = totalCustomers > 0 
+    ? customers.reduce((sum, customer) => sum + (customer.totalSpent || 0), 0) / totalCustomers
+    : 0;
+  
+  const topCustomerValue = customers.length > 0
+    ? Math.max(...customers.map(customer => customer.totalSpent || 0))
+    : 0;
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center mb-4">
-        <h3 className="text-lg font-semibold">تحليلات العملاء المتقدمة</h3>
-        <div className="flex gap-4">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="الفترة الزمنية" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الفترات</SelectItem>
-              <SelectItem value="month">آخر شهر</SelectItem>
-              <SelectItem value="quarter">آخر ربع سنة</SelectItem>
-              <SelectItem value="year">آخر سنة</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      {/* ملخص التحليلات */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">إجمالي العملاء</p>
+                <h2 className="text-2xl font-bold">{totalCustomers}</h2>
+              </div>
+              <div className="bg-primary/10 p-2 rounded-full">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1 text-xs">
+              <Badge variant="outline" className="font-normal">
+                100%
+              </Badge>
+              <span className="text-muted-foreground">من قاعدة العملاء</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">العملاء النشطون</p>
+                <h2 className="text-2xl font-bold">{activeCustomers}</h2>
+              </div>
+              <div className="bg-green-100 p-2 rounded-full">
+                <Activity className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">نسبة النشاط</span>
+                <span>{activePercentage}%</span>
+              </div>
+              <Progress value={activePercentage} className="h-1" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">العملاء غير النشطين</p>
+                <h2 className="text-2xl font-bold">{inactiveCustomers}</h2>
+              </div>
+              <div className="bg-amber-100 p-2 rounded-full">
+                <Clock className="h-5 w-5 text-amber-600" />
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">نسبة عدم النشاط</span>
+                <span>{inactivePercentage}%</span>
+              </div>
+              <Progress value={inactivePercentage} className="h-1" indicatorClassName="bg-amber-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-muted-foreground">متوسط قيمة العميل</p>
+                <h2 className="text-2xl font-bold">{avgCustomerValue.toFixed(0)} ج.م</h2>
+              </div>
+              <div className="bg-purple-100 p-2 rounded-full">
+                <Wallet className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-xs flex items-center gap-2">
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                <Star className="h-3 w-3 mr-1" />
+                أعلى قيمة: {topCustomerValue.toFixed(0)} ج.م
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      
-      <Tabs defaultValue="segments" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="segments">تحليل الشرائح</TabsTrigger>
-          <TabsTrigger value="activity">تحليل النشاط</TabsTrigger>
-          <TabsTrigger value="top">العملاء الأساسيين</TabsTrigger>
+
+      {/* تبويبات التحليلات المتقدمة */}
+      <Tabs defaultValue="activity" className="w-full">
+        <TabsList>
+          <TabsTrigger value="activity" onClick={() => setActiveMetric('activity')}>
+            <Activity className="h-4 w-4 ml-2" />
+            تحليل النشاط
+          </TabsTrigger>
+          <TabsTrigger value="geography" onClick={() => setActiveMetric('geography')}>
+            <Map className="h-4 w-4 ml-2" />
+            التوزيع الجغرافي
+          </TabsTrigger>
+          <TabsTrigger value="business" onClick={() => setActiveMetric('business')}>
+            <Building className="h-4 w-4 ml-2" />
+            نوع النشاط التجاري
+          </TabsTrigger>
+          <TabsTrigger value="purchases" onClick={() => setActiveMetric('purchases')}>
+            <ShoppingBag className="h-4 w-4 ml-2" />
+            تحليل المشتريات
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="segments">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <div className="flex justify-between">
-                  <div>
-                    <CardTitle>تحليل شرائح العملاء</CardTitle>
-                    <CardDescription>توزيع العملاء حسب الخصائص المختلفة</CardDescription>
-                  </div>
-                  <Select value={segmentBy} onValueChange={setSegmentBy}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="تصنيف حسب" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="businessType">نوع النشاط التجاري</SelectItem>
-                      <SelectItem value="activityLevel">مستوى النشاط</SelectItem>
-                      <SelectItem value="purchaseFrequency">معدل الشراء</SelectItem>
-                      <SelectItem value="averageValue">متوسط قيمة الفاتورة</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  {segmentData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={segmentData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis yAxisId="left" orientation="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip formatter={(value, name) => {
-                          if (name === 'عدد العملاء') return value;
-                          return `${formatAmountEn(value as number)} ج.م`;
-                        }} />
-                        <Legend />
-                        <Bar yAxisId="left" dataKey="count" name="عدد العملاء" fill="#8B5CF6" />
-                        <Bar yAxisId="right" dataKey="totalPurchase" name="إجمالي المشتريات" fill="#10B981" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>التوزيع النسبي للشرائح</CardTitle>
-                <CardDescription>نسبة كل شريحة من إجمالي عدد العملاء</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  {segmentData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={segmentData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="count"
-                        >
-                          {segmentData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>مقارنة بين الشرائح</CardTitle>
-              <CardDescription>مؤشرات الأداء الرئيسية لكل شريحة من العملاء</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-right p-2 font-medium">الشريحة</th>
-                      <th className="text-right p-2 font-medium">عدد العملاء</th>
-                      <th className="text-right p-2 font-medium">نسبة العملاء</th>
-                      <th className="text-right p-2 font-medium">إجمالي المشتريات</th>
-                      <th className="text-right p-2 font-medium">متوسط قيمة المشتريات</th>
-                      <th className="text-right p-2 font-medium">إجمالي النقاط</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {segmentData.map((segment, index) => {
-                      const percentage = (segment.count / customerPurchaseData.length) * 100;
-                      return (
-                        <tr key={index} className="hover:bg-muted/30">
-                          <td className="p-2">{segment.name}</td>
-                          <td className="p-2">{segment.count}</td>
-                          <td className="p-2">{percentage.toFixed(1)}%</td>
-                          <td className="p-2">{formatAmountEn(segment.totalPurchase)} ج.م</td>
-                          <td className="p-2">{formatAmountEn(segment.averagePurchase)} ج.م</td>
-                          <td className="p-2">{segment.pointsEarned}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity">
+        {/* تحليل النشاط */}
+        <TabsContent value="activity" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>تحليل نشاط العملاء</CardTitle>
-                <CardDescription>توزيع العملاء حسب فترة عدم النشاط</CardDescription>
+                <CardTitle className="flex items-center">
+                  <Activity className="h-5 w-5 ml-2" />
+                  توزيع نشاط العملاء
+                </CardTitle>
+                <CardDescription>
+                  تقسيم العملاء حسب فترة نشاطهم الأخير
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  {inactivityData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={inactivityData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" name="عدد العملاء" fill="#8B5CF6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
-                    </div>
-                  )}
+              <CardContent className="h-[350px]">
+                {activityDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={activityDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {activityDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value} عميل`, 'العدد']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="h-5 w-5 ml-2" />
+                  اتجاهات نشاط العملاء
+                </CardTitle>
+                <CardDescription>
+                  تطور نشاط العملاء على مدار الأشهر الستة الماضية
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[350px]">
+                {activityTrends.some(item => item.active > 0 || item.inactive > 0 || item.lost > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={activityTrends}
+                      margin={{
+                        top: 20,
+                        right: 30,
+                        left: 20,
+                        bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar name="نشط" dataKey="active" stackId="a" fill="#10B981" />
+                      <Bar name="غير نشط" dataKey="inactive" stackId="a" fill="#F59E0B" />
+                      <Bar name="مفقود" dataKey="lost" stackId="a" fill="#EF4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Calendar className="h-5 w-5 ml-2" />
+                التحليل الزمني لنشاط العملاء
+              </CardTitle>
+              <CardDescription>
+                مقارنة بين أنماط نشاط العملاء على مدار الأشهر الستة الماضية
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[350px]">
+              {activityTrends.some(item => item.active > 0 || item.inactive > 0 || item.lost > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={activityTrends}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line name="نشط" type="monotone" dataKey="active" stroke="#10B981" activeDot={{ r: 8 }} />
+                    <Line name="غير نشط" type="monotone" dataKey="inactive" stroke="#F59E0B" />
+                    <Line name="مفقود" type="monotone" dataKey="lost" stroke="#EF4444" />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* التوزيع الجغرافي */}
+        <TabsContent value="geography" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Map className="h-5 w-5 ml-2" />
+                توزيع العملاء حسب المناطق
+              </CardTitle>
+              <CardDescription>
+                تقسيم العملاء حسب المناطق الجغرافية
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              {regionData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={regionData}
+                    layout="vertical"
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 100,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="name" width={80} />
+                    <Tooltip formatter={(value) => [`${value} عميل`, 'العدد']} />
+                    <Legend />
+                    <Bar name="عدد العملاء" dataKey="value" fill="#6366F1" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">لا توجد بيانات جغرافية كافية للعرض</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* نوع النشاط التجاري */}
+        <TabsContent value="business" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Building className="h-5 w-5 ml-2" />
+                توزيع العملاء حسب نوع النشاط
+              </CardTitle>
+              <CardDescription>
+                تقسيم العملاء حسب نوع النشاط التجاري
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              {businessTypeData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={businessTypeData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {businessTypeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} عميل`, 'العدد']} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">لا توجد بيانات كافية عن أنواع النشاط التجاري</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* تحليل المشتريات */}
+        <TabsContent value="purchases" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ShoppingBag className="h-5 w-5 ml-2" />
+                  مقارنة بين المشتريات والنشاط
+                </CardTitle>
+                <CardDescription>
+                  العلاقة بين إجمالي المشتريات والوقت منذ آخر نشاط
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[350px]">
+                {purchaseVsActivity.length > 0 && purchaseVsActivity.some(item => item.totalSpent > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart
+                      margin={{
+                        top: 20,
+                        right: 20,
+                        bottom: 20,
+                        left: 20,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        type="number" 
+                        dataKey="daysSinceActive" 
+                        name="الأيام منذ آخر نشاط" 
+                        unit=" يوم" 
+                      />
+                      <YAxis 
+                        type="number" 
+                        dataKey="totalSpent" 
+                        name="إجمالي المشتريات" 
+                        unit=" ج.م" 
+                      />
+                      <ZAxis type="number" dataKey="z" range={[50, 400]} />
+                      <Tooltip 
+                        cursor={{ strokeDasharray: '3 3' }}
+                        formatter={(value, name, props) => {
+                          if (name === 'الأيام منذ آخر نشاط') return [`${value} يوم`, name];
+                          if (name === 'إجمالي المشتريات') return [`${value} ج.م`, name];
+                          return [value, name];
+                        }}
+                        labelFormatter={(label) => `${label}`}
+                      />
+                      <Legend />
+                      <Scatter 
+                        name="العميل" 
+                        data={purchaseVsActivity} 
+                        fill="#8884d8" 
+                      />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-muted-foreground">لا توجد بيانات مشتريات كافية للعرض</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader>
-                <CardTitle>توزيع نشاط العملاء</CardTitle>
-                <CardDescription>النسب المئوية لمستويات نشاط العملاء</CardDescription>
+                <CardTitle className="flex items-center">
+                  <Wallet className="h-5 w-5 ml-2" />
+                  تحليل قيمة العملاء
+                </CardTitle>
+                <CardDescription>
+                  تقسيم العملاء حسب إجمالي مشترياتهم
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  {inactivityData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={inactivityData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="count"
-                        >
-                          {inactivityData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-8">
+                  {/* تصنيف مستويات العملاء */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-purple-100 text-purple-800">VIP</Badge>
+                        <h4>عملاء VIP</h4>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {customers.filter(c => (c.totalSpent || 0) > 10000).length} عميل
+                      </span>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="top">
-          <Card>
-            <CardHeader>
-              <CardTitle>العملاء الأكثر قيمة</CardTitle>
-              <CardDescription>ترتيب العملاء حسب إجمالي قيمة المشتريات</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                {topCustomers.length > 0 ? (
-                  <ChartContainer
-                    config={{
-                      totalPurchase: {
-                        label: "إجمالي المشتريات",
-                        color: "#8B5CF6"
-                      }
-                    }}
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={topCustomers} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={150} />
-                        <ChartTooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div className="font-medium">العميل:</div>
-                                    <div>{payload[0]?.payload?.name}</div>
-                                    <div className="font-medium">المشتريات:</div>
-                                    <div>{formatAmountEn(payload[0]?.value as number)} ج.م</div>
-                                    <div className="font-medium">عدد الفواتير:</div>
-                                    <div>{payload[0]?.payload?.purchaseCount}</div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Bar dataKey="totalPurchase" fill="#8B5CF6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                    <Progress 
+                      value={
+                        totalCustomers > 0 
+                          ? (customers.filter(c => (c.totalSpent || 0) > 10000).length / totalCustomers) * 100
+                          : 0
+                      } 
+                      className="h-2" 
+                      indicatorClassName="bg-purple-600"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      العملاء الذين أنفقوا أكثر من 10,000 ج.م
+                    </p>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>قائمة العملاء الأساسيين</CardTitle>
-                <CardDescription>العملاء الذين يمثلون أعلى قيمة للأعمال</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="text-right p-2 font-medium">العميل</th>
-                        <th className="text-right p-2 font-medium">نوع النشاط</th>
-                        <th className="text-right p-2 font-medium">إجمالي المشتريات</th>
-                        <th className="text-right p-2 font-medium">عدد الفواتير</th>
-                        <th className="text-right p-2 font-medium">متوسط الفاتورة</th>
-                        <th className="text-right p-2 font-medium">فترة عدم النشاط</th>
-                        <th className="text-right p-2 font-medium">الحالة</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {topCustomers.map((customer, index) => (
-                        <tr key={index} className="hover:bg-muted/30">
-                          <td className="p-2 font-medium">{customer.name}</td>
-                          <td className="p-2">{customer.businessType}</td>
-                          <td className="p-2">{formatAmountEn(customer.totalPurchase)} ج.م</td>
-                          <td className="p-2">{customer.purchaseCount}</td>
-                          <td className="p-2">{formatAmountEn(customer.averagePurchase)} ج.م</td>
-                          <td className="p-2">{customer.inactiveDays} يوم</td>
-                          <td className="p-2">
-                            {customer.inactiveDays > 90 ? (
-                              <Badge variant="destructive">خطر</Badge>
-                            ) : customer.inactiveDays > 30 ? (
-                              <Badge variant="warning" className="bg-amber-500">تحذير</Badge>
-                            ) : (
-                              <Badge variant="success" className="bg-green-500">نشط</Badge>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-blue-100 text-blue-800">ذهبي</Badge>
+                        <h4>عملاء ذهبيون</h4>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {customers.filter(c => (c.totalSpent || 0) > 5000 && (c.totalSpent || 0) <= 10000).length} عميل
+                      </span>
+                    </div>
+                    <Progress 
+                      value={
+                        totalCustomers > 0 
+                          ? (customers.filter(c => (c.totalSpent || 0) > 5000 && (c.totalSpent || 0) <= 10000).length / totalCustomers) * 100
+                          : 0
+                      } 
+                      className="h-2" 
+                      indicatorClassName="bg-blue-500"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      العملاء الذين أنفقوا بين 5,000 و 10,000 ج.م
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-green-100 text-green-800">فضي</Badge>
+                        <h4>عملاء فضيون</h4>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {customers.filter(c => (c.totalSpent || 0) > 1000 && (c.totalSpent || 0) <= 5000).length} عميل
+                      </span>
+                    </div>
+                    <Progress 
+                      value={
+                        totalCustomers > 0 
+                          ? (customers.filter(c => (c.totalSpent || 0) > 1000 && (c.totalSpent || 0) <= 5000).length / totalCustomers) * 100
+                          : 0
+                      } 
+                      className="h-2" 
+                      indicatorClassName="bg-green-500"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      العملاء الذين أنفقوا بين 1,000 و 5,000 ج.م
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-gray-100 text-gray-800">عادي</Badge>
+                        <h4>عملاء عاديون</h4>
+                      </div>
+                      <span className="text-sm font-semibold">
+                        {customers.filter(c => (c.totalSpent || 0) <= 1000).length} عميل
+                      </span>
+                    </div>
+                    <Progress 
+                      value={
+                        totalCustomers > 0 
+                          ? (customers.filter(c => (c.totalSpent || 0) <= 1000).length / totalCustomers) * 100
+                          : 0
+                      } 
+                      className="h-2"
+                      indicatorClassName="bg-gray-400" 
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      العملاء الذين أنفقوا أقل من 1,000 ج.م
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* خلاصة التوصيات والنصائح */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Lightbulb className="h-5 w-5 ml-2" />
+            توصيات ونصائح بناءً على التحليلات
+          </CardTitle>
+          <CardDescription>
+            اقتراحات لتحسين التفاعل مع العملاء ورفع معدلات النشاط
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* نصائح متعلقة بالنشاط */}
+            <div className="bg-blue-50 text-blue-800 p-4 rounded-md">
+              <h4 className="font-semibold mb-2 flex items-center">
+                <Activity className="h-4 w-4 ml-2" />
+                تحسين نشاط العملاء
+              </h4>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>هناك {inactivityStats.warning} عميل معرض للضياع - يجب التواصل معهم في أقرب وقت</li>
+                <li>تطبيق حملة ترويجية خاصة للعملاء الذين لم يتفاعلوا منذ أكثر من 60 يوم</li>
+                <li>إرسال رسائل تذكير للعملاء الذين لم يتفاعلوا منذ أكثر من 30 يوم</li>
+              </ul>
+            </div>
+            
+            {/* نصائح متعلقة بالتوزيع الجغرافي */}
+            {regionData.length > 0 && (
+              <div className="bg-green-50 text-green-800 p-4 rounded-md">
+                <h4 className="font-semibold mb-2 flex items-center">
+                  <Map className="h-4 w-4 ml-2" />
+                  استهداف المناطق الجغرافية
+                </h4>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>المنطقة الأكثر نشاطاً هي {regionData[0]?.name} - يمكن إطلاق مبادرات جديدة فيها</li>
+                  <li>المناطق ذات الكثافة المنخفضة تحتاج إلى حملات تسويقية مخصصة</li>
+                  <li>استكشاف فرص نمو في المناطق المجاورة للمناطق النشطة</li>
+                </ul>
+              </div>
+            )}
+            
+            {/* نصائح متعلقة بنوع النشاط التجاري */}
+            {businessTypeData.length > 0 && (
+              <div className="bg-purple-50 text-purple-800 p-4 rounded-md">
+                <h4 className="font-semibold mb-2 flex items-center">
+                  <Building className="h-4 w-4 ml-2" />
+                  استهداف أنواع النشاط التجاري
+                </h4>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>نشاط {businessTypeData[0]?.name} يمثل النسبة الأكبر - تخصيص عروض مناسبة له</li>
+                  <li>تطوير منتجات وخدمات تلبي احتياجات الأنشطة التجارية الأكثر تمثيلاً</li>
+                  <li>البحث عن فرص توسع في قطاعات أنشطة جديدة</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

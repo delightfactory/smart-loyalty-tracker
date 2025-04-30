@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from "date-fns";
@@ -9,14 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Format date to a readable string using date-fns
-export function formatDate(date: string | Date | null | undefined): string {
-  if (!date) return "---";
+export function formatDate(dateString?: string | Date): string {
+  if (!dateString) return 'غير محدد';
   
-  try {
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    return format(dateObj, "d MMM yyyy", { locale: ar });
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return "---";
-  }
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  
+  // Use Intl to format dates in a locale-appropriate way
+  return new Intl.DateTimeFormat('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
 }

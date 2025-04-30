@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { UserRole } from '@/lib/auth-types';
-import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users';
+import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users-api';
 
 // تحديد نموذج بيانات المستخدم للتعديل
 const userEditFormSchema = z.object({

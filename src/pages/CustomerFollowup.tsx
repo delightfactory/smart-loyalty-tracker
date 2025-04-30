@@ -1,216 +1,184 @@
 
-import { useState, useEffect, useMemo } from 'react';
-import PageContainer from '@/components/layout/PageContainer';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCustomers } from '@/hooks/useCustomers';
-import { useInvoices } from '@/hooks/useInvoices';
-import { useProducts } from '@/hooks/useProducts';
-import CustomerPerformanceTab from '@/components/customer/CustomerPerformanceTab';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+  Search, UserRound, Clock, AlertTriangle, AlertCircle,
+  Activity, Filter, Download, RefreshCw
+} from 'lucide-react';
+import PageContainer from '@/components/layout/PageContainer';
 import InactiveCustomersTable from '@/components/customer/InactiveCustomersTable';
 import InactivityStatCards from '@/components/customer/InactivityStatCards';
 import InactivityFilter from '@/components/customer/InactivityFilter';
-import PointsSummary from '@/components/dashboard/PointsSummary';
+import { useCustomers } from '@/hooks/useCustomers';
+import { subDays } from 'date-fns';
+import { useToast } from '@/components/ui/use-toast';
+import { Customer } from '@/lib/types';
 import CustomerAnalytics from '@/components/customer/CustomerAnalytics';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { format, subDays } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 const CustomerFollowup = () => {
   const { toast } = useToast();
-  const [period, setPeriod] = useState<string>("30");
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { customers, isLoading } = useCustomers();
+  
+  // فلاتر تتبع العملاء
+  const [period, setPeriod] = useState<string>('30');
+  const [date, setDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<string>("all");
-  const [searchTerm, setSearchTerm] = useState<string>("");
-
-  // جلب العملاء والفواتير والمنتجات الحقيقية
-  const { getAll: getAllCustomers } = useCustomers();
-  const { data: customers = [], isLoading: customersLoading } = getAllCustomers;
-  const { getAll: getAllInvoices } = useInvoices();
-  const { data: invoices = [], isLoading: invoicesLoading } = getAllInvoices;
-  const { getAll: getAllProducts } = useProducts();
-  const { data: products = [], isLoading: productsLoading } = getAllProducts;
-
-  // تأثير للتعامل مع تحديثات فترة التاريخ
+  
+  // التعامل مع تغيير فترة عدم النشاط
   useEffect(() => {
-    if (period === "custom") {
-      // لا تفعل شيئًا، سيقوم المستخدم بتحديد نطاق التاريخ المخصص
-    } else {
-      // إعادة تعيين نطاق التاريخ المخصص عند تغيير الفترة
+    if (period === 'custom') {
+      setDate(undefined);
+    } else if (period === 'all') {
+      setDate(undefined);
       setFromDate(undefined);
       setToDate(undefined);
-      
-      // تعيين تاريخ البداية بناءً على الفترة المحددة
-      const days = parseInt(period, 10);
+    } else {
+      const days = parseInt(period);
       if (!isNaN(days)) {
         setDate(subDays(new Date(), days));
-      } else {
-        setDate(undefined);
+        setFromDate(undefined);
+        setToDate(undefined);
       }
     }
   }, [period]);
-
-  // بناء بيانات العملاء غير النشطين من البيانات الحقيقية
-  const inactiveCustomers = useMemo(() => {
-    return customers.map(customer => {
-      const customerInvoices = invoices.filter(inv => inv.customerId === customer.id);
-      
-      // إيجاد تاريخ آخر شراء
-      const lastPurchaseDate = customerInvoices.length
-        ? new Date(Math.max(...customerInvoices.map(inv => new Date(inv.date).getTime())))
-        : null;
-        
-      // حساب عدد أيام عدم النشاط
-      const inactiveDays = lastPurchaseDate
-        ? Math.floor((Date.now() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24))
-        : null;
-        
-      // إضافة العناصر لكل فاتورة للعميل
-      const customerInvoicesWithItems = customerInvoices.map(invoice => {
-        const items = invoice.items || [];
-        // إضافة معلومات المنتج لكل عنصر
-        const itemsWithProducts = items.map(item => {
-          const product = products.find(p => p.id === item.productId);
-          return { ...item, product };
-        });
-        
-        return { ...invoice, items: itemsWithProducts };
-      });
-      
-      // حساب إجمالي المشتريات
-      const totalPurchases = customerInvoicesWithItems.reduce((sum, inv) => sum + inv.totalAmount, 0);
-      
-      // حساب متوسط قيمة الفاتورة
-      const avgInvoiceValue = customerInvoicesWithItems.length > 0 
-        ? totalPurchases / customerInvoicesWithItems.length 
-        : 0;
-      
-      // تحديد الفئات المفضلة
-      const categoryCounts: Record<string, number> = {};
-      customerInvoicesWithItems.forEach(invoice => {
-        invoice.items.forEach(item => {
-          if (item.product?.category) {
-            categoryCounts[item.product.category] = (categoryCounts[item.product.category] || 0) + 1;
-          }
-        });
-      });
-      
-      // ترتيب الفئات حسب عدد المشتريات
-      const favoriteCategories = Object.entries(categoryCounts)
-        .sort(([, countA], [, countB]) => countB - countA)
-        .map(([category]) => category);
-        
-      return {
-        ...customer,
-        lastPurchase: lastPurchaseDate,
-        inactiveDays: inactiveDays,
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(customer.name)}`,
-        email: customer.contactPerson || '',
-        loyaltyPoints: customer.currentPoints,
-        totalPurchases: totalPurchases,
-        avgInvoiceValue: avgInvoiceValue,
-        invoiceCount: customerInvoicesWithItems.length,
-        favoriteCategories: favoriteCategories,
-        invoices: customerInvoicesWithItems // إضافة فواتير العميل مع معلومات المنتجات
-      };
-    });
-  }, [customers, invoices, products]);
-
-  // حساب ملخص النقاط لكل العملاء
-  const totalEarned = invoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0);
-  const totalRedeemed = invoices.reduce((sum, inv) => sum + (inv.pointsRedeemed || 0), 0);
-  const totalRemaining = totalEarned - totalRedeemed;
-
-  // تطبيق فلتر الفترة الزمنية المخصصة إذا تم تحديدها
-  const applyDateFilter = (customer: any) => {
-    if (fromDate && toDate && customer.lastPurchase) {
-      return customer.lastPurchase >= fromDate && customer.lastPurchase <= toDate;
-    } else if (fromDate && customer.lastPurchase) {
-      return customer.lastPurchase >= fromDate;
-    } else if (toDate && customer.lastPurchase) {
-      return customer.lastPurchase <= toDate;
-    }
-    
-    return true;
-  };
-
-  // فلترة العملاء حسب فترة الغياب
-  const filteredCustomers = useMemo(() => {
-    return inactiveCustomers
-      .filter(customer => {
-        // إذا كان العميل بلا تاريخ شراء، يعتبر غير نشط تمامًا
-        if (customer.inactiveDays === null) {
-          return period === "all" || period === "custom"; // إظهار في حالة "الكل" أو "مخصص"
-        }
-        
-        // فلترة حسب فترة الزمنية
-        if (period === "custom") {
-          return applyDateFilter(customer);
-        } else {
-          return customer.inactiveDays >= parseInt(period);
-        }
-      })
-      .filter(customer => {
-        if (!searchTerm) return true;
-        return customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               customer.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               customer.businessType?.toLowerCase().includes(searchTerm.toLowerCase());
-      })
-      .sort((a, b) => (b.inactiveDays || 0) - (a.inactiveDays || 0));
-  }, [inactiveCustomers, period, searchTerm, fromDate, toDate]);
-
-  const criticalCustomers = useMemo(() => filteredCustomers.filter(c => (c.inactiveDays || 0) > 90), [filteredCustomers]);
-  const warningCustomers = useMemo(() => filteredCustomers.filter(c => (c.inactiveDays || 0) >= 30 && (c.inactiveDays || 0) <= 90), [filteredCustomers]);
-  const recentCustomers = useMemo(() => filteredCustomers.filter(c => (c.inactiveDays || 0) < 30), [filteredCustomers]);
-
-  // معالجة تغيير نطاق التاريخ المخصص
+  
+  // التعامل مع تغيير نطاق التاريخ المخصص
   const handleDateRangeChange = (from: Date | null, to: Date | null) => {
     setFromDate(from || undefined);
     setToDate(to || undefined);
-    
-    if (from || to) {
-      // التبديل إلى وضع "مخصص" عندما يحدد المستخدم تاريخًا
-      setPeriod("custom");
-    }
   };
-
+  
+  // تصفية العملاء حسب فترة عدم النشاط
+  const getFilteredCustomers = (): Customer[] => {
+    let filtered = [...customers];
+    
+    // تطبيق فلتر البحث
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(customer => 
+        customer.name.toLowerCase().includes(term) || 
+        customer.email?.toLowerCase().includes(term) || 
+        customer.phone?.includes(term) ||
+        customer.businessName?.toLowerCase().includes(term)
+      );
+    }
+    
+    // تطبيق فلتر الفترة الزمنية
+    if (period === 'all') {
+      return filtered;
+    }
+    
+    if (period === 'custom' && (fromDate || toDate)) {
+      if (fromDate && toDate) {
+        // تصفية العملاء غير النشطين في الفترة بين التاريخين
+        return filtered.filter(customer => {
+          const lastActivityDate = customer.lastActive ? new Date(customer.lastActive) : new Date(0);
+          return lastActivityDate >= fromDate && lastActivityDate <= toDate;
+        });
+      } else if (fromDate) {
+        // تصفية العملاء غير النشطين بعد تاريخ معين
+        return filtered.filter(customer => {
+          const lastActivityDate = customer.lastActive ? new Date(customer.lastActive) : new Date(0);
+          return lastActivityDate >= fromDate;
+        });
+      } else if (toDate) {
+        // تصفية العملاء غير النشطين قبل تاريخ معين
+        return filtered.filter(customer => {
+          const lastActivityDate = customer.lastActive ? new Date(customer.lastActive) : new Date(0);
+          return lastActivityDate <= toDate;
+        });
+      }
+    }
+    
+    if (date) {
+      // تصفية العملاء غير النشطين منذ تاريخ معين
+      return filtered.filter(customer => {
+        if (!customer.lastActive) return true; // اعتبر العملاء الذين لم يكن لديهم نشاط على الإطلاق غير نشطين
+        const lastActivityDate = new Date(customer.lastActive);
+        return lastActivityDate <= date;
+      });
+    }
+    
+    return filtered;
+  };
+  
+  const filteredCustomers = getFilteredCustomers();
+  
+  // حساب إحصائيات عدم النشاط
+  const calculateInactivityStats = () => {
+    const now = new Date();
+    const criticalInactive = customers.filter(customer => {
+      if (!customer.lastActive) return true;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff > 90;
+    }).length;
+    
+    const warningInactive = customers.filter(customer => {
+      if (!customer.lastActive) return false;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff >= 30 && daysDiff <= 90;
+    }).length;
+    
+    const recentInactive = customers.filter(customer => {
+      if (!customer.lastActive) return false;
+      const lastActiveDate = new Date(customer.lastActive);
+      const daysDiff = Math.floor((now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff < 30 && daysDiff > 7;
+    }).length;
+    
+    return {
+      critical: criticalInactive,
+      warning: warningInactive,
+      recent: recentInactive,
+      total: customers.length,
+      percentage: customers.length > 0 
+        ? Math.round(((criticalInactive + warningInactive + recentInactive) / customers.length) * 100)
+        : 0
+    };
+  };
+  
+  const inactivityStats = calculateInactivityStats();
+  
+  // تصدير بيانات العملاء غير النشطين
+  const exportData = () => {
+    // تنفيذ تصدير البيانات (سيتم تنفيذه لاحقًا)
+    toast({
+      title: "تم تصدير البيانات",
+      description: "تم تصدير بيانات العملاء غير النشطين بنجاح",
+    });
+  };
+  
+  // تحديث بيانات العملاء
+  const refreshData = () => {
+    // تحديث البيانات (سيتم تنفيذه لاحقًا)
+    toast({
+      title: "تم تحديث البيانات",
+      description: "تم تحديث بيانات العملاء بنجاح",
+    });
+  };
+  
   // معالجة البحث
   const handleSearch = (term: string) => {
     setSearchTerm(term);
   };
 
-  // عرض رسالة عند تغيير التبويب
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    if (tab === "performance" && filteredCustomers.length === 0) {
-      toast({
-        title: "لا توجد بيانات كافية",
-        description: "لا توجد عملاء يطابقون معايير التصفية الحالية لعرض التحليلات",
-        variant: "warning"
-      });
-    }
-  };
-
   return (
     <PageContainer 
-      title="متابعة العملاء"
-      subtitle="متابعة العملاء غير النشطين وتحفيزهم على العودة للشراء"
-      searchPlaceholder="بحث عن عميل..."
+      title="متابعة العملاء" 
+      subtitle="تحليل وتتبع نشاط العملاء ومتابعة تفاعلهم مع النظام"
+      searchPlaceholder="البحث عن عميل..."
       onSearch={handleSearch}
     >
       <div className="space-y-6">
-        {/* ملخص النقاط */}
-        <PointsSummary
-          totalEarned={totalEarned}
-          totalRedeemed={totalRedeemed}
-          totalRemaining={totalRemaining}
-          loading={customersLoading || invoicesLoading}
-        />
-        
-        <InactivityFilter 
+        {/* فلتر فترة عدم النشاط */}
+        <InactivityFilter
           period={period}
           setPeriod={setPeriod}
           date={date}
@@ -219,77 +187,111 @@ const CustomerFollowup = () => {
           toDate={toDate}
           onDateRangeChange={handleDateRangeChange}
         />
-
+        
+        {/* إحصائيات عدم النشاط */}
         <InactivityStatCards
-          criticalCount={criticalCustomers.length}
-          warningCount={warningCustomers.length}
-          recentCount={recentCustomers.length}
-          totalCustomers={customers.length}
-          inactivePercentage={customers.length > 0 ? Math.round((filteredCustomers.length / customers.length) * 100) : 0}
+          criticalCount={inactivityStats.critical}
+          warningCount={inactivityStats.warning}
+          recentCount={inactivityStats.recent}
+          totalCustomers={inactivityStats.total}
+          inactivePercentage={inactivityStats.percentage}
         />
-
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="all">جميع العملاء</TabsTrigger>
-            <TabsTrigger value="critical">
-              عملاء غير نشطين جدًا
-              {criticalCustomers.length > 0 && (
-                <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
-                  {criticalCustomers.length}
-                </span>
-              )}
+        
+        {/* أزرار الإجراءات */}
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="bg-secondary text-secondary-foreground">
+              {filteredCustomers.length} عميل
+            </Badge>
+            {searchTerm && (
+              <Badge variant="outline">
+                نتائج البحث: {searchTerm}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 ml-1 rounded-full"
+                  onClick={() => setSearchTerm('')}
+                >
+                  &times;
+                </Button>
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={exportData}>
+              <Download className="h-4 w-4 ml-2" />
+              تصدير البيانات
+            </Button>
+            <Button variant="outline" size="sm" onClick={refreshData}>
+              <RefreshCw className="h-4 w-4 ml-2" />
+              تحديث البيانات
+            </Button>
+          </div>
+        </div>
+        
+        {/* تبويبات متابعة العملاء */}
+        <Tabs defaultValue="inactive">
+          <TabsList className="mb-6">
+            <TabsTrigger value="inactive">
+              <Clock className="h-4 w-4 ml-2" />
+              العملاء غير النشطين
             </TabsTrigger>
             <TabsTrigger value="warning">
-              عملاء في خطر الضياع
-              {warningCustomers.length > 0 && (
-                <span className="bg-amber-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
-                  {warningCustomers.length}
-                </span>
-              )}
+              <AlertTriangle className="h-4 w-4 ml-2" />
+              العملاء المعرضين للفقد
             </TabsTrigger>
-            <TabsTrigger value="recent">
-              عملاء حديثي الغياب
-              {recentCustomers.length > 0 && (
-                <span className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
-                  {recentCustomers.length}
-                </span>
-              )}
+            <TabsTrigger value="critical">
+              <AlertCircle className="h-4 w-4 ml-2" />
+              العملاء المفقودين
             </TabsTrigger>
-            <TabsTrigger value="performance">تحليل الأداء</TabsTrigger>
-            <TabsTrigger value="analytics">تحليلات متقدمة</TabsTrigger>
+            <TabsTrigger value="analytics">
+              <Activity className="h-4 w-4 ml-2" />
+              تحليلات متقدمة
+            </TabsTrigger>
           </TabsList>
           
-          {(customersLoading || invoicesLoading || productsLoading) ? (
-            <Card className="p-6">
-              <Skeleton className="h-[400px] w-full" />
-            </Card>
-          ) : (
-            <>
-              <TabsContent value="all">
-                <InactiveCustomersTable customers={filteredCustomers} />
-              </TabsContent>
-              <TabsContent value="critical">
-                <InactiveCustomersTable customers={criticalCustomers} />
-              </TabsContent>
-              <TabsContent value="warning">
-                <InactiveCustomersTable customers={warningCustomers} />
-              </TabsContent>
-              <TabsContent value="recent">
-                <InactiveCustomersTable customers={recentCustomers} />
-              </TabsContent>
-              <TabsContent value="performance">
-                <CustomerPerformanceTab customers={inactiveCustomers} />
-              </TabsContent>
-              <TabsContent value="analytics">
-                <CustomerAnalytics 
-                  customers={inactiveCustomers} 
-                  invoices={invoices} 
-                  products={products} 
-                  isLoading={customersLoading || invoicesLoading || productsLoading}
-                />
-              </TabsContent>
-            </>
-          )}
+          <TabsContent value="inactive" className="mt-0">
+            <InactiveCustomersTable 
+              customers={filteredCustomers}
+              isLoading={isLoading}
+            />
+          </TabsContent>
+          
+          <TabsContent value="warning" className="mt-0">
+            <InactiveCustomersTable 
+              customers={customers.filter(customer => {
+                if (!customer.lastActive) return false;
+                const lastActiveDate = new Date(customer.lastActive);
+                const daysDiff = Math.floor((new Date().getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+                return daysDiff >= 30 && daysDiff <= 90;
+              })}
+              isLoading={isLoading}
+              title="العملاء المعرضين للفقد"
+              description="قائمة العملاء الذين لم يتفاعلوا مع النظام منذ 30-90 يومًا"
+              emptyMessage="لا يوجد عملاء معرضين للفقد حاليًا"
+              warningLevel="warning"
+            />
+          </TabsContent>
+          
+          <TabsContent value="critical" className="mt-0">
+            <InactiveCustomersTable 
+              customers={customers.filter(customer => {
+                if (!customer.lastActive) return true;
+                const lastActiveDate = new Date(customer.lastActive);
+                const daysDiff = Math.floor((new Date().getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24));
+                return daysDiff > 90;
+              })}
+              isLoading={isLoading}
+              title="العملاء المفقودين"
+              description="قائمة العملاء الذين لم يتفاعلوا مع النظام منذ أكثر من 90 يومًا"
+              emptyMessage="لا يوجد عملاء مفقودين حاليًا"
+              warningLevel="destructive"
+            />
+          </TabsContent>
+          
+          <TabsContent value="analytics" className="mt-0">
+            <CustomerAnalytics customers={filteredCustomers} />
+          </TabsContent>
         </Tabs>
       </div>
     </PageContainer>

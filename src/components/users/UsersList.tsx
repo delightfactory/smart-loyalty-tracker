@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Plus, Search, UserCog } from 'lucide-react';
-import { getAllUsers } from '@/services/users';
+import { getAllUsers } from '@/services/users-api';
 import { UserRole } from '@/lib/auth-types';
 import { AddUserDialog } from './AddUserDialog';
 import { EditUserDialog } from './EditUserDialog';

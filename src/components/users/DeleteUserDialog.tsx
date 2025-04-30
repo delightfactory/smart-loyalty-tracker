@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { deleteUser, getUserById } from '@/services/users';
+import { deleteUser, getUserById } from '@/services/users-api';
 
 interface DeleteUserDialogProps {
   userId: string;

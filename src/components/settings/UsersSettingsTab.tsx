@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
 import { UserCog, Users } from 'lucide-react';
-import { getAllUsers } from '@/services/users';
+import { getAllUsers } from '@/services/users-api';
 import { UserRole } from '@/lib/auth-types';
 
 export function UsersSettingsTab() {
