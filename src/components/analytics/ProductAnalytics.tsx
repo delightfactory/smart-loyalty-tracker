@@ -438,8 +438,8 @@ const getPriceVsSalesInsight = (data: any[]): string => {
   if (data.length === 0) return 'لا توجد بيانات كافية لتحليل العلاقة بين السعر والمبيعات.';
   
   // Simple insight generation based on data pattern
-  const highPricedItems = data.filter(item => item.price > 100);
-  const lowPricedItems = data.filter(item => item.price <= 100);
+  const highPricedItems = data.filter(item => Number(item.price) > 100);
+  const lowPricedItems = data.filter(item => Number(item.price) <= 100);
   
   const highPricedSales = highPricedItems.reduce((sum, item) => sum + item.sales, 0);
   const lowPricedSales = lowPricedItems.reduce((sum, item) => sum + item.sales, 0);
