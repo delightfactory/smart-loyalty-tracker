@@ -18,6 +18,7 @@ const InactivityFilter: React.FC<InactivityFilterProps> = ({
   date,
   setDate,
 }) => {
+  // Add reset handler to reset both period and date
   const handleReset = () => {
     setPeriod("30");
     setDate(undefined);

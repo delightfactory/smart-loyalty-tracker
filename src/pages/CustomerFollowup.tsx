@@ -98,9 +98,7 @@ const CustomerFollowup = () => {
     <PageContainer 
       title="متابعة العملاء"
       subtitle="متابعة العملاء غير النشطين وتحفيزهم على العودة للشراء"
-      showSearch
       searchPlaceholder="بحث عن عميل..."
-      onSearch={handleSearch}
     >
       <div className="space-y-6">
         {/* ملخص النقاط */}
