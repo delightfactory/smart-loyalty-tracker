@@ -12,11 +12,13 @@ export type Database = {
       customers: {
         Row: {
           business_type: Database["public"]["Enums"]["business_type"]
+          city: string | null
           classification: number
           contact_person: string
           created_at: string
           credit_balance: number
           current_points: number
+          governorate: string | null
           id: string
           level: number
           name: string
@@ -27,11 +29,13 @@ export type Database = {
         }
         Insert: {
           business_type: Database["public"]["Enums"]["business_type"]
+          city?: string | null
           classification?: number
           contact_person: string
           created_at?: string
           credit_balance?: number
           current_points?: number
+          governorate?: string | null
           id: string
           level?: number
           name: string
@@ -42,11 +46,13 @@ export type Database = {
         }
         Update: {
           business_type?: Database["public"]["Enums"]["business_type"]
+          city?: string | null
           classification?: number
           contact_person?: string
           created_at?: string
           credit_balance?: number
           current_points?: number
+          governorate?: string | null
           id?: string
           level?: number
           name?: string
@@ -434,6 +440,7 @@ export type Database = {
         | "العناية بالإطارات"
         | "العناية بالتابلوه"
         | "العناية بالفرش الداخلي"
+        | "المستلزمات"
       redemption_status: "completed" | "cancelled" | "pending"
     }
     CompositeTypes: {
@@ -568,6 +575,7 @@ export const Constants = {
         "العناية بالإطارات",
         "العناية بالتابلوه",
         "العناية بالفرش الداخلي",
+        "المستلزمات",
       ],
       redemption_status: ["completed", "cancelled", "pending"],
     },

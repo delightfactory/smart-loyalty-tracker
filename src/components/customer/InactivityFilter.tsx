@@ -1,65 +1,62 @@
 
-import { useState } from 'react';
-import { History, Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import DatePicker from '@/components/ui/DatePicker';
+import { RefreshCcw } from 'lucide-react';
 
 interface InactivityFilterProps {
   period: string;
-  setPeriod: (period: string) => void;
+  setPeriod: (value: string) => void;
   date: Date | undefined;
   setDate: (date: Date | undefined) => void;
 }
 
-const InactivityFilter = ({ period, setPeriod, date, setDate }: InactivityFilterProps) => {
+const InactivityFilter: React.FC<InactivityFilterProps> = ({
+  period,
+  setPeriod,
+  date,
+  setDate,
+}) => {
+  const handleReset = () => {
+    setPeriod("30");
+    setDate(undefined);
+  };
+  
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-muted/50 p-4 rounded-lg">
-      <div className="flex gap-2 items-center">
-        <History className="text-muted-foreground h-5 w-5" />
-        <h3 className="font-medium">تصفية حسب فترة عدم النشاط</h3>
-      </div>
-      
-      <div className="flex flex-wrap gap-4">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="اختر الفترة" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="15">15 يوم</SelectItem>
-            <SelectItem value="30">30 يوم</SelectItem>
-            <SelectItem value="60">60 يوم</SelectItem>
-            <SelectItem value="90">90 يوم</SelectItem>
-            <SelectItem value="180">180 يوم</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-[240px] justify-start text-right"
-            >
-              <CalendarIcon className="ml-2 h-4 w-4" />
-              {date ? (
-                format(date, 'PPP', { locale: ar })
-              ) : (
-                <span>اختر تاريخًا محددًا</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              locale={ar}
-            />
-          </PopoverContent>
-        </Popover>
+    <div className="bg-card p-4 rounded-md shadow-sm border">
+      <h3 className="font-medium mb-3">فلترة العملاء غير النشطين</h3>
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+        <div className="space-y-2 flex-grow">
+          <label className="text-sm text-muted-foreground">فترة الغياب</label>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger>
+              <SelectValue placeholder="اختر الفترة" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">آخر 7 أيام</SelectItem>
+              <SelectItem value="15">آخر 15 يوم</SelectItem>
+              <SelectItem value="30">آخر 30 يوم</SelectItem>
+              <SelectItem value="60">آخر 60 يوم</SelectItem>
+              <SelectItem value="90">آخر 90 يوم</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2 flex-grow">
+          <label className="text-sm text-muted-foreground">تاريخ الفلترة</label>
+          <DatePicker value={date} onChange={setDate} placeholder="اختر التاريخ" />
+        </div>
+
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={handleReset} 
+          className="flex-shrink-0 h-10 w-10"
+          title="إعادة تعيين الفلاتر"
+        >
+          <RefreshCcw className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
