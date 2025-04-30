@@ -493,7 +493,8 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
       
       if (data && data.users && data.users.length > 0) {
         const adminUser = data.users.find(user => {
-          return typeof user.email === 'string' && user.email === email;
+          // Safely check if email exists and matches
+          return user && typeof user.email === 'string' && user.email === email;
         });
         
         if (adminUser) {
