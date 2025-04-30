@@ -492,10 +492,10 @@ export const createDefaultAdmin = async (email: string, password: string, fullNa
       }
       
       if (data && data.users && data.users.length > 0) {
-        const adminUser = data.users.find(user => {
+        const adminUser = data.users ? data.users.find(user => {
           // Safely check if email exists and matches
           return user && typeof user.email === 'string' && user.email === email;
-        });
+        }) : null;
         
         if (adminUser) {
           console.log('Found existing admin user:', adminUser.id);
