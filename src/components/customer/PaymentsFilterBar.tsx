@@ -1,42 +1,34 @@
-import { useState } from 'react';
+
+import React from 'react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import DateRangePicker from './DateRangePicker';
+import { Search } from 'lucide-react';
+import { DatePickerWithRange } from '@/components/ui/DatePicker';
 
 interface PaymentsFilterBarProps {
   onSearch: (term: string) => void;
   onDateRangeChange: (from: string, to: string) => void;
 }
 
-const PaymentsFilterBar = ({ onSearch, onDateRangeChange }: PaymentsFilterBarProps) => {
-  const [search, setSearch] = useState('');
-  const [from, setFrom] = useState<Date | null>(null);
-  const [to, setTo] = useState<Date | null>(null);
-
+const PaymentsFilterBar: React.FC<PaymentsFilterBarProps> = ({ onSearch, onDateRangeChange }) => {
   return (
-    <div className="flex flex-col md:flex-row gap-2 mb-4 items-end">
-      <Input
-        placeholder="بحث برقم العملية أو الملاحظات..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        onBlur={() => onSearch(search)}
-        className="md:w-64"
-      />
-      <DateRangePicker
-        from={from}
-        to={to}
-        onFromChange={(date) => {
-          setFrom(date);
-          onDateRangeChange(date ? date.toISOString().slice(0, 10) : '', to ? to.toISOString().slice(0, 10) : '');
-        }}
-        onToChange={(date) => {
-          setTo(date);
-          onDateRangeChange(from ? from.toISOString().slice(0, 10) : '', date ? date.toISOString().slice(0, 10) : '');
-        }}
-      />
-      <Button variant="outline" onClick={() => { setSearch(''); setFrom(null); setTo(null); onSearch(''); onDateRangeChange('', ''); }}>
-        إعادة تعيين
-      </Button>
+    <div className="flex flex-col md:flex-row gap-2 mb-4">
+      <div className="relative w-full md:w-2/3">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="بحث عن مدفوعات..."
+          className="pl-10"
+          onChange={(e) => onSearch(e.target.value)}
+        />
+      </div>
+      <div className="w-full md:w-1/3">
+        <DatePickerWithRange 
+          onChange={(range) => {
+            const from = range?.from ? range.from.toISOString().split('T')[0] : '';
+            const to = range?.to ? range.to.toISOString().split('T')[0] : '';
+            onDateRangeChange(from, to);
+          }}
+        />
+      </div>
     </div>
   );
 };

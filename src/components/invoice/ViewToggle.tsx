@@ -1,9 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Table, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ViewToggleProps {
   view: 'table' | 'cards';
@@ -12,6 +12,16 @@ interface ViewToggleProps {
 }
 
 const ViewToggle: React.FC<ViewToggleProps> = ({ view, setView, storageKey }) => {
+  const isMobile = useIsMobile();
+  
+  // تعيين القيمة الافتراضية استنادًا إلى حجم الشاشة
+  useEffect(() => {
+    // فقط إذا لم يكن هناك قيمة محفوظة في localStorage
+    if (!storageKey || localStorage.getItem(storageKey) === null) {
+      setView(isMobile ? 'cards' : 'table');
+    }
+  }, [isMobile, setView, storageKey]);
+  
   // استرجاع القيمة المخزنة عند التحميل
   useEffect(() => {
     if (storageKey) {

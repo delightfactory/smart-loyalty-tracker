@@ -1,10 +1,31 @@
+
 import React from 'react';
+import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { Calendar, CreditCard, User, FileText, Banknote, MoreVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+
+interface PaymentProps {
+  id: string;
+  customerId: string;
+  amount: number;
+  date: string | Date;
+  method?: string;
+  invoiceId?: string;
+  notes?: string;
+  type?: string;
+}
 
 interface PaymentCardProps {
-  payment: any;
+  payment: PaymentProps;
   customerName: string;
   invoiceNumber: string;
   onEdit: () => void;
@@ -12,56 +33,92 @@ interface PaymentCardProps {
 }
 
 const PaymentCard: React.FC<PaymentCardProps> = ({ payment, customerName, invoiceNumber, onEdit, onDelete }) => {
+  const formatDate = (date: string | Date) => {
+    try {
+      return format(new Date(date), 'yyyy-MM-dd');
+    } catch (e) {
+      return 'تاريخ غير صالح';
+    }
+  };
+
+  const isPayment = !payment.type || payment.type === 'payment';
+
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 flex flex-col gap-3 border border-gray-200 dark:border-gray-800 transition-all hover:scale-[1.015] hover:shadow-xl">
-      <div className="flex justify-between items-center mb-2">
-        <div className="text-2xl font-extrabold text-blue-700 dark:text-blue-300 font-mono drop-shadow-sm">
-          {Number(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+    <Card className={cn(
+      "overflow-hidden transition-all hover:shadow-md",
+      isPayment 
+        ? "border-l-4 border-l-green-500 dark:border-l-green-700" 
+        : "border-l-4 border-l-red-500 dark:border-l-red-700"
+    )}>
+      <CardHeader className="p-4 pb-2 bg-gradient-to-r from-slate-50 to-gray-100 dark:from-gray-900 dark:to-slate-900">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-lg flex items-center gap-2 text-primary">
+            <CreditCard className="h-5 w-5" />
+            <span className="font-mono text-sm">{payment.id}</span>
+          </CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[160px]">
+              <DropdownMenuItem onClick={onEdit}>تعديل</DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-red-600 dark:text-red-400">حذف</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onEdit}
-            className="rounded-full p-2 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400"
-            aria-label="Edit"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="rounded-full p-2 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-700 text-red-700 dark:text-red-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-400"
-            aria-label="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+      </CardHeader>
+      <CardContent className="p-4 pt-3 space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium">{customerName}</span>
+          </div>
+          <Badge variant={isPayment ? "default" : "destructive"} className="flex items-center gap-1">
+            {isPayment ? (
+              <>
+                <ArrowDown className="h-3 w-3" />
+                <span>دفعة</span>
+              </>
+            ) : (
+              <>
+                <ArrowUp className="h-3 w-3" />
+                <span>استرجاع</span>
+              </>
+            )}
+          </Badge>
         </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-blue-100 dark:bg-blue-900 rounded px-2 py-0.5">Customer</span>
-          <span className="font-semibold text-gray-800 dark:text-gray-100">{customerName}</span>
+
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            <span>{formatDate(payment.date)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            <span>{invoiceNumber !== '-' ? invoiceNumber : 'بدون فاتورة'}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-green-100 dark:bg-green-900 rounded px-2 py-0.5">Invoice</span>
-          <span className="font-mono text-gray-700 dark:text-gray-200">{invoiceNumber}</span>
+
+        {payment.notes && (
+          <div className="text-xs text-muted-foreground bg-gray-50 dark:bg-gray-900 p-2 rounded-md break-words">
+            {payment.notes}
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="p-4 pt-0 flex justify-between items-center">
+        <div className="flex items-center gap-1">
+          <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <span className={isPayment ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+            <span className="font-mono font-bold">{Number(payment.amount).toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-yellow-100 dark:bg-yellow-900 rounded px-2 py-0.5">Date</span>
-          <span className="text-xs text-gray-600 dark:text-gray-300">{payment.date ? format(new Date(payment.date), 'yyyy-MM-dd HH:mm') : '-'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-purple-100 dark:bg-purple-900 rounded px-2 py-0.5">Method</span>
-          <span className="text-xs text-gray-700 dark:text-gray-200">{payment.method || '-'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-pink-100 dark:bg-pink-900 rounded px-2 py-0.5">Type</span>
-          <span className="text-xs text-gray-700 dark:text-gray-200">{payment.type || '-'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 rounded px-2 py-0.5">Notes</span>
-          <span className="text-xs text-gray-600 dark:text-gray-400">{payment.notes || '-'}</span>
-        </div>
-      </div>
-    </div>
+        <Badge variant="outline" className="font-normal">
+          {payment.method || 'غير محدد'}
+        </Badge>
+      </CardFooter>
+    </Card>
   );
 };
 

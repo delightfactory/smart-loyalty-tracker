@@ -2,6 +2,7 @@
 import { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PageContainerProps {
   children: ReactNode;
@@ -20,6 +21,8 @@ const PageContainer = ({
   onSearchChange,
   extra
 }: PageContainerProps) => {
+  const isMobile = useIsMobile();
+
   return (
     <div className="container mx-auto p-2 sm:p-3 md:p-4 space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
@@ -41,7 +44,7 @@ const PageContainer = ({
           )}
           
           {extra && (
-            <div className="flex items-center">
+            <div className={isMobile ? "w-full flex justify-end" : "flex items-center"}>
               {extra}
             </div>
           )}

@@ -169,17 +169,17 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
  */
 async function deleteAllFromTable(tableName: TableName) {
   if (isUuidTable(tableName)) {
-    // For UUID tables, use delete() without conditions to delete all records
+    // للجداول التي تستخدم UUID، نستخدم استعلام مخصص بدلًا من قيمة dummy
     return await supabase
       .from(tableName)
       .delete()
-      .gt('id', '00000000-0000-0000-0000-000000000000'); // Match all UUIDs
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // سيحذف جميع السجلات مع أي معرف UUID صالح
   } else {
-    // For non-UUID tables, use delete() with a more generic condition
+    // للجداول الأخرى، استخدام استعلام ملائم للمفاتيح الرقمية
     return await supabase
       .from(tableName)
       .delete()
-      .gte('id', 0); // This will match all numeric IDs
+      .gte('id', 0); // هذا سيطابق جميع المعرفات الرقمية
   }
 }
 
@@ -235,7 +235,7 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ products, in
   
   // حساب بعض الإحصائيات البسيطة عن المنتجات
   const totalProducts = products.length;
-  const activeProducts = products.filter(p => p.isActive).length;
+  const activeProducts = products.filter(p => p.active).length;  // تغيير من isActive إلى active ليتوافق مع نوع Product
   const inactiveProducts = totalProducts - activeProducts;
   
   // حساب الأكثر مبيعاً

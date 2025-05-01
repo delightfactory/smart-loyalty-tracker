@@ -49,7 +49,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       {/* خلفية شفافة للنقر عليها لإغلاق الشريط الجانبي على الأجهزة المحمولة */}
       {isMobile && isOpen && (
         <div 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-30"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity duration-300 ease-in-out"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -61,7 +61,9 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           isOpen ? "w-64" : "w-16 hover:w-64",
           isMobile ? (isOpen ? "translate-x-0" : "translate-x-full") : "translate-x-0",
           isMobile ? "shadow-lg border-l" : "border-l",
-          theme === 'dark' ? 'bg-sidebar' : 'bg-background'
+          theme === 'dark' 
+            ? 'bg-sidebar dark:bg-gray-900 text-white' 
+            : 'bg-background text-gray-900'
         )}
         onMouseEnter={() => !isMobile && setHovering(true)}
         onMouseLeave={() => !isMobile && setHovering(false)}
@@ -79,7 +81,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               variant="ghost" 
               size="sm" 
               onClick={onClose}
-              className="h-8 w-8 p-0 transition-opacity duration-200"
+              className="h-8 w-8 p-0 transition-opacity duration-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label={isOpen ? "إغلاق القائمة" : "فتح القائمة"}
             >
               {isOpen ? (
@@ -90,7 +92,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             </Button>
           </div>
           {/* جعل القائمة الجانبية قابلة للتمرير العمودي دائماً */}
-          <div className="flex-1 min-h-0 overflow-y-auto pb-10">
+          <div className="flex-1 min-h-0 overflow-y-auto pb-10 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
             <SidebarContent isSidebarOpen={isEffectivelyOpen} />
           </div>
         </div>
