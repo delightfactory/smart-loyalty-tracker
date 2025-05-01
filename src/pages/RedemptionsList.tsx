@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,17 +23,23 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RedemptionListPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { getAll: getAllRedemptions, deleteRedemption } = useRedemptions();
   const { data: redemptions = [], isLoading } = getAllRedemptions;
   const { getAll: getAllCustomers } = useCustomers();
   const { data: customers = [] } = getAllCustomers;
-  const [view, setView] = useState<'table' | 'cards'>('table');
+  const [view, setView] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; customerId: string; status: RedemptionStatus } | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (isMobile) setView('cards');
+  }, [isMobile]);
 
   // Helper to get customer name by ID
   const getCustomerName = (customerId: string) => {

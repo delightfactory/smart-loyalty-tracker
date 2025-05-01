@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -56,6 +57,7 @@ import { useRealtime } from '@/hooks/use-realtime';
 import { useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import ViewToggle from '@/components/invoices/ViewToggle';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -64,7 +66,8 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
   
   // استخدام React Query hooks
   const { getAll: getAllInvoices, deleteInvoice } = useInvoices();
@@ -193,6 +196,10 @@ const Invoices = () => {
   };
   
   const isLoading = isLoadingInvoices || isLoadingCustomers;
+
+  useEffect(() => {
+    if (isMobile) setViewMode('cards');
+  }, [isMobile]);
 
   if (!Array.isArray(invoices) || !Array.isArray(customers)) {
     return (

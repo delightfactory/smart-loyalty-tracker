@@ -34,9 +34,11 @@ import { useProducts } from '@/hooks/useProducts';
 import { toast } from '@/components/ui/use-toast';
 import * as XLSX from 'xlsx';
 import ProductCard from "@/components/products/ProductCard";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Products = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -210,15 +212,12 @@ const Products = () => {
   };
 
   // الحالة الجديدة لعرض الجدول أو الكروت
-  const [viewMode, setViewMode] = React.useState<'table' | 'card'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('products_view_mode');
-      if (saved === 'table' || saved === 'card') return saved;
-      // افتراضيًا: كروت على الهاتف، جدول على غير ذلك
-      return window.innerWidth <= 640 ? 'card' : 'table';
-    }
-    return 'table';
-  });
+  const [viewMode, setViewMode] = React.useState<'table' | 'card'>(isMobile ? 'card' : 'table');
+
+  // فرض عرض الكروت تلقائياً في وضع الهاتف
+  React.useEffect(() => {
+    if (isMobile) setViewMode('card');
+  }, [isMobile]);
 
   // حفظ التفضيل عند التغيير
   React.useEffect(() => {

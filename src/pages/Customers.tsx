@@ -53,9 +53,11 @@ import { usePayments } from '@/hooks/usePayments';
 import { useRedemptions } from '@/hooks/useRedemptions';
 import { useMemo } from 'react';
 import { formatNumberEn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Customers = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
   const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
   const [governorateFilter, setGovernorateFilter] = useState<string>('all');
@@ -347,12 +349,11 @@ const Customers = () => {
   };
 
   // واجهة العرض: جدول أو كروت
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('customers_view_mode') || 'table';
-    }
-    return 'table';
-  });
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
+
+  useEffect(() => {
+    if (isMobile) setViewMode('cards');
+  }, [isMobile]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

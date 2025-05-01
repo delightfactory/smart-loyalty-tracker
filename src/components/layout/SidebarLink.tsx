@@ -1,6 +1,6 @@
-
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useSidebar } from '@/components/ui/sidebar';
 
 interface SidebarLinkProps {
   href: string;
@@ -10,12 +10,19 @@ interface SidebarLinkProps {
 }
 
 const SidebarLink = ({ href, icon, label, isSidebarOpen }: SidebarLinkProps) => {
+  const { isMobile, setOpenMobile } = useSidebar?.() || {};
   const { pathname } = useLocation();
   const isActive = pathname === href || pathname.startsWith(`${href}/`);
+
+  // إغلاق القائمة الجانبية تلقائياً عند الضغط على الرابط في وضع الجوال
+  const handleClick = (e: React.MouseEvent) => {
+    if (isMobile && setOpenMobile) setOpenMobile(false);
+  };
 
   return (
     <Link
       to={href}
+      onClick={handleClick}
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 group relative",
         isActive

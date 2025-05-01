@@ -1,11 +1,9 @@
-
 import { Button } from '@/components/ui/button';
 import { MoonIcon, SunIcon, Menu as MenuIcon } from 'lucide-react';
 import { useTheme } from '@/components/ui/theme-provider';
-import { useSidebar } from '@/components/ui/sidebar';
-import { UserMenu } from '@/components/auth/UserMenu';
-import UpdateCustomersButton from './UpdateCustomersButton';
 import { useIsMobile } from '@/hooks/use-mobile';
+import UpdateCustomersButton from './UpdateCustomersButton';
+import { UserMenu } from '@/components/auth/UserMenu';
 import { useEffect, useState } from 'react';
 
 interface HeaderProps {
@@ -14,7 +12,6 @@ interface HeaderProps {
 
 const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { theme, setTheme } = useTheme();
-  const { toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   
   // استخدام localStorage لحفظ وضع السمة
@@ -32,8 +29,6 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
   const handleToggleSidebar = () => {
     if (onToggleSidebar) {
       onToggleSidebar();
-    } else {
-      toggleSidebar();
     }
   };
   

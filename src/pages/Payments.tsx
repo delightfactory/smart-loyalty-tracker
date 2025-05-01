@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { usePayments } from '@/hooks/usePayments';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -40,6 +39,11 @@ const Payments: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('payments_view', view);
   }, [view]);
+
+  // فرض عرض الكروت دائماً في وضع الهاتف
+  useEffect(() => {
+    if (isMobile) setView('cards');
+  }, [isMobile]);
 
   // حالة الترتيب: العمود والاتجاه
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
