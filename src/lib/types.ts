@@ -1,4 +1,3 @@
-
 // We need to ensure the Customer interface has all required properties
 // Adding lastActive and totalSpent properties
 
@@ -41,6 +40,7 @@ export interface Product {
   price: number;
   pointsEarned?: number;
   pointsRequired?: number;
+  active?: boolean; // Adding the active property that was missing
 }
 
 // Customer Interface

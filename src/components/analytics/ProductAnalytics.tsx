@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { saveAs } from 'file-saver';
@@ -235,7 +234,10 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ products, in
   
   // حساب بعض الإحصائيات البسيطة عن المنتجات
   const totalProducts = products.length;
-  const activeProducts = products.filter(p => p.active).length;  // تغيير من isActive إلى active ليتوافق مع نوع Product
+  
+  // Fix: Use an isActive property if it exists, otherwise always consider it active
+  // Since 'active' doesn't exist in the Product type, we'll modify this logic
+  const activeProducts = products.filter(p => 'active' in p ? p.active : true).length;
   const inactiveProducts = totalProducts - activeProducts;
   
   // حساب الأكثر مبيعاً
