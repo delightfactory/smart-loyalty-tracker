@@ -19,6 +19,17 @@ const TABLE_ORDER = [
 // Define type for table names from the const array
 type TableName = typeof TABLE_ORDER[number];
 
+// Tables with UUID primary keys
+const UUID_TABLES = ['redemption_items', 'invoice_items'] as const;
+type UuidTableName = typeof UUID_TABLES[number];
+
+/**
+ * Helper function to determine if a table uses UUID as primary key
+ */
+const isUuidTable = (tableName: TableName): tableName is UuidTableName => {
+  return UUID_TABLES.includes(tableName as any);
+};
+
 /**
  * Creates a backup of all database tables and downloads it as a JSON file
  */
@@ -80,10 +91,7 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           
           // Clear all tables in reverse order to avoid foreign key constraints
           for (const tableName of [...TABLE_ORDER].reverse()) {
-            const { error } = await supabase
-              .from(tableName as TableName)
-              .delete()
-              .neq('id', 'dummy_value'); // Delete all rows
+            const { error } = await deleteAllFromTable(tableName as TableName);
               
             if (error) {
               console.error(`Error clearing ${tableName}:`, error);
@@ -145,6 +153,25 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
 }
 
 /**
+ * Helper function to delete all records from a table with appropriate method for the primary key type
+ */
+async function deleteAllFromTable(tableName: TableName) {
+  if (isUuidTable(tableName)) {
+    // For UUID tables, use delete() without conditions to delete all records
+    return await supabase
+      .from(tableName)
+      .delete()
+      .gt('id', '00000000-0000-0000-0000-000000000000'); // Match all UUIDs
+  } else {
+    // For non-UUID tables, use delete() with a more generic condition
+    return await supabase
+      .from(tableName)
+      .delete()
+      .gte('id', '0'); // This will match all numeric or text IDs
+  }
+}
+
+/**
  * Performs a factory reset by clearing all data from all tables
  */
 export async function factoryReset(): Promise<boolean> {
@@ -158,10 +185,7 @@ export async function factoryReset(): Promise<boolean> {
     // Clear all tables in reverse order to avoid foreign key constraints
     for (const tableName of [...TABLE_ORDER].reverse()) {
       if (tableName !== 'settings') { // Skip settings table to preserve configurations
-        const { error } = await supabase
-          .from(tableName as TableName)
-          .delete()
-          .neq('id', 'dummy_value'); // Delete all rows
+        const { error } = await deleteAllFromTable(tableName as TableName);
           
         if (error) {
           console.error(`Error clearing ${tableName}:`, error);
