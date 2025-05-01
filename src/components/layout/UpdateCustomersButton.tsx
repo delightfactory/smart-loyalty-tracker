@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
@@ -45,8 +46,8 @@ const UpdateCustomersButton = () => {
       disabled={loading}
       title="تحديث بيانات العملاء"
     >
-      <RefreshCw className={`mr-1 ${loading ? 'animate-spin' : ''}`} size={18} />
-      {loading ? '...جاري التحديث' : 'تحديث بيانات العملاء'}
+      <RefreshCw className={`ml-1 ${loading ? 'animate-spin' : ''}`} size={18} />
+      {loading ? '...جاري التحديث' : 'تحديث البيانات'}
     </Button>
   );
 };

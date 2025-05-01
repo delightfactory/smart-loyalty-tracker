@@ -17,9 +17,12 @@ export type Database = {
           contact_person: string
           created_at: string
           credit_balance: number
+          credit_limit: number | null
+          credit_period: number | null
           current_points: number
           governorate: string | null
           id: string
+          lastactive: string | null
           level: number
           name: string
           phone: string
@@ -34,9 +37,12 @@ export type Database = {
           contact_person: string
           created_at?: string
           credit_balance?: number
+          credit_limit?: number | null
+          credit_period?: number | null
           current_points?: number
           governorate?: string | null
           id: string
+          lastactive?: string | null
           level?: number
           name: string
           phone: string
@@ -51,9 +57,12 @@ export type Database = {
           contact_person?: string
           created_at?: string
           credit_balance?: number
+          credit_limit?: number | null
+          credit_period?: number | null
           current_points?: number
           governorate?: string | null
           id?: string
+          lastactive?: string | null
           level?: number
           name?: string
           phone?: string

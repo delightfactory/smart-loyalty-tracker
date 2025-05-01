@@ -7,11 +7,19 @@ import PageContainer from '@/components/layout/PageContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsersSettingsTab } from '@/components/settings/UsersSettingsTab';
 import { SecuritySettingsTab } from '@/components/settings/SecuritySettingsTab';
+import { BackupSettingsTab } from '@/components/settings/BackupSettingsTab';
+import { DatabaseManagementTab } from '@/components/settings/DatabaseManagementTab';
+import { useSettings } from '@/hooks/useSettings';
 
 const Settings = () => {
   const { hasRole } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('profile');
+  const { 
+    backupSettings, 
+    updateBackupSettings, 
+    isLoading 
+  } = useSettings();
   
   return (
     <PageContainer title="الإعدادات" subtitle="إدارة إعدادات النظام والمستخدمين">
@@ -19,6 +27,8 @@ const Settings = () => {
         <TabsList className="w-full">
           <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
           <TabsTrigger value="security">الأمان</TabsTrigger>
+          <TabsTrigger value="backup">النسخ الاحتياطي</TabsTrigger>
+          <TabsTrigger value="database">قاعدة البيانات</TabsTrigger>
           {hasRole(UserRole.ADMIN) && (
             <TabsTrigger value="users">المستخدمين</TabsTrigger>
           )}
@@ -30,6 +40,22 @@ const Settings = () => {
         
         <TabsContent value="security">
           <SecuritySettingsTab />
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <BackupSettingsTab 
+            settings={backupSettings || {
+              enableAutoBackup: true,
+              backupFrequency: 'weekly',
+              backupRetention: 30
+            }}
+            onSave={updateBackupSettings.mutate}
+            isLoading={isLoading || updateBackupSettings.isPending}
+          />
+        </TabsContent>
+
+        <TabsContent value="database">
+          <DatabaseManagementTab />
         </TabsContent>
         
         {hasRole(UserRole.ADMIN) && (

@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from "date-fns";
@@ -25,4 +26,26 @@ export function formatDate(dateString?: string | Date): string {
 export function formatNumberEn(value: number | string): string {
   if (value === null || value === undefined || isNaN(Number(value))) return '-';
   return Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+// Format a number to Arabic with up to 2 decimal places (rounded)
+export function formatNumberAr(value: number | string): string {
+  if (value === null || value === undefined || isNaN(Number(value))) return '-';
+  return Number(value).toLocaleString('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+// Format date and time to a readable string
+export function formatDateTime(dateString?: string | Date): string {
+  if (!dateString) return 'غير محدد';
+  
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  
+  return new Intl.DateTimeFormat('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: true,
+  }).format(date);
 }
