@@ -5,6 +5,16 @@ import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { Product, Invoice } from '@/lib/types';
 import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 // Define table dependencies for proper restoration order
 const TABLE_ORDER = [
@@ -220,22 +230,117 @@ interface ProductAnalyticsProps {
   isLoading: boolean;
 }
 
-const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ products, invoices, isLoading }) => {
+export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ products, invoices, isLoading }) => {
+  const isMobile = useIsMobile();
+  
+  // حساب بعض الإحصائيات البسيطة عن المنتجات
+  const totalProducts = products.length;
+  const activeProducts = products.filter(p => p.isActive).length;
+  const inactiveProducts = totalProducts - activeProducts;
+  
+  // حساب الأكثر مبيعاً
+  const productSales = products.map(product => {
+    const productInvoiceItems = invoices
+      .flatMap(invoice => invoice.items || [])
+      .filter(item => item.productId === product.id);
+    
+    const totalQuantity = productInvoiceItems.reduce((total, item) => total + item.quantity, 0);
+    const totalRevenue = productInvoiceItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    
+    return {
+      id: product.id,
+      name: product.name,
+      totalQuantity,
+      totalRevenue,
+    };
+  });
+  
+  // ترتيب المنتجات حسب الكمية المباعة
+  const topSellingProducts = [...productSales]
+    .sort((a, b) => b.totalQuantity - a.totalQuantity)
+    .slice(0, 5);
+  
   return (
-    <div>
+    <div className="space-y-4">
       <h3 className="text-xl font-semibold mb-4">تحليل المنتجات</h3>
+      
       {isLoading ? (
         <div className="flex justify-center items-center py-10">
           <span>جاري تحميل البيانات...</span>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Here would be the actual product analytics content */}
-          <p>تحليلات المنتجات تظهر هنا</p>
-        </div>
+        <>
+          {/* بطاقات إحصائية للمنتجات */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">إجمالي المنتجات</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{totalProducts}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">المنتجات النشطة</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-500">{activeProducts}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">المنتجات غير النشطة</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-red-500">{inactiveProducts}</p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* جدول أفضل المنتجات مبيعاً */}
+          <Card>
+            <CardHeader>
+              <CardTitle>أكثر المنتجات مبيعاً</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topSellingProducts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">المرتبة</TableHead>
+                        <TableHead>اسم المنتج</TableHead>
+                        <TableHead className="text-center">الكمية المباعة</TableHead>
+                        <TableHead className="text-center">إجمالي المبيعات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topSellingProducts.map((product, index) => (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell>{product.name}</TableCell>
+                          <TableCell className="text-center">{product.totalQuantity}</TableCell>
+                          <TableCell className="text-center">{product.totalRevenue.toFixed(2)} ر.س</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  لا توجد بيانات مبيعات للمنتجات
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
 };
 
+// إضافة export default للتوافق مع الاستيراد في ملفات أخرى
 export default ProductAnalytics;

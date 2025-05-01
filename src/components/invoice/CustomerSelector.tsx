@@ -12,6 +12,7 @@ import { Customer } from '@/lib/types';
 import { useCustomers } from '@/hooks/useCustomers';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CustomerSelectorProps {
   selectedCustomerId: string;
@@ -27,6 +28,7 @@ const CustomerSelector = ({
   const { getAll: getCustomers } = useCustomers();
   const { data: customers, isLoading, error } = getCustomers;
   const [isMounted, setIsMounted] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setIsMounted(true);
@@ -60,7 +62,7 @@ const CustomerSelector = ({
   return (
     <div className="space-y-2">
       <Label htmlFor="customer">العميل</Label>
-      <div className="flex gap-2">
+      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-2`}>
         <Select
           value={selectedCustomerId}
           onValueChange={onSelectCustomer}
@@ -79,7 +81,7 @@ const CustomerSelector = ({
         </Select>
         
         {!disabled && (
-          <div className="w-44">
+          <div className={`${isMobile ? 'w-full' : 'w-44'}`}>
             <SmartSearch 
               type="customer"
               placeholder="بحث سريع..."

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,9 +11,22 @@ import AdvancedAnalytics from '@/components/analytics/AdvancedAnalytics';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Analytics = () => {
-  const [activeTab, setActiveTab] = useState('products');
+  // استرجاع التبويب المحفوظ من localStorage
+  const getInitialTab = (): string => {
+    const savedTab = localStorage.getItem('analytics_activeTab');
+    return savedTab || 'products';
+  };
+  
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab);
+  const isMobile = useIsMobile();
+  
+  // حفظ التبويب النشط في localStorage
+  useEffect(() => {
+    localStorage.setItem('analytics_activeTab', activeTab);
+  }, [activeTab]);
   
   // Fetch real data from database
   const { getAll: getAllCustomers } = useCustomers();
@@ -35,17 +48,19 @@ const Analytics = () => {
     >
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-xl">لوحة التحليلات</CardTitle>
+          <CardTitle className="text-lg md:text-xl">لوحة التحليلات</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="products" onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-5 mb-6">
-              <TabsTrigger value="products">تحليل المنتجات</TabsTrigger>
-              <TabsTrigger value="customers">تحليل العملاء</TabsTrigger>
-              <TabsTrigger value="sales">تحليل المبيعات</TabsTrigger>
-              <TabsTrigger value="points">تحليل النقاط</TabsTrigger>
-              <TabsTrigger value="advanced">تحليلات متقدمة</TabsTrigger>
-            </TabsList>
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
+            <div className="overflow-x-auto pb-2">
+              <TabsList className={`mb-4 md:mb-6 ${isMobile ? 'w-max' : 'grid grid-cols-5'}`}>
+                <TabsTrigger value="products">تحليل المنتجات</TabsTrigger>
+                <TabsTrigger value="customers">تحليل العملاء</TabsTrigger>
+                <TabsTrigger value="sales">تحليل المبيعات</TabsTrigger>
+                <TabsTrigger value="points">تحليل النقاط</TabsTrigger>
+                <TabsTrigger value="advanced">تحليلات متقدمة</TabsTrigger>
+              </TabsList>
+            </div>
             
             <TabsContent value="products">
               <ProductAnalytics 
