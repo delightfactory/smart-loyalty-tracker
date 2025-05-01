@@ -14,7 +14,10 @@ const TABLE_ORDER = [
   'payments',
   'redemptions',
   'redemption_items'
-];
+] as const;
+
+// Define type for table names from the const array
+type TableName = typeof TABLE_ORDER[number];
 
 /**
  * Creates a backup of all database tables and downloads it as a JSON file
@@ -78,7 +81,7 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           // Clear all tables in reverse order to avoid foreign key constraints
           for (const tableName of [...TABLE_ORDER].reverse()) {
             const { error } = await supabase
-              .from(tableName)
+              .from(tableName as TableName)
               .delete()
               .neq('id', 'dummy_value'); // Delete all rows
               
@@ -92,7 +95,7 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           for (const tableName of TABLE_ORDER) {
             if (backupData[tableName] && backupData[tableName].length > 0) {
               const { error } = await supabase
-                .from(tableName)
+                .from(tableName as TableName)
                 .insert(backupData[tableName]);
                 
               if (error) {
@@ -148,7 +151,7 @@ export async function factoryReset(): Promise<boolean> {
   try {
     // Preserve settings
     const { data: settingsData } = await supabase
-      .from('settings')
+      .from('settings' as TableName)
       .select('*')
       .single();
     
@@ -156,7 +159,7 @@ export async function factoryReset(): Promise<boolean> {
     for (const tableName of [...TABLE_ORDER].reverse()) {
       if (tableName !== 'settings') { // Skip settings table to preserve configurations
         const { error } = await supabase
-          .from(tableName)
+          .from(tableName as TableName)
           .delete()
           .neq('id', 'dummy_value'); // Delete all rows
           

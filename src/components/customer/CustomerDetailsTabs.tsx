@@ -44,7 +44,12 @@ const CustomerDetailsTabs = ({ customer, invoices }: CustomerDetailsTabsProps) =
       </TabsContent>
 
       <TabsContent value="analysis">
-        <CustomerAnalytics customers={[customer]} />
+        <CustomerAnalytics 
+          customers={[customer]} 
+          invoices={invoices}
+          products={[]} 
+          isLoading={false}
+        />
       </TabsContent>
 
       <TabsContent value="recommendations">
