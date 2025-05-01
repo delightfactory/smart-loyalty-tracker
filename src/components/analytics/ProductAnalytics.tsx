@@ -1,7 +1,10 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
+import { Product, Invoice } from '@/lib/types';
+import React from 'react';
 
 // Define table dependencies for proper restoration order
 const TABLE_ORDER = [
@@ -90,7 +93,7 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           
           // Clear all tables in reverse order to avoid foreign key constraints
           for (const tableName of [...TABLE_ORDER].reverse()) {
-            const { error } = await deleteAllFromTable(tableName as TableName);
+            const { error } = await deleteAllFromTable(tableName);
               
             if (error) {
               console.error(`Error clearing ${tableName}:`, error);
@@ -102,7 +105,7 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           for (const tableName of TABLE_ORDER) {
             if (backupData[tableName] && backupData[tableName].length > 0) {
               const { error } = await supabase
-                .from(tableName as TableName)
+                .from(tableName)
                 .insert(backupData[tableName]);
                 
               if (error) {
@@ -166,7 +169,7 @@ async function deleteAllFromTable(tableName: TableName) {
     return await supabase
       .from(tableName)
       .delete()
-      .gte('id', '0'); // This will match all numeric or text IDs
+      .gte('id', 0); // This will match all numeric IDs
   }
 }
 
@@ -184,7 +187,7 @@ export async function factoryReset(): Promise<boolean> {
     // Clear all tables in reverse order to avoid foreign key constraints
     for (const tableName of [...TABLE_ORDER].reverse()) {
       if (tableName !== 'settings') { // Skip settings table to preserve configurations
-        const { error } = await deleteAllFromTable(tableName as TableName);
+        const { error } = await deleteAllFromTable(tableName);
           
         if (error) {
           console.error(`Error clearing ${tableName}:`, error);
@@ -209,3 +212,30 @@ export async function factoryReset(): Promise<boolean> {
     return false;
   }
 }
+
+// Add the actual ProductAnalytics component
+interface ProductAnalyticsProps {
+  products: Product[];
+  invoices: Invoice[];
+  isLoading: boolean;
+}
+
+const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ products, invoices, isLoading }) => {
+  return (
+    <div>
+      <h3 className="text-xl font-semibold mb-4">تحليل المنتجات</h3>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10">
+          <span>جاري تحميل البيانات...</span>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Here would be the actual product analytics content */}
+          <p>تحليلات المنتجات تظهر هنا</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProductAnalytics;
