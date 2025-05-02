@@ -47,95 +47,69 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // جلب بيانات المستخدم مع جميع الأدوار والصلاحيات المرتبطة به عبر join
-      const { data: userData, error: userError } = await supabase
+      // 1. جلب بيانات المستخدم الأساسية
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select(`
-          id, full_name, email, avatar_url, phone, position
-        `)
+        .select('id, full_name, email, avatar_url, phone, position, created_at')
         .eq('id', userId)
         .single();
+      if (profileError) throw profileError;
 
-      // إذا كان الخطأ موجودًا أو لم يتم جلب بيانات صحيحة، أوقف التنفيذ
-      if (userError || !userData || typeof userData !== 'object' || Array.isArray(userData) || !('id' in userData)) {
-        throw userError || new Error('لم يتم العثور على بيانات المستخدم');
-      }
-
-      // جلب أدوار المستخدم بشكل منفصل
-      const { data: userRoles, error: rolesError } = await supabase
+      // 2. جلب أدوار المستخدم
+      const { data: userRoles, error: userRolesError } = await supabase
         .from('user_roles')
-        .select(`
-          role_id, roles:role_id(id, name, description)
-        `)
+        .select('role_id')
         .eq('user_id', userId);
+      if (userRolesError) throw userRolesError;
+      const roleIds = (userRoles || []).map((ur: any) => ur.role_id);
 
-      if (rolesError) {
-        console.error("Error fetching user roles:", rolesError);
-        throw rolesError;
-      }
-
-      // تحويل الأدوار إلى النموذج المطلوب
-      const roles: Role[] = [];
-
-      // تحقق من أن userRoles هو مصفوفة وليست خطأ
-      if (Array.isArray(userRoles)) {
-        for (const userRole of userRoles) {
-          if (userRole.roles && typeof userRole.roles === 'object') {
-            // لكل دور، جلب الصلاحيات المرتبطة به
-            const { data: rolePerms, error: permsError } = await supabase
-              .from('role_permissions')
-              .select(`
-                permission_id, permissions:permission_id(id, name, description)
-              `)
-              .eq('role_id', userRole.roles.id);
-
-            if (permsError) {
-              console.error("Error fetching role permissions:", permsError);
-              continue;
-            }
-
-            const permissions = (Array.isArray(rolePerms) ? 
-              rolePerms.map(rp => rp.permissions).filter(Boolean) : 
-              []);
-
-            roles.push({
-              id: userRole.roles.id,
-              name: userRole.roles.name,
-              description: userRole.roles.description,
-              permissions: permissions
-            });
-          }
+      // 3. جلب تفاصيل الأدوار مع الصلاحيات
+      let roles: Role[] = [];
+      if (roleIds.length > 0) {
+        const { data: rolesData, error: rolesDataError } = await supabase
+          .from('roles')
+          .select('id, name, description')
+          .in('id', roleIds);
+        if (rolesDataError) throw rolesDataError;
+        // جلب الصلاحيات لكل دور
+        for (const role of rolesData) {
+          const { data: perms, error: permsError } = await supabase
+            .from('role_permissions')
+            .select('permission:permissions(id, name, description)')
+            .eq('role_id', role.id);
+          const permissions = (!permsError && perms)
+            ? perms.map((p: any) => p.permission)
+            : [];
+          roles.push({ ...role, permissions });
         }
       }
 
-      // بناء الملف الشخصي
-      interface UserProfile extends Omit<BaseUserProfile, 'roles'> {
-        roles: Role[];
-      }
-
-      const userProfile: AuthUserProfile = {
-        id: userData.id,
-        fullName: userData.full_name,
-        email: userData.email,
-        avatarUrl: userData.avatar_url,
-        phone: userData.phone,
-        position: userData.position,
-        roles: roles, // Role[]
-      };
-
       setState(prev => ({
         ...prev,
-        profile: userProfile,
-        roles: roles, // Role[]
-        isLoading: false,
+        profile: {
+          id: profile.id,
+          fullName: profile.full_name, // تحويل الاسم
+          avatarUrl: profile.avatar_url, // تحويل الصورة
+          phone: profile.phone,
+          position: profile.position,
+          email: profile.email,
+          roles,
+        },
+        roles,
         isAuthenticated: true,
+        isLoading: false,
       }));
-    } catch (error) {
+    } catch (error: any) {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: 'حدث خطأ أثناء جلب الملف الشخصي',
+        error: error.message,
       }));
+      toast({
+        variant: 'destructive',
+        title: 'فشل تحميل الملف الشخصي',
+        description: error.message,
+      });
     }
   };
 

@@ -109,39 +109,31 @@ const Dashboard = () => {
     totalManualDeducted: 0
   });
 
-
-// ... بقية الاستيرادات هنا ...
-
-useEffect(() => {
-    setIsMounted(true);
-    // دالة async لجلب وتجميع النقاط اليدوية
-    const fetchManualPoints = async () => {
-      try {
-        const { data: allPointsHistory, error } = await supabase
-          .from('points_history')
-          .select('*');
-        let totalManualAdded = 0;
-        let totalManualDeducted = 0;
-        if (!error && Array.isArray(allPointsHistory)) {
-          totalManualAdded = allPointsHistory
-            .filter((entry) => entry.type === 'manual_add')
-            .reduce((sum, entry) => sum + (entry.points || 0), 0);
-          totalManualDeducted = allPointsHistory
-            .filter((entry) => entry.type === 'manual_deduct')
-            .reduce((sum, entry) => sum + Math.abs(entry.points || 0), 0);
-        }
-        setSummary(prev => ({
-          ...prev,
-          totalManualAdded,
-          totalManualDeducted
-        }));
-      } catch (e) {
-        console.error('Error aggregating manual points:', e);
+  // --- جلب النقاط اليدوية عبر React Query ---
+  const {
+    data: manualPoints,
+    isLoading: manualPointsLoading
+  } = useQuery({
+    queryKey: ['manualPointsHistory'],
+    queryFn: async () => {
+      const { data: allPointsHistory, error } = await supabase
+        .from('points_history')
+        .select('*');
+      let totalManualAdded = 0;
+      let totalManualDeducted = 0;
+      if (!error && Array.isArray(allPointsHistory)) {
+        totalManualAdded = allPointsHistory
+          .filter((entry) => entry.type === 'manual_add')
+          .reduce((sum, entry) => sum + (entry.points || 0), 0);
+        totalManualDeducted = allPointsHistory
+          .filter((entry) => entry.type === 'manual_deduct')
+          .reduce((sum, entry) => sum + Math.abs(entry.points || 0), 0);
       }
-    };
-    fetchManualPoints();
-    return () => setIsMounted(false);
-  }, []);
+      return { totalManualAdded, totalManualDeducted };
+    },
+    enabled: isMounted,
+    refetchOnWindowFocus: true,
+  });
 
   // Fetch data from API
   const { data: productsData } = useQuery({
@@ -327,6 +319,11 @@ useEffect(() => {
     : [];
 
   useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+
+  useEffect(() => {
     // Calculate dashboard summary based on filtered data
     if (isMounted) {
       const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
@@ -337,11 +334,6 @@ useEffect(() => {
         .filter(inv => inv.status === InvoiceStatus.OVERDUE)
         .reduce((sum, inv) => sum + inv.totalAmount, 0);
 
-      // تلخيص النقاط اليدوية بشكل فعلي
-      let totalManualAdded = 0;
-      let totalManualDeducted = 0;
-      // سيتم جلب وتجميع النقاط اليدوية في دالة async منفصلة داخل useEffect
-
       setSummary({
         totalProducts: products.length,
         totalCustomers: customers.length,
@@ -351,11 +343,11 @@ useEffect(() => {
         totalOverdue,
         totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0),
         totalPointsRedeemed: filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0),
-        totalManualAdded,
-        totalManualDeducted
+        totalManualAdded: manualPoints?.totalManualAdded || 0,
+        totalManualDeducted: manualPoints?.totalManualDeducted || 0
       });
     }
-  }, [filteredInvoices, products, customers, filteredRedemptions, isMounted]);
+  }, [filteredInvoices, products, customers, filteredRedemptions, isMounted, manualPoints]);
 
   // Calculate total redeemed points from all filtered redemptions
   const totalPointsRedeemed = filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0);
@@ -445,10 +437,10 @@ useEffect(() => {
             <PointsSummary
               totalEarned={summary.totalPointsIssued}
               totalRedeemed={totalPointsRedeemed}
-              totalManualAdded={summary.totalManualAdded}
-              totalManualDeducted={summary.totalManualDeducted}
+              totalManualAdded={manualPoints?.totalManualAdded}
+              totalManualDeducted={manualPoints?.totalManualDeducted}
               totalRemaining={customers.reduce((sum, c) => sum + (Number(c.currentPoints) || 0), 0)}
-              loading={!isMounted || isRedemptionsLoading}
+              loading={!isMounted || isRedemptionsLoading || manualPointsLoading}
             />
             <DashboardCards
               summary={{

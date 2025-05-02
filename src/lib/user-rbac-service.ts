@@ -17,6 +17,7 @@ export class UserService implements IUserService {
    * الحصول على جميع المستخدمين مع أدوارهم وصلاحياتهم
    */
   async getAllUsers(): Promise<User[]> {
+    // جلب جميع المستخدمين مع أدوارهم وصلاحياتهم عبر join متداخل
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select(`
@@ -26,110 +27,51 @@ export class UserService implements IUserService {
         phone,
         position,
         avatar_url,
-        created_at
+        created_at,
+        user_roles (
+          role:roles (
+            id,
+            name,
+            description,
+            role_permissions (
+              permission:permissions (
+                id,
+                name,
+                description
+              )
+            )
+          )
+        )
       `);
-
     if (error) throw error;
-
-    // جلب بيانات آخر تسجيل دخول من جدول auth.users
-    // ملاحظة: يتطلب هذا صلاحيات خاصة على مستوى قاعدة البيانات أو استخدام RPC
-    
-    const users = await Promise.all(
-      profiles.map(async (profile) => {
-        // جلب أدوار المستخدم
-        const { data: userRoles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role_id')
-          .eq('user_id', profile.id);
-
-        if (rolesError) throw rolesError;
-
-        // جلب تفاصيل الأدوار مع الصلاحيات
-        const roles: Role[] = [];
-        
-        for (const userRole of userRoles) {
-          if (!userRole.role_id) continue;
-          
-          const { data: roleData, error: roleError } = await supabase
-            .from('roles')
-            .select('id, name, description')
-            .eq('id', userRole.role_id)
-            .single();
-            
-          if (roleError) continue;
-          
-          // جلب صلاحيات الدور
-          const { data: rolePerms, error: permError } = await supabase
-            .from('role_permissions')
-            .select('permission_id')
-            .eq('role_id', roleData.id);
-            
-          if (permError) continue;
-          
-          // جلب تفاصيل الصلاحيات
-          const permissions: Permission[] = [];
-          
-          for (const rp of rolePerms) {
-            const { data: permData, error: permDetailsError } = await supabase
-              .from('permissions')
-              .select('id, name, description')
-              .eq('id', rp.permission_id)
-              .single();
-              
-            if (permDetailsError) continue;
-            
-            permissions.push(permData as Permission);
-          }
-          
-          roles.push({
-            ...roleData,
-            permissions
-          } as Role);
-        }
-
-        // جلب صلاحيات المستخدم المباشرة
-        const { data: userPermissions, error: userPermError } = await supabase
-          .from('user_permissions')
-          .select('permission_id')
-          .eq('user_id', profile.id);
-          
-        if (userPermError) throw userPermError;
-
-        // جلب تفاصيل الصلاحيات المباشرة
-        const directPermissions: Permission[] = [];
-        
-        for (const up of (userPermissions || [])) {
-          const { data: permData, error: permError } = await supabase
-            .from('permissions')
-            .select('id, name, description')
-            .eq('id', up.permission_id)
-            .single();
-            
-          if (permError) continue;
-          
-          directPermissions.push(permData as Permission);
-        }
-
-        // جلب معلومات آخر تسجيل دخول (إذا كانت متاحة)
-        // نظرًا لأن هذه المعلومات غير متاحة مباشرة، يمكن تركها فارغة أو استخدام RPC
-        
-        return {
-          id: profile.id,
-          fullName: profile.full_name,
-          email: profile.email,
-          phone: profile.phone,
-          avatarUrl: profile.avatar_url,
-          isActive: true, // يمكن إضافة حقل في الملف الشخصي لحالة نشاط المستخدم
-          position: profile.position,
-          createdAt: profile.created_at,
-          lastSignInAt: null, // بحاجة إلى طريقة لجلب هذه المعلومة
-          roles,
-          permissions: directPermissions
-        } as User;
-      })
-    );
-
-    return users;
+    return profiles.map((profile: any) => {
+      const userRolesArr = Array.isArray(profile.user_roles) ? profile.user_roles : [];
+      const roles: Role[] = userRolesArr.map((ur: any) => ({
+        id: ur.role.id,
+        name: ur.role.name,
+        description: ur.role.description,
+        permissions: Array.isArray(ur.role.role_permissions)
+          ? ur.role.role_permissions.map((rp: any) => ({
+              id: rp.permission.id,
+              name: rp.permission.name,
+              description: rp.permission.description,
+            }))
+          : [],
+      }));
+      return {
+        id: profile.id,
+        fullName: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        avatarUrl: profile.avatar_url,
+        isActive: true,
+        position: profile.position,
+        createdAt: profile.created_at,
+        lastSignInAt: null, // يمكن جلبه من جدول آخر إذا لزم الأمر
+        roles,
+        permissions: [], // صلاحيات مباشرة إذا لزم الأمر
+      } as User;
+    });
   }
 
   /**
@@ -145,87 +87,38 @@ export class UserService implements IUserService {
         phone,
         position,
         avatar_url,
-        created_at
+        created_at,
+        user_roles (
+          role:roles (
+            id,
+            name,
+            description,
+            role_permissions (
+              permission:permissions (
+                id,
+                name,
+                description
+              )
+            )
+          )
+        )
       `)
       .eq('id', id)
       .single();
-
     if (error) return null;
-
-    // جلب أدوار المستخدم
-    const { data: userRoles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role_id')
-      .eq('user_id', profile.id);
-
-    if (rolesError) throw rolesError;
-
-    // جلب تفاصيل الأدوار مع الصلاحيات
-    const roles: Role[] = [];
-    
-    for (const userRole of userRoles) {
-      if (!userRole.role_id) continue;
-      
-      const { data: roleData, error: roleError } = await supabase
-        .from('roles')
-        .select('id, name, description')
-        .eq('id', userRole.role_id)
-        .single();
-        
-      if (roleError) continue;
-      
-      // جلب صلاحيات الدور
-      const { data: rolePerms, error: permError } = await supabase
-        .from('role_permissions')
-        .select('permission_id')
-        .eq('role_id', roleData.id);
-        
-      if (permError) continue;
-      
-      // جلب تفاصيل الصلاحيات
-      const permissions: Permission[] = [];
-      
-      for (const rp of rolePerms) {
-        const { data: permData, error: permDetailsError } = await supabase
-          .from('permissions')
-          .select('id, name, description')
-          .eq('id', rp.permission_id)
-          .single();
-          
-        if (permDetailsError) continue;
-        
-        permissions.push(permData as Permission);
-      }
-      
-      roles.push({
-        ...roleData,
-        permissions
-      } as Role);
-    }
-
-    // جلب صلاحيات المستخدم المباشرة
-    const { data: userPermissions, error: userPermError } = await supabase
-      .from('user_permissions')
-      .select('permission_id')
-      .eq('user_id', profile.id);
-      
-    if (userPermError) throw userPermError;
-
-    // جلب تفاصيل الصلاحيات المباشرة
-    const directPermissions: Permission[] = [];
-    
-    for (const up of (userPermissions || [])) {
-      const { data: permData, error: permError } = await supabase
-        .from('permissions')
-        .select('id, name, description')
-        .eq('id', up.permission_id)
-        .single();
-        
-      if (permError) continue;
-      
-      directPermissions.push(permData as Permission);
-    }
-
+    const userRolesArr = Array.isArray(profile.user_roles) ? profile.user_roles : [];
+    const roles: Role[] = userRolesArr.map((ur: any) => ({
+      id: ur.role.id,
+      name: ur.role.name,
+      description: ur.role.description,
+      permissions: Array.isArray(ur.role.role_permissions)
+        ? ur.role.role_permissions.map((rp: any) => ({
+            id: rp.permission.id,
+            name: rp.permission.name,
+            description: rp.permission.description,
+          }))
+        : [],
+    }));
     return {
       id: profile.id,
       fullName: profile.full_name,
@@ -237,7 +130,7 @@ export class UserService implements IUserService {
       createdAt: profile.created_at,
       lastSignInAt: null,
       roles,
-      permissions: directPermissions
+      permissions: [],
     } as User;
   }
 
@@ -342,38 +235,6 @@ export class UserService implements IUserService {
   }
 
   /**
-   * حذف مستخدم
-   */
-  async deleteUser(id: UUID): Promise<void> {
-    // حذف أدوار المستخدم أولاً
-    const { error: roleErr } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', id);
-
-    if (roleErr) throw roleErr;
-
-    // حذف صلاحيات المستخدم المباشرة
-    const { error: permErr } = await supabase
-      .from('user_permissions')
-      .delete()
-      .eq('user_id', id);
-
-    if (permErr) throw permErr;
-
-    // حذف الملف الشخصي
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-
-    // ملاحظة: حذف المستخدم من نظام المصادقة يتطلب صلاحيات خاصة
-    // يمكن استخدام API وظائف مخصصة لهذه العملية
-  }
-
-  /**
    * تعيين أدوار المستخدم
    */
   async setUserRoles(userId: UUID, roleIds: UUID[]): Promise<void> {
@@ -382,22 +243,17 @@ export class UserService implements IUserService {
       .from('user_roles')
       .delete()
       .eq('user_id', userId);
-
     if (deleteErr) throw deleteErr;
-
     // لا تضيف أي أدوار إذا كانت القائمة فارغة
     if (roleIds.length === 0) return;
-
     // إضافة الأدوار الجديدة
     const userRoles = roleIds.map(roleId => ({
       user_id: userId,
       role_id: roleId
     }));
-
     const { error } = await supabase
       .from('user_roles')
       .insert(userRoles);
-
     if (error) throw error;
   }
 
@@ -428,6 +284,32 @@ export class UserService implements IUserService {
 
     if (error) throw error;
   }
+
+  /**
+   * حذف مستخدم
+   */
+  async deleteUser(id: UUID): Promise<void> {
+    // حذف أدوار المستخدم أولاً
+    const { error: roleErr } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', id);
+    if (roleErr) throw roleErr;
+    // حذف صلاحيات المستخدم المباشرة
+    const { error: permErr } = await supabase
+      .from('user_permissions')
+      .delete()
+      .eq('user_id', id);
+    if (permErr) throw permErr;
+    // حذف الملف الشخصي
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    // ملاحظة: حذف المستخدم من نظام المصادقة يتطلب صلاحيات خاصة
+    // يمكن استخدام API وظائف مخصصة لهذه العملية
+  }
 }
 
 /**
@@ -440,7 +322,7 @@ export class RoleService implements IRoleService {
   async getAllRoles(): Promise<Role[]> {
     const { data: roles, error } = await supabase
       .from('roles')
-      .select('id, name, description');
+      .select('id, name, description, role_permissions (permission_id)');
 
     if (error) throw error;
 
@@ -483,7 +365,7 @@ export class RoleService implements IRoleService {
   async getRoleById(id: UUID): Promise<Role | null> {
     const { data: role, error } = await supabase
       .from('roles')
-      .select('id, name, description')
+      .select('id, name, description, role_permissions (permission_id)')
       .eq('id', id)
       .single();
 
