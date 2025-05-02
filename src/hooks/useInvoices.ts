@@ -75,6 +75,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
         }
       }
     });
+    
     // حساب قيمة الائتمان (Credit Limit): متوسط مسحوبات العميل آخر 3 شهور
     let creditLimit = 0;
     const now = new Date();
@@ -85,6 +86,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       const total = recentInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
       creditLimit = total / 3;
     }
+    
     // الحصول على جميع عمليات الاستبدال للعميل
     let totalPointsRedeemed = 0;
     let latestRedemptionDate = null;
@@ -103,37 +105,77 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
         }
       });
     }
+    
+    // الحصول على سجل التعديلات اليدوية للنقاط
+    let manualPointsAdjustments = { added: 0, deducted: 0 };
+    let latestManualAdjustmentDate = null;
+    try {
+      const pointsHistoryService = await import('@/services/points-history').then(m => m.pointsHistoryService);
+      const pointsHistory = await pointsHistoryService.getByCustomerId(customerId);
+      
+      pointsHistory.forEach(entry => {
+        if (entry.type === 'manual_add') {
+          manualPointsAdjustments.added += entry.points;
+        } else if (entry.type === 'manual_deduct') {
+          manualPointsAdjustments.deducted += Math.abs(entry.points);
+        }
+        
+        // تحديث أحدث تاريخ تعديل يدوي
+        if (entry.created_at) {
+          const adjustmentDate = new Date(entry.created_at);
+          if (!latestManualAdjustmentDate || adjustmentDate > latestManualAdjustmentDate) {
+            latestManualAdjustmentDate = adjustmentDate;
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching points history:', error);
+      // Continue without points history if service isn't available
+    }
+    
     // تحديد أحدث تاريخ تفاعل
     let lastActive = null;
-    if (latestInvoiceDate && latestRedemptionDate) {
-      lastActive = latestInvoiceDate > latestRedemptionDate ? latestInvoiceDate : latestRedemptionDate;
-    } else if (latestInvoiceDate) {
-      lastActive = latestInvoiceDate;
-    } else if (latestRedemptionDate) {
-      lastActive = latestRedemptionDate;
+    const dates = [
+      latestInvoiceDate, 
+      latestRedemptionDate,
+      latestManualAdjustmentDate
+    ].filter(Boolean);
+    
+    if (dates.length > 0) {
+      lastActive = new Date(Math.max(...dates.map(d => d instanceof Date ? d.getTime() : new Date(d).getTime())));
     }
+    
     // تحديث بيانات العميل
     const { classification, level } = calculateClassificationAndLevel(customer, invoices);
+    
+    // تطبيق التعديلات اليدوية على إجمالي النقاط
+    const adjustedPointsEarned = totalPointsEarned + manualPointsAdjustments.added;
+    const adjustedPointsRedeemed = totalPointsRedeemed + manualPointsAdjustments.deducted;
+    
     const updatedCustomer = {
       ...customer,
-      pointsEarned: totalPointsEarned,
-      pointsRedeemed: totalPointsRedeemed,
-      currentPoints: totalPointsEarned - totalPointsRedeemed,
+      pointsEarned: adjustedPointsEarned,
+      pointsRedeemed: adjustedPointsRedeemed,
+      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
       creditBalance: totalCreditBalance,
       lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
       credit_limit: creditLimit,
       classification,
       level,
     };
+    
     // تحديث بيانات العميل في قاعدة البيانات
     await customersService.update(updatedCustomer);
+    
     // تحديث الذاكرة المؤقتة
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['points_history', customerId] });
+    
     console.log(`Updated customer data for ${customerId}:`, {
-      pointsEarned: totalPointsEarned,
-      pointsRedeemed: totalPointsRedeemed,
-      currentPoints: totalPointsEarned - totalPointsRedeemed,
+      pointsEarned: adjustedPointsEarned,
+      pointsRedeemed: adjustedPointsRedeemed,
+      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
       creditBalance: totalCreditBalance,
       lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
       credit_limit: creditLimit,

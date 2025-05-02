@@ -1,21 +1,24 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Edit, ShoppingCart, CreditCard, Trash2, AlertTriangle, Plus } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ui/use-toast";
-import CustomerRedemptionButton from './CustomerRedemptionButton';
+import { 
+  MoreVertical, 
+  Pencil, 
+  Trash2, 
+  FilePlus, 
+  CreditCard,
+  Coins
+} from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { Customer, Invoice } from '@/lib/types';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import CustomerPointsAdjustmentDialog from './CustomerPointsAdjustmentDialog';
 
 interface CustomerActionsBarProps {
   customer: Customer;
@@ -26,66 +29,72 @@ interface CustomerActionsBarProps {
 
 const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerActionsBarProps) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-
+  const [isPointsDialogOpen, setIsPointsDialogOpen] = useState(false);
+  
   return (
-    <div className="mb-6 flex justify-between">
-      <Button variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm" onClick={() => navigate('/customers')}>
-        <ChevronLeft className="h-4 w-4 mr-2" />
-        العودة للعملاء
-      </Button>
-      
-      <div className="flex gap-2">
-        <CustomerRedemptionButton customer={customer} />
+    <div className="flex justify-between items-center mb-6">
+      <div className="flex space-x-2 space-x-reverse">
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+        >
+          <Pencil className="ml-2 h-4 w-4" />
+          تعديل
+        </Button>
         
-        <Button variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm" onClick={() => navigate(`/create-payment/${customer.id}`)}>
-          <CreditCard className="h-4 w-4 mr-2" />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/invoices/new?customerId=${customer.id}`)}
+        >
+          <FilePlus className="ml-2 h-4 w-4" />
+          فاتورة جديدة
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/payments/new?customerId=${customer.id}`)}
+        >
+          <CreditCard className="ml-2 h-4 w-4" />
           دفعة جديدة
         </Button>
         
-        <Button variant="outline" onClick={onEdit}>
-          <Edit className="h-4 w-4 ml-2" />
-          تعديل البيانات
-        </Button>
-
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive">
-              <Trash2 className="h-4 w-4 ml-2" />
-              حذف العميل
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>هل أنت متأكد من حذف العميل؟</AlertDialogTitle>
-              <AlertDialogDescription>
-                هذا الإجراء لا يمكن التراجع عنه. سيؤدي إلى حذف العميل وجميع بياناته من النظام.
-                {invoices.length > 0 && (
-                  <div className="mt-4 flex items-center p-3 bg-amber-50 text-amber-800 rounded-md">
-                    <AlertTriangle className="h-5 w-5 ml-2 flex-shrink-0" />
-                    <span>لا يمكن حذف عميل له فواتير مسجلة ({invoices.length} فاتورة)</span>
-                  </div>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={onDelete}
-                disabled={invoices.length > 0}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                تأكيد الحذف
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        
-        <Button onClick={() => navigate(`/create-invoice/${customer.id}`)} variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm">
-          <Plus className="h-4 w-4 mr-2" />
-          فاتورة جديدة
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsPointsDialogOpen(true)}
+        >
+          <Coins className="ml-2 h-4 w-4" />
+          تعديل النقاط
         </Button>
       </div>
+      
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="ml-2 h-4 w-4" />
+            حذف العميل
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      
+      {isPointsDialogOpen && (
+        <CustomerPointsAdjustmentDialog
+          isOpen={isPointsDialogOpen}
+          onClose={() => setIsPointsDialogOpen(false)}
+          customer={customer}
+        />
+      )}
     </div>
   );
 };

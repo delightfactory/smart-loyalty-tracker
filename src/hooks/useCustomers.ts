@@ -1,3 +1,4 @@
+
 // Update the useCustomers hook to properly expose customers and isLoading
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +7,7 @@ import { Customer } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtime } from './use-realtime';
 import { useInvoices } from './useInvoices';
+import { pointsHistoryService } from '@/services/points-history';
 
 export function useCustomers() {
   const queryClient = useQueryClient();
@@ -13,6 +15,7 @@ export function useCustomers() {
   
   // إعداد التحديثات في الوقت الفعلي للعملاء
   useRealtime('customers');
+  useRealtime('points_history');
   
   // استخدم بيانات الفواتير من hook useInvoices.getAll بدلاً من useInvoices مباشرة
   const { getAll: invoicesQuery } = useInvoices();
