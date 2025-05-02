@@ -81,12 +81,12 @@ const ChurnRiskTable = (props: ChurnRiskTableProps) => {
                 <tr><td colSpan={5} className="text-center">جارٍ التحميل...</td></tr>
               ) : (
                 churnRiskCustomers.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-orange-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-orange-700">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold">{c.name}</td>
-                    <td className="p-2">{c.businessType}</td>
-                    <td className="p-2">{formatDateEn(c.lastPurchase)}</td>
-                    <td className="p-2 text-orange-700 font-bold">{c.daysSinceLast !== null ? formatNumberEn(c.daysSinceLast) + ' يوم' : 'غير متاح'}</td>
+                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-orange-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'}>
+                    <td className="p-2 font-bold text-orange-600 dark:text-orange-300">{formatNumberEn(idx + 1)}</td>
+                    <td className="p-2 font-semibold dark:text-gray-100">{c.name}</td>
+                    <td className="p-2 dark:text-gray-200">{c.businessType}</td>
+                    <td className="p-2 dark:text-gray-200">{formatDateEn(c.lastPurchase)}</td>
+                    <td className="p-2 text-orange-700 font-bold dark:text-orange-400">{c.daysSinceLast !== null ? formatNumberEn(c.daysSinceLast) + ' يوم' : 'غير متاح'}</td>
                   </tr>
                 ))
               )}

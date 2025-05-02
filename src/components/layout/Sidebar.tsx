@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -57,14 +56,22 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       <aside
         ref={sidebarRef}
         className={cn(
-          "fixed right-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out",
+          // Scrollable, sticky, and visually enhanced sidebar
+          "fixed right-0 z-40 transition-all duration-300 ease-in-out flex flex-col",
           isOpen ? "w-64" : "w-16 hover:w-64",
-          isMobile ? (isOpen ? "translate-x-0" : "translate-x-full") : "translate-x-0",
+          // في الديسكتوب يبدأ أسفل الهيدر، في الموبايل يغطي الشاشة بالكامل
+          "top-0 h-screen md:top-[64px] md:h-[calc(100vh-64px)]",
           isMobile ? "shadow-lg border-l" : "border-l",
-          theme === 'dark' 
-            ? 'bg-sidebar dark:bg-gray-900 text-white' 
-            : 'bg-background text-gray-900'
+          // Enhanced contrast for light/dark
+          theme === 'dark'
+            ? 'bg-gray-900 text-white border-gray-800' // darker bg, clear border
+            : 'bg-white text-gray-900 border-gray-200',
+          // Custom scrollbar always
+          'scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent'
         )}
+        style={{
+          overscrollBehavior: 'contain',
+        }}
         onMouseEnter={() => !isMobile && setHovering(true)}
         onMouseLeave={() => !isMobile && setHovering(false)}
       >
@@ -91,8 +98,8 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               )}
             </Button>
           </div>
-          {/* جعل القائمة الجانبية قابلة للتمرير العمودي دائماً */}
-          <div className="flex-1 min-h-0 overflow-y-auto pb-10 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+          {/* Scrollable content with improved contrast and sticky footer if needed */}
+          <div className="flex-1 min-h-0 overflow-y-auto pb-10 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent bg-inherit">
             <SidebarContent isSidebarOpen={isEffectivelyOpen} />
           </div>
         </div>

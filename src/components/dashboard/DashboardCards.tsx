@@ -15,6 +15,8 @@ import { DashboardCardProps, DashboardSummaryProps } from './DashboardCardProps'
 import { useEffect, useState } from 'react';
 import { formatNumberEn } from '@/lib/utils';
 import { useCustomers } from '@/hooks/useCustomers';
+import { useContext } from 'react';
+import { DashboardTimeFilterContext } from '@/pages/Dashboard';
 
 interface CardData extends Omit<DashboardCardProps, 'value'> {
   value: number | string;
@@ -90,25 +92,25 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     retry: 2
   });
   
+  const { filteredPayments, filteredCustomers, filteredInvoices, filteredRedemptions } = useContext(DashboardTimeFilterContext);
+
+  // حساب الإيرادات المالية بشكل مطابق لصفحة المدفوعات بدون الاعتماد على summary
   const calculateTotalRevenue = () => {
-    if (summary) return summary.totalRevenue;
-    
-    if (!payments) return 0;
-    return payments
+    if (!filteredPayments) return 0;
+    return filteredPayments
       .filter(payment => payment.type === 'payment')
-      .reduce((sum, payment) => sum + payment.amount, 0);
+      .reduce((sum, payment) => sum + Number(payment.amount), 0);
   };
   
   const calculateTotalOutstanding = () => {
-    if (summary) return summary.totalOverdue || 0;
-    if (!customers) return 0;
-    return customers.reduce((sum, customer) => sum + (Number(customer.creditBalance) || 0), 0);
+    if (!filteredCustomers) return 0;
+    return filteredCustomers.reduce((sum, customer) => sum + (Number(customer.creditBalance) || 0), 0);
   };
   
   const cardDataDefault: CardData[] = [
     {
       title: 'إجمالي العملاء',
-      value: summary ? summary.totalCustomers : customers?.length || 0,
+      value: formatNumberEn(filteredCustomers?.length || 0),
       icon: <Users className="h-5 w-5 text-blue-600" />,
       loading: !summary && isLoadingCustomers,
       trend: '+5.2%',
@@ -116,7 +118,7 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     },
     {
       title: 'إجمالي المنتجات',
-      value: summary ? summary.totalProducts : products?.length || 0,
+      value: formatNumberEn(products?.length || 0),
       icon: <Package className="h-5 w-5 text-green-600" />,
       loading: !summary && isLoadingProducts,
       trend: '+3.1%',
@@ -124,21 +126,15 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     },
     {
       title: 'إجمالي الفواتير',
-      value: summary ? summary.totalInvoices : invoices?.length || 0,
+      value: formatNumberEn(filteredInvoices?.length || 0),
       icon: <FileText className="h-5 w-5 text-amber-600" />,
       loading: !summary && isLoadingInvoices,
       trend: '+12.5%',
       description: 'منذ الشهر الماضي'
     },
     {
-      title: 'إجمالي الإيرادات',
-      value: formatCurrency 
-        ? formatCurrency(calculateTotalRevenue())
-        : new Intl.NumberFormat('ar-EG', { 
-            style: 'currency', 
-            currency: 'EGP',
-            maximumFractionDigits: 0 
-          }).format(calculateTotalRevenue()),
+      title: 'إجمالي الإيرادات المالية',
+      value: formatNumberEn(calculateTotalRevenue()) + ' EGP',
       icon: <TrendingUp className="h-5 w-5 text-purple-600" />,
       loading: !summary && isLoadingPayments,
       trend: '+18.2%',
@@ -154,7 +150,7 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
     },
     {
       title: 'عمليات استبدال النقاط',
-      value: summary ? summary.totalPointsRedeemed : redemptions?.length || 0,
+      value: formatNumberEn(filteredRedemptions?.length || 0),
       icon: <Star className="h-5 w-5 text-yellow-600" />,
       loading: !summary && isLoadingRedemptions,
       trend: '+7.3%',

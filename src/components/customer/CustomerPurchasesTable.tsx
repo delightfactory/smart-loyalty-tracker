@@ -16,7 +16,7 @@ import {
   CardDescription, 
   CardContent 
 } from '@/components/ui/card';
-import { FileText, ShoppingCart } from 'lucide-react';
+import { FileText, ShoppingCart, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Invoice, InvoiceStatus } from '@/lib/types';
 import { getProductById } from '@/lib/data';
@@ -57,9 +57,14 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
           <CardTitle>سجل المشتريات</CardTitle>
           <CardDescription>جميع فواتير الشراء</CardDescription>
         </div>
-        <Button onClick={() => navigate(`/create-invoice/${customerId}`)}>
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          فاتورة جديدة
+        <Button 
+          size="sm"
+          variant="outline"
+          className="rounded-lg bg-gradient-to-l from-primary to-purple-500 text-white shadow-md hover:from-purple-600 hover:to-primary dark:from-purple-900 dark:to-purple-700 px-5 py-2 font-bold text-base transition-all min-w-[120px] flex items-center gap-2"
+          onClick={() => navigate(`/create-invoice/${customerId}`)}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          إنشاء فاتورة جديدة
         </Button>
       </CardHeader>
       <CardContent>
@@ -118,11 +123,12 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
             <FileText className="h-12 w-12 mb-4 opacity-50" />
             <p>لا توجد فواتير مطابقة للبحث أو التصفية</p>
             <Button 
-              variant="outline" 
-              className="mt-4"
+              size="sm"
+              variant="outline"
+              className="rounded-lg bg-gradient-to-l from-primary to-purple-500 text-white shadow-md hover:from-purple-600 hover:to-primary dark:from-purple-900 dark:to-purple-700 px-5 py-2 font-bold text-base transition-all min-w-[120px] flex items-center gap-2 mt-4"
               onClick={() => navigate(`/create-invoice/${customerId}`)}
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1" />
               إنشاء فاتورة جديدة
             </Button>
           </div>

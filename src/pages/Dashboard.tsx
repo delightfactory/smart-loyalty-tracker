@@ -80,6 +80,16 @@ const formatCurrency = (value: number) => {
 // تعريف نوع الفلترة الزمنية بشكل صريح
 type TimeRangeType = 'all' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 
+// 1. إنشاء Context لتوفير البيانات المفلترة لكل المكونات الفرعية
+import { createContext } from 'react';
+
+export const DashboardTimeFilterContext = createContext({
+  filteredPayments: [],
+  filteredCustomers: [],
+  filteredInvoices: [],
+  filteredRedemptions: []
+});
+
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState<TimeRangeType>('all');
@@ -327,206 +337,213 @@ const Dashboard = () => {
   }
 
   return (
-    <PageContainer title="لوحة التحكم" subtitle="نظرة عامة وتحليلات عن الأداء">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-          <TabsList>
-            <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
-            <TabsTrigger value="sales">المبيعات</TabsTrigger>
-            <TabsTrigger value="customers">العملاء</TabsTrigger>
-            <TabsTrigger value="products">المنتجات</TabsTrigger>
-          </TabsList>
-          <div className="flex items-center gap-4">
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="تصفية حسب المدة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">كل الفترات</SelectItem>
-                <SelectItem value="week">الأسبوع الأخير</SelectItem>
-                <SelectItem value="month">الشهر الأخير</SelectItem>
-                <SelectItem value="quarter">آخر 3 أشهر</SelectItem>
-                <SelectItem value="year">آخر سنة</SelectItem>
-                <SelectItem value="custom">مخصص</SelectItem>
-              </SelectContent>
-            </Select>
-            {timeRange === 'custom' && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className="flex items-center px-3 py-2 border rounded-md bg-background text-sm"
-                    type="button"
-                  >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {customRange.from && customRange.to
-                      ? `${customRange.from.toLocaleDateString('en-GB')} - ${customRange.to.toLocaleDateString('en-GB')}`
-                      : 'اختر الفترة'}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-0">
-                  <DateRangeCalendar
-                    mode="range"
-                    selected={customRange}
-                    onSelect={setCustomRange}
-                    numberOfMonths={2}
-                    locale={enGB}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-            {isCustomFilterActive && (
-              <button
-                onClick={handleResetFilter}
-                className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-300 text-sm"
-                type="button"
-              >
-                إعادة تعيين الفلتر
-              </button>
-            )}
+    <DashboardTimeFilterContext.Provider value={{
+      filteredPayments,
+      filteredCustomers: customers, // يمكنك لاحقًا تطبيق الفلترة الزمنية لو احتجت
+      filteredInvoices,
+      filteredRedemptions
+    }}>
+      <PageContainer title="لوحة التحكم" subtitle="نظرة عامة وتحليلات عن الأداء">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+            <TabsList>
+              <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
+              <TabsTrigger value="sales">المبيعات</TabsTrigger>
+              <TabsTrigger value="customers">العملاء</TabsTrigger>
+              <TabsTrigger value="products">المنتجات</TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-4">
+              <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="تصفية حسب المدة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل الفترات</SelectItem>
+                  <SelectItem value="week">الأسبوع الأخير</SelectItem>
+                  <SelectItem value="month">الشهر الأخير</SelectItem>
+                  <SelectItem value="quarter">آخر 3 أشهر</SelectItem>
+                  <SelectItem value="year">آخر سنة</SelectItem>
+                  <SelectItem value="custom">مخصص</SelectItem>
+                </SelectContent>
+              </Select>
+              {timeRange === 'custom' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="flex items-center px-3 py-2 border rounded-md bg-background text-sm"
+                      type="button"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" />
+                      {customRange.from && customRange.to
+                        ? `${customRange.from.toLocaleDateString('en-GB')} - ${customRange.to.toLocaleDateString('en-GB')}`
+                        : 'اختر الفترة'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <DateRangeCalendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={setCustomRange}
+                      numberOfMonths={2}
+                      locale={enGB}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              {isCustomFilterActive && (
+                <button
+                  onClick={handleResetFilter}
+                  className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-300 text-sm"
+                  type="button"
+                >
+                  إعادة تعيين الفلتر
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        <TabsContent value="overview">
-          {/* ملخص النظام: بطاقات + رسوم بيانية عامة */}
-          <PointsSummary
-            totalEarned={summary.totalPointsIssued}
-            totalRedeemed={totalPointsRedeemed}
-            totalRemaining={summary.totalPointsIssued - totalPointsRedeemed}
-            loading={!isMounted || isRedemptionsLoading}
-          />
-          <DashboardCards
-            summary={{
-              totalProducts: products.length,
-              totalCustomers: customers.length,
-              totalInvoices: invoices.length,
-              totalRevenue: invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0),
-              totalOverdue: customers.reduce((sum, c) => sum + (Number(c.creditBalance) || 0), 0),
-              totalPointsIssued: customers.reduce((sum, c) => sum + (Number(c.pointsEarned) || 0), 0),
-              totalPointsRedeemed: customers.reduce((sum, c) => sum + (Number(c.pointsRedeemed) || 0), 0),
-            }}
-            view="overview"
-            formatCurrency={formatCurrency}
-          />
-          <OutstandingSummaryCards
-            customers={customers}
-            invoices={invoices}
-            loading={!customers.length || !invoices.length}
-          />
-          <InvoiceStatusChart data={undefined} />
-          <RevenueChart data={[]} formatCurrency={formatCurrency} />
-          <PointsRedemptionChart data={undefined} />
-        </TabsContent>
-        <TabsContent value="sales">
-          {/* تحليلات المبيعات */}
-          <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
-          <div className="grid grid-cols-1 gap-6">
-            <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} type="area" title="تطور الإيرادات" description="التغير في حجم المبيعات على مدار الوقت" />
-            <Card>
-              <CardHeader>
-                <CardTitle>الفواتير المتأخرة</CardTitle>
-                <CardDescription>قائمة الفواتير المتأخرة عن موعد السداد</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {overdueData.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-right p-2">رقم الفاتورة</th>
-                          <th className="text-right p-2">العميل</th>
-                          <th className="text-right p-2">المبلغ</th>
-                          <th className="text-right p-2">تاريخ الفاتورة</th>
-                          <th className="text-right p-2">تاريخ الاستحقاق</th>
-                          <th className="text-right p-2">أيام التأخير</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overdueData.map((invoice, index) => (
-                          <tr key={invoice.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                            <td className="p-2">{invoice.id}</td>
-                            <td className="p-2">{invoice.customer}</td>
-                            <td className="p-2">{formatCurrency(invoice.amount)}</td>
-                            <td className="p-2">{invoice.date}</td>
-                            <td className="p-2">{invoice.dueDate}</td>
-                            <td className="p-2 text-red-500">{invoice.daysOverdue}</td>
+          <TabsContent value="overview">
+            {/* ملخص النظام: بطاقات + رسوم بيانية عامة */}
+            <PointsSummary
+              totalEarned={summary.totalPointsIssued}
+              totalRedeemed={totalPointsRedeemed}
+              totalRemaining={summary.totalPointsIssued - totalPointsRedeemed}
+              loading={!isMounted || isRedemptionsLoading}
+            />
+            <DashboardCards
+              summary={{
+                totalProducts: products.length,
+                totalCustomers: customers.length,
+                totalInvoices: invoices.length,
+                totalRevenue: invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0),
+                totalOverdue: customers.reduce((sum, c) => sum + (Number(c.creditBalance) || 0), 0),
+                totalPointsIssued: customers.reduce((sum, c) => sum + (Number(c.pointsEarned) || 0), 0),
+                totalPointsRedeemed: customers.reduce((sum, c) => sum + (Number(c.pointsRedeemed) || 0), 0),
+              }}
+              view="overview"
+              formatCurrency={formatCurrency}
+            />
+            <OutstandingSummaryCards
+              customers={customers}
+              invoices={invoices} // تمرير جميع الفواتير بدون أي تصفية زمنية
+              loading={!customers.length || !invoices.length}
+            />
+            <InvoiceStatusChart data={undefined} />
+            <RevenueChart data={[]} formatCurrency={formatCurrency} />
+            <PointsRedemptionChart data={undefined} />
+          </TabsContent>
+          <TabsContent value="sales">
+            {/* تحليلات المبيعات */}
+            <DashboardCards summary={summary} view="sales" formatCurrency={formatCurrency} />
+            <div className="grid grid-cols-1 gap-6">
+              <RevenueChart data={monthlyRevenueData} formatCurrency={formatCurrency} type="area" title="تطور الإيرادات" description="التغير في حجم المبيعات على مدار الوقت" />
+              <Card>
+                <CardHeader>
+                  <CardTitle>الفواتير المتأخرة</CardTitle>
+                  <CardDescription>قائمة الفواتير المتأخرة عن موعد السداد</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {overdueData.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-right p-2">رقم الفاتورة</th>
+                            <th className="text-right p-2">العميل</th>
+                            <th className="text-right p-2">المبلغ</th>
+                            <th className="text-right p-2">تاريخ الفاتورة</th>
+                            <th className="text-right p-2">تاريخ الاستحقاق</th>
+                            <th className="text-right p-2">أيام التأخير</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">لا توجد فواتير متأخرة حالياً</div>
-                )}
-              </CardContent>
-            </Card>
-            <RevenueChart data={paymentTrendData} formatCurrency={formatCurrency} title="تفاصيل المدفوعات" description="تطور المدفوعات على مدار الوقت" />
-          </div>
-        </TabsContent>
-        <TabsContent value="customers">
-          {/* تحليلات العملاء */}
-          <CustomerStatsCards
-            totalCustomers={(() => {
-              if (!customers.length) return 0;
-              return customers.length;
-            })()}
-            newCustomers={(() => {
-              if (!customers.length) return 0;
-              const now = new Date();
-              // استخدم created_at فقط لأنه هو الحقل الموجود في قاعدة البيانات
-              return customers.filter((c) => {
-                const createdAt = c.created_at ? new Date(c.created_at) : null;
-                return createdAt && createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
-              }).length;
-            })()}
-            activeCustomers={(() => {
-              if (!customers.length || !invoices.length) return 0;
-              const now = new Date();
-              return customers.filter((c) => {
-                const lastInvoice = invoices.filter((inv) => inv.customerId === c.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-                if (!lastInvoice) return false;
-                const lastDate = new Date(lastInvoice.date);
-                const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
-                return diffDays <= 60;
-              }).length;
-            })()}
-            inactiveCustomers={(() => {
-              if (!customers.length || !invoices.length) return 0;
-              const now = new Date();
-              return customers.filter((c) => {
-                const lastInvoice = invoices.filter((inv) => inv.customerId === c.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-                if (!lastInvoice) return true;
-                const lastDate = new Date(lastInvoice.date);
-                const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
-                return diffDays > 60;
-              }).length;
-            })()}
-            loading={!customers.length || !invoices.length}
-          />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <NewCustomersChart customers={getFilteredData(customers, 'created_at')} />
-            <TopCustomersTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <InactiveCustomersTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
-            <CategoryDiversityTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} products={getFilteredData(products)} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <CustomerFrequencyTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
-            <CustomerRFMTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <ChurnRiskTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} thresholdDays={90} />
-            <BusinessTypeDistribution customers={getFilteredData(customers, 'created_at')} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <TopRedemptionCustomersTable customers={getFilteredData(customers, 'created_at')} />
-            {/* يمكن إضافة تحليلات أخرى هنا */}
-          </div>
-        </TabsContent>
-        <TabsContent value="products">
-          <ProductsDashboard products={getFilteredData(products)} invoices={getFilteredData(invoices)} />
-        </TabsContent>
-      </Tabs>
-    </PageContainer>
+                        </thead>
+                        <tbody>
+                          {overdueData.map((invoice, index) => (
+                            <tr key={invoice.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                              <td className="p-2">{invoice.id}</td>
+                              <td className="p-2">{invoice.customer}</td>
+                              <td className="p-2">{formatCurrency(invoice.amount)}</td>
+                              <td className="p-2">{invoice.date}</td>
+                              <td className="p-2">{invoice.dueDate}</td>
+                              <td className="p-2 text-red-500">{invoice.daysOverdue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">لا توجد فواتير متأخرة حالياً</div>
+                  )}
+                </CardContent>
+              </Card>
+              <RevenueChart data={paymentTrendData} formatCurrency={formatCurrency} title="تفاصيل المدفوعات" description="تطور المدفوعات على مدار الوقت" />
+            </div>
+          </TabsContent>
+          <TabsContent value="customers">
+            {/* تحليلات العملاء */}
+            <CustomerStatsCards
+              totalCustomers={(() => {
+                if (!customers.length) return 0;
+                return customers.length;
+              })()}
+              newCustomers={(() => {
+                if (!customers.length) return 0;
+                const now = new Date();
+                // استخدم created_at فقط لأنه هو الحقل الموجود في قاعدة البيانات
+                return customers.filter((c) => {
+                  const createdAt = c.created_at ? new Date(c.created_at) : null;
+                  return createdAt && createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+                }).length;
+              })()}
+              activeCustomers={(() => {
+                if (!customers.length || !invoices.length) return 0;
+                const now = new Date();
+                return customers.filter((c) => {
+                  const lastInvoice = invoices.filter((inv) => inv.customerId === c.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                  if (!lastInvoice) return false;
+                  const lastDate = new Date(lastInvoice.date);
+                  const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+                  return diffDays <= 60;
+                }).length;
+              })()}
+              inactiveCustomers={(() => {
+                if (!customers.length || !invoices.length) return 0;
+                const now = new Date();
+                return customers.filter((c) => {
+                  const lastInvoice = invoices.filter((inv) => inv.customerId === c.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                  if (!lastInvoice) return true;
+                  const lastDate = new Date(lastInvoice.date);
+                  const diffDays = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+                  return diffDays > 60;
+                }).length;
+              })()}
+              loading={!customers.length || !invoices.length}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <NewCustomersChart customers={getFilteredData(customers, 'created_at')} />
+              <TopCustomersTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <InactiveCustomersTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
+              <CategoryDiversityTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} products={getFilteredData(products)} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <CustomerFrequencyTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
+              <CustomerRFMTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <ChurnRiskTable customers={getFilteredData(customers, 'created_at')} invoices={getFilteredData(invoices)} thresholdDays={90} />
+              <BusinessTypeDistribution customers={getFilteredData(customers, 'created_at')} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <TopRedemptionCustomersTable customers={getFilteredData(customers, 'created_at')} />
+              {/* يمكن إضافة تحليلات أخرى هنا */}
+            </div>
+          </TabsContent>
+          <TabsContent value="products">
+            <ProductsDashboard products={getFilteredData(products)} invoices={getFilteredData(invoices)} />
+          </TabsContent>
+        </Tabs>
+      </PageContainer>
+    </DashboardTimeFilterContext.Provider>
   );
 };
 

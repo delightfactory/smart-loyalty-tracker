@@ -124,12 +124,16 @@ const CreateInvoice = () => {
   const totalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const totalPointsEarned = items.reduce((sum, item) => sum + item.pointsEarned, 0);
   
-  // Determine categories count for points calculation
+  // Determine categories count for points calculation (excluding SUPPLIES robustly)
   const uniqueCategories = new Set(
-    items.map(item => {
-      const product = products.find(p => p.id === item.productId);
-      return product?.category;
-    }).filter(Boolean)
+    items
+      .map(item => {
+        const product = products.find(p => p.id === item.productId);
+        // Normalize category: support both enum and string, and exclude SUPPLIES by all representations
+        const cat = product?.category?.toUpperCase?.() || '';
+        return (cat === 'SUPPLIES' || cat === 'المستلزمات') ? null : cat;
+      })
+      .filter(cat => cat && cat !== null)
   );
   const categoriesCount = uniqueCategories.size;
   

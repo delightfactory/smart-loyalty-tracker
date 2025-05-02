@@ -281,11 +281,11 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
     <div className="space-y-6">
       {/* ملخص التحليلات */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
           <CardContent className="p-4">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground">إجمالي العملاء</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300">إجمالي العملاء</p>
                 <h2 className="text-2xl font-bold">{totalCustomers}</h2>
               </div>
               <div className="bg-primary/10 p-2 rounded-full">
@@ -296,16 +296,16 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
               <Badge variant="outline" className="font-normal">
                 100%
               </Badge>
-              <span className="text-muted-foreground">من قاعدة العملاء</span>
+              <span className="text-muted-foreground dark:text-gray-300">من قاعدة العملاء</span>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
           <CardContent className="p-4">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground">العملاء النشطون</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300">العملاء النشطون</p>
                 <h2 className="text-2xl font-bold">{activeCustomers}</h2>
               </div>
               <div className="bg-green-100 p-2 rounded-full">
@@ -314,7 +314,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             </div>
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">نسبة النشاط</span>
+                <span className="text-muted-foreground dark:text-gray-300">نسبة النشاط</span>
                 <span>{activePercentage}%</span>
               </div>
               <Progress value={activePercentage} className="h-1" />
@@ -322,11 +322,11 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
           <CardContent className="p-4">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground">العملاء غير النشطين</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300">العملاء غير النشطين</p>
                 <h2 className="text-2xl font-bold">{inactiveCustomers}</h2>
               </div>
               <div className="bg-amber-100 p-2 rounded-full">
@@ -335,7 +335,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             </div>
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">نسبة عدم النشاط</span>
+                <span className="text-muted-foreground dark:text-gray-300">نسبة عدم النشاط</span>
                 <span>{inactivePercentage}%</span>
               </div>
               <Progress value={inactivePercentage} className="h-1" indicatorClassName="bg-amber-500" />
@@ -343,11 +343,11 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
           <CardContent className="p-4">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground">متوسط قيمة العميل</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300">متوسط قيمة العميل</p>
                 <h2 className="text-2xl font-bold">{avgCustomerValue.toFixed(0)} ج.م</h2>
               </div>
               <div className="bg-purple-100 p-2 rounded-full">
@@ -366,7 +366,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
 
       {/* تبويبات التحليلات المتقدمة */}
       <Tabs defaultValue="activity" className="w-full">
-        <TabsList>
+        <TabsList className="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <TabsTrigger value="activity" onClick={() => setActiveMetric('activity')}>
             <Activity className="h-4 w-4 ml-2" />
             تحليل النشاط
@@ -388,13 +388,13 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
         {/* تحليل النشاط */}
         <TabsContent value="activity" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Activity className="h-5 w-5 ml-2" />
                   توزيع نشاط العملاء
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-gray-300">
                   تقسيم العملاء حسب فترة نشاطهم الأخير
                 </CardDescription>
               </CardHeader>
@@ -423,19 +423,19 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center">
-                    <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                    <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات كافية للعرض</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <TrendingUp className="h-5 w-5 ml-2" />
                   اتجاهات نشاط العملاء
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-gray-300">
                   تطور نشاط العملاء على مدار الأشهر الستة الماضية
                 </CardDescription>
               </CardHeader>
@@ -463,20 +463,20 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center">
-                    <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                    <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات كافية للعرض</p>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
           
-          <Card>
+          <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Calendar className="h-5 w-5 ml-2" />
                 التحليل الزمني لنشاط العملاء
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-muted-foreground dark:text-gray-300">
                 مقارنة بين أنماط نشاط العملاء على مدار الأشهر الستة الماضية
               </CardDescription>
             </CardHeader>
@@ -504,7 +504,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">لا توجد بيانات كافية للعرض</p>
+                  <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات كافية للعرض</p>
                 </div>
               )}
             </CardContent>
@@ -513,13 +513,13 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
 
         {/* التوزيع الجغرافي */}
         <TabsContent value="geography" className="space-y-6 mt-6">
-          <Card>
+          <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Map className="h-5 w-5 ml-2" />
                 توزيع العملاء حسب المناطق
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-muted-foreground dark:text-gray-300">
                 تقسيم العملاء حسب المناطق الجغرافية
               </CardDescription>
             </CardHeader>
@@ -546,7 +546,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">لا توجد بيانات جغرافية كافية للعرض</p>
+                  <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات جغرافية كافية للعرض</p>
                 </div>
               )}
             </CardContent>
@@ -555,13 +555,13 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
 
         {/* نوع النشاط التجاري */}
         <TabsContent value="business" className="space-y-6 mt-6">
-          <Card>
+          <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Building className="h-5 w-5 ml-2" />
                 توزيع العملاء حسب نوع النشاط
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-muted-foreground dark:text-gray-300">
                 تقسيم العملاء حسب نوع النشاط التجاري
               </CardDescription>
             </CardHeader>
@@ -588,7 +588,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">لا توجد بيانات كافية عن أنواع النشاط التجاري</p>
+                  <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات كافية عن أنواع النشاط التجاري</p>
                 </div>
               )}
             </CardContent>
@@ -598,13 +598,13 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
         {/* تحليل المشتريات */}
         <TabsContent value="purchases" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <ShoppingBag className="h-5 w-5 ml-2" />
                   مقارنة بين المشتريات والنشاط
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-gray-300">
                   العلاقة بين إجمالي المشتريات والوقت منذ آخر نشاط
                 </CardDescription>
               </CardHeader>
@@ -652,19 +652,19 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center">
-                    <p className="text-muted-foreground">لا توجد بيانات مشتريات كافية للعرض</p>
+                    <p className="text-muted-foreground dark:text-gray-300">لا توجد بيانات مشتريات كافية للعرض</p>
                   </div>
                 )}
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Wallet className="h-5 w-5 ml-2" />
                   تحليل قيمة العملاء
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground dark:text-gray-300">
                   تقسيم العملاء حسب إجمالي مشترياتهم
                 </CardDescription>
               </CardHeader>
@@ -690,7 +690,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                       className="h-2" 
                       indicatorClassName="bg-purple-600"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-gray-300">
                       العملاء الذين أنفقوا أكثر من 10,000 ج.م
                     </p>
                   </div>
@@ -714,7 +714,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                       className="h-2" 
                       indicatorClassName="bg-blue-500"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-gray-300">
                       العملاء الذين أنفقوا بين 5,000 و 10,000 ج.م
                     </p>
                   </div>
@@ -738,7 +738,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                       className="h-2" 
                       indicatorClassName="bg-green-500"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-gray-300">
                       العملاء الذين أنفقوا بين 1,000 و 5,000 ج.م
                     </p>
                   </div>
@@ -762,7 +762,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
                       className="h-2"
                       indicatorClassName="bg-gray-400" 
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground dark:text-gray-300">
                       العملاء الذين أنفقوا أقل من 1,000 ج.م
                     </p>
                   </div>
@@ -774,20 +774,20 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
       </Tabs>
       
       {/* خلاصة التوصيات والنصائح */}
-      <Card>
+      <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Lightbulb className="h-5 w-5 ml-2" />
             توصيات ونصائح بناءً على التحليلات
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-muted-foreground dark:text-gray-300">
             اقتراحات لتحسين التفاعل مع العملاء ورفع معدلات النشاط
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {/* نصائح متعلقة بالنشاط */}
-            <div className="bg-blue-50 text-blue-800 p-4 rounded-md">
+            <div className="bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 p-4 rounded-md">
               <h4 className="font-semibold mb-2 flex items-center">
                 <Activity className="h-4 w-4 ml-2" />
                 تحسين نشاط العملاء
@@ -801,7 +801,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             
             {/* نصائح متعلقة بالتوزيع الجغرافي */}
             {regionData.length > 0 && (
-              <div className="bg-green-50 text-green-800 p-4 rounded-md">
+              <div className="bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-200 p-4 rounded-md">
                 <h4 className="font-semibold mb-2 flex items-center">
                   <Map className="h-4 w-4 ml-2" />
                   استهداف المناطق الجغرافية
@@ -816,7 +816,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             
             {/* نصائح متعلقة بنوع النشاط التجاري */}
             {businessTypeData.length > 0 && (
-              <div className="bg-purple-50 text-purple-800 p-4 rounded-md">
+              <div className="bg-purple-50 dark:bg-purple-900 text-purple-800 dark:text-purple-200 p-4 rounded-md">
                 <h4 className="font-semibold mb-2 flex items-center">
                   <Building className="h-4 w-4 ml-2" />
                   استهداف أنواع النشاط التجاري

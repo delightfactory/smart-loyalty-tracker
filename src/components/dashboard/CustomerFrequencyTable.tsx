@@ -83,13 +83,13 @@ const CustomerFrequencyTable = (props: CustomerFrequencyTableProps) => {
                 <tr><td colSpan={6} className="text-center">جارٍ التحميل...</td></tr>
               ) : (
                 customerFrequency.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-yellow-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-yellow-700">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold">{c.name}</td>
-                    <td className="p-2">{c.businessType}</td>
-                    <td className="p-2 text-blue-700 font-bold">{formatNumberEn(c.invoicesCount)}</td>
-                    <td className="p-2" dir="ltr">{c.lastPurchase ? formatDateEn(c.lastPurchase) : 'لم يشترِ من قبل'}</td>
-                    <td className="p-2 text-purple-700 font-bold">{c.avgDaysBetweenPurchases !== null ? formatNumberEn(Math.round(c.avgDaysBetweenPurchases)) + ' يوم' : 'غير متاح'}</td>
+                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-yellow-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'}>
+                    <td className="p-2 font-bold text-yellow-700 dark:text-yellow-300">{formatNumberEn(idx + 1)}</td>
+                    <td className="p-2 font-semibold dark:text-gray-100">{c.name}</td>
+                    <td className="p-2 dark:text-gray-200">{c.businessType}</td>
+                    <td className="p-2 text-blue-700 font-bold dark:text-blue-300">{formatNumberEn(c.invoicesCount)}</td>
+                    <td className="p-2 dark:text-gray-200" dir="ltr">{c.lastPurchase ? formatDateEn(c.lastPurchase) : 'لم يشترِ من قبل'}</td>
+                    <td className="p-2 text-gray-700 font-bold dark:text-gray-300">{c.avgDaysBetweenPurchases !== null ? formatNumberEn(Math.round(c.avgDaysBetweenPurchases)) + ' يوم' : 'غير متاح'}</td>
                   </tr>
                 ))
               )}

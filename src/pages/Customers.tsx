@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Users, Plus, Search, Filter, UserPlus, Star, Loader2, Eye, Pencil, Trash, RotateCcw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PageContainer from '@/components/layout/PageContainer';
 import { BusinessType, Customer, ProductCategory } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -54,9 +54,11 @@ import { useRedemptions } from '@/hooks/useRedemptions';
 import { useMemo } from 'react';
 import { formatNumberEn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import ViewToggle from '@/components/invoice/ViewToggle';
 
 const Customers = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
   const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
@@ -349,17 +351,17 @@ const Customers = () => {
   };
 
   // واجهة العرض: جدول أو كروت
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
+  const [view, setView] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
 
   useEffect(() => {
-    if (isMobile) setViewMode('cards');
+    if (isMobile) setView('cards');
   }, [isMobile]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('customers_view_mode', viewMode);
+      localStorage.setItem('customers_view', view);
     }
-  }, [viewMode]);
+  }, [view]);
 
   // --- Real-time points cell ---
   function CustomerPointsCell({ customerId }: { customerId: string }) {
@@ -405,6 +407,13 @@ const Customers = () => {
     return <>{formatNumberEn(totalBalance)} ج.م</>;
   }
 
+  // فتح نافذة إضافة عميل تلقائياً إذا تم التوجيه مع state مناسب
+  useEffect(() => {
+    if (location.state && location.state.openAddDialog) {
+      setIsAddDialogOpen(true);
+    }
+  }, [location.state]);
+
   return (
     <PageContainer
       title="إدارة العملاء"
@@ -432,12 +441,15 @@ const Customers = () => {
     >
       {/* أزرار عصرية أعلى الصفحة */}
       <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <ViewToggle view={view} setView={setView} storageKey="customers_view" />
         <Button
-          variant="ghost"
-          className="rounded-lg px-5 py-2 font-semibold bg-gradient-to-tr from-blue-400 to-blue-600 text-white shadow-md hover:from-blue-500 hover:to-blue-700 focus:ring-2 focus:ring-blue-300 transition-all duration-200"
+          size="sm"
+          variant="outline"
+          className="rounded-lg bg-gradient-to-l from-primary to-green-500 text-white shadow-md hover:from-green-600 hover:to-primary dark:from-green-900 dark:to-green-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
           onClick={() => setIsAddDialogOpen(true)}
         >
-          <UserPlus className="w-4 h-4 ml-2" /> إضافة عميل
+          <Plus className="h-4 w-4 mr-1" />
+          إضافة عميل
         </Button>
         <Button
           variant="ghost"
@@ -457,20 +469,6 @@ const Customers = () => {
           />
         </label>
         <div className="flex gap-2 items-center ml-4">
-          <Button
-            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-            className={`rounded-lg px-4 py-2 font-medium border border-blue-200 text-blue-700 bg-white hover:bg-blue-50 shadow-sm transition-all duration-200 ${viewMode === 'table' ? 'bg-gradient-to-tr from-blue-100 to-blue-200' : ''}`}
-            onClick={() => setViewMode('table')}
-          >
-            <Users className="w-4 h-4 ml-1" /> جدول
-          </Button>
-          <Button
-            variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-            className={`rounded-lg px-4 py-2 font-medium border border-teal-200 text-teal-700 bg-white hover:bg-teal-50 shadow-sm transition-all duration-200 ${viewMode === 'cards' ? 'bg-gradient-to-tr from-teal-100 to-teal-200' : ''}`}
-            onClick={() => setViewMode('cards')}
-          >
-            <UserPlus className="w-4 h-4 ml-1" /> كروت
-          </Button>
         </div>
       </div>
       
@@ -532,7 +530,7 @@ const Customers = () => {
         </Button>
       </div>
       
-      {viewMode === 'table' ? (
+      {view === 'table' ? (
         <div className="rounded-lg border bg-card shadow-sm overflow-x-auto">
           <Table>
             <TableHeader>
@@ -558,7 +556,7 @@ const Customers = () => {
                 <TableRow>
                   <TableCell colSpan={13} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Loader2 className="h-10 w-10 mb-2 animate-spin" />
+                      <Loader2 className="h-10 w-10 animate-spin" />
                       <p>جاري تحميل البيانات...</p>
                     </div>
                   </TableCell>

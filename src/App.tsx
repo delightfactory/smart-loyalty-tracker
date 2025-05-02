@@ -27,6 +27,7 @@ import RedemptionsList from '@/pages/RedemptionsList';
 import RedemptionDetails from '@/pages/RedemptionDetails';
 import EditRedemption from '@/pages/EditRedemption';
 import RequireAuth from '@/components/auth/RequireAuth';
+import FloatingQuickActions from '@/components/FloatingQuickActions';
 
 function App() {
   return (
@@ -71,6 +72,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
+            <FloatingQuickActions />
             <Toaster />
           </AuthProvider>
         </QueryProvider>

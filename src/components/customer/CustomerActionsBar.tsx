@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Edit, ShoppingCart, CreditCard, Trash2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Edit, ShoppingCart, CreditCard, Trash2, AlertTriangle, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +30,7 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
 
   return (
     <div className="mb-6 flex justify-between">
-      <Button variant="outline" onClick={() => navigate('/customers')}>
+      <Button variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm" onClick={() => navigate('/customers')}>
         <ChevronLeft className="h-4 w-4 mr-2" />
         العودة للعملاء
       </Button>
@@ -39,9 +38,9 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
       <div className="flex gap-2">
         <CustomerRedemptionButton customer={customer} />
         
-        <Button variant="outline" onClick={() => navigate(`/create-payment/${customer.id}`)}>
-          <CreditCard className="h-4 w-4 ml-2" />
-          تسجيل دفعة
+        <Button variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm" onClick={() => navigate(`/create-payment/${customer.id}`)}>
+          <CreditCard className="h-4 w-4 mr-2" />
+          دفعة جديدة
         </Button>
         
         <Button variant="outline" onClick={onEdit}>
@@ -82,8 +81,8 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
           </AlertDialogContent>
         </AlertDialog>
         
-        <Button onClick={() => navigate(`/create-invoice/${customer.id}`)}>
-          <ShoppingCart className="h-4 w-4 ml-2" />
+        <Button onClick={() => navigate(`/create-invoice/${customer.id}`)} variant="outline" size="sm" className="rounded-lg flex items-center gap-2 px-4 py-2 font-semibold shadow-sm">
+          <Plus className="h-4 w-4 mr-2" />
           فاتورة جديدة
         </Button>
       </div>

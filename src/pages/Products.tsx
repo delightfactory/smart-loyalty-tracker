@@ -35,6 +35,7 @@ import { toast } from '@/components/ui/use-toast';
 import * as XLSX from 'xlsx';
 import ProductCard from "@/components/products/ProductCard";
 import { useIsMobile } from '@/hooks/use-mobile';
+import ViewToggle from '@/components/invoice/ViewToggle';
 
 const Products = () => {
   const navigate = useNavigate();
@@ -212,19 +213,7 @@ const Products = () => {
   };
 
   // الحالة الجديدة لعرض الجدول أو الكروت
-  const [viewMode, setViewMode] = React.useState<'table' | 'card'>(isMobile ? 'card' : 'table');
-
-  // فرض عرض الكروت تلقائياً في وضع الهاتف
-  React.useEffect(() => {
-    if (isMobile) setViewMode('card');
-  }, [isMobile]);
-
-  // حفظ التفضيل عند التغيير
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('products_view_mode', viewMode);
-    }
-  }, [viewMode]);
+  const [view, setView] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
 
   return (
     <PageContainer title="إدارة المنتجات" subtitle="عرض وإضافة وتعديل المنتجات">
@@ -241,10 +230,12 @@ const Products = () => {
         </div>
         {/* مجموعة الأزرار العلوية */}
         <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto justify-end">
+          <ViewToggle view={view} setView={setView} storageKey="products_view" />
           <Button
             asChild
             variant="outline"
-            className="flex gap-2 rounded-xl border-2 border-primary/60 dark:border-blue-700 bg-gradient-to-l from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900 dark:to-blue-950 text-primary dark:text-blue-200 font-semibold shadow-md hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900 dark:hover:to-blue-800 transition-all px-4 py-2 min-w-[150px]"
+            size="sm"
+            className="flex gap-2 rounded-lg border-2 border-primary/60 dark:border-blue-700 bg-gradient-to-l from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900 dark:to-blue-950 text-primary dark:text-blue-200 font-semibold shadow-md hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900 dark:hover:to-blue-800 transition-all px-4 py-2 min-w-[120px]"
           >
             <a href="/product_import_template.csv" download>
               <ExternalLink className="h-4 w-4 ml-1" />
@@ -252,7 +243,7 @@ const Products = () => {
             </a>
           </Button>
           <label className="flex items-center gap-2 cursor-pointer w-full sm:w-auto">
-            <span className="bg-gradient-to-l from-primary to-blue-500 text-white rounded-xl px-4 py-2 text-sm font-semibold shadow-md hover:from-blue-600 hover:to-primary dark:from-blue-900 dark:to-blue-700 w-full sm:w-auto text-center transition-all flex items-center gap-2">
+            <span className="bg-gradient-to-l from-primary to-blue-500 text-white rounded-lg px-4 py-2 text-sm font-semibold shadow-md hover:from-blue-600 hover:to-primary dark:from-blue-900 dark:to-blue-700 w-full sm:w-auto text-center transition-all flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               استيراد منتجات من Excel
             </span>
@@ -264,7 +255,7 @@ const Products = () => {
             />
           </label>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="rounded-xl border-2 border-primary/60 dark:border-blue-700 shadow-md bg-white dark:bg-gray-900 dark:text-gray-100 min-w-[140px] font-semibold text-primary dark:text-blue-200">
+            <SelectTrigger className="rounded-lg border-2 border-primary/60 dark:border-blue-700 shadow-md bg-white dark:bg-gray-900 dark:text-gray-100 min-w-[140px] font-semibold text-primary dark:text-blue-200">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
                 <SelectValue placeholder="جميع الأقسام" />
@@ -278,32 +269,17 @@ const Products = () => {
             </SelectContent>
           </Select>
           <Button
-            className="rounded-xl bg-gradient-to-l from-primary to-blue-500 text-white shadow-md hover:from-blue-600 hover:to-primary dark:from-blue-900 dark:to-blue-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
+            size="sm"
+            variant="outline"
+            className="rounded-lg bg-gradient-to-l from-primary to-blue-500 text-white shadow-md hover:from-blue-600 hover:to-primary dark:from-blue-900 dark:to-blue-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
             onClick={() => setIsAddDialogOpen(true)}
           >
             <Plus className="h-4 w-4 mr-1" />
             إضافة منتج
           </Button>
-          <Button
-            variant="outline"
-            className="rounded-xl border-2 border-primary/60 dark:border-blue-700 shadow-md flex items-center gap-2 px-4 py-2 font-semibold text-primary dark:text-blue-200 transition-all min-w-[120px]"
-            onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
-          >
-            {viewMode === 'table' ? (
-              <>
-                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" className="stroke-current"/><rect x="14" y="3" width="7" height="7" className="stroke-current"/><rect x="14" y="14" width="7" height="7" className="stroke-current"/><rect x="3" y="14" width="7" height="7" className="stroke-current"/></svg>
-                عرض كروت
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                عرض جدول
-              </>
-            )}
-          </Button>
         </div>
       </div>
-      {viewMode === 'table' ? (
+      {view === 'table' ? (
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-x-auto w-full">
           <Table className="min-w-[700px] w-full">
             <TableHeader>

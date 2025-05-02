@@ -402,7 +402,13 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
     }
     
     const today = new Date();
-    if (invoice.dueDate && today > new Date(invoice.dueDate) && totalPayments < invoice.totalAmount - epsilon) {
+    // من الأفضل التأكد أن الفواتير التي طريقة دفعها "آجل" فقط يمكن أن تكون متأخرة
+    if (
+      invoice.paymentMethod === PaymentMethod.CREDIT &&
+      invoice.dueDate &&
+      today > new Date(invoice.dueDate) &&
+      totalPayments < invoice.totalAmount - epsilon
+    ) {
       newStatus = InvoiceStatus.OVERDUE;
     }
     

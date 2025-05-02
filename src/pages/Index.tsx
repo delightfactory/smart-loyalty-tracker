@@ -1,9 +1,9 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BarChart2, Package, Settings, Users } from 'lucide-react';
+import FloatingQuickActions from '@/components/FloatingQuickActions';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -123,6 +123,7 @@ const Index = () => {
           </CardFooter>
         </Card>
       </div>
+      <FloatingQuickActions />
     </div>
   );
 };

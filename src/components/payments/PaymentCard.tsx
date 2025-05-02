@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardFooter, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -111,7 +110,7 @@ const PaymentCard: React.FC<PaymentCardProps> = ({ payment, customerName, invoic
         <div className="flex items-center gap-1">
           <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
           <span className={isPayment ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-            <span className="font-mono font-bold">{Number(payment.amount).toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</span>
+            <span className="font-mono font-bold">{Number(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           </span>
         </div>
         <Badge variant="outline" className="font-normal">

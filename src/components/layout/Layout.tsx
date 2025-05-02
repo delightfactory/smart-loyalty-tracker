@@ -9,12 +9,28 @@ interface LayoutProps {
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const isMobile = useIsMobile();
-
+  // يجب أن يكون useSidebar داخل SidebarProvider فقط
   return (
     <SidebarProvider>
+      <LayoutWithSidebar children={children} />
+    </SidebarProvider>
+  );
+};
+
+// فصل المنطق الداخلي في مكون فرعي ليتم استدعاء useSidebar بعد التأكد من وجود SidebarProvider
+const LayoutWithSidebar = ({ children }: LayoutProps) => {
+  const isMobile = useIsMobile();
+  const { open, openMobile } = useSidebar();
+  const isSidebarOpen = isMobile ? openMobile : open;
+
+  return (
+    <>
       <SidebarWithContext />
-      <div className="relative flex flex-1 flex-col overflow-hidden">
+      <div
+        className={`relative flex flex-1 flex-col overflow-hidden transition-all duration-300`
+          + (isSidebarOpen && !isMobile ? ' md:mr-[256px]' : '')
+        }
+      >
         <HeaderWithContext />
         <main className="flex-1 overflow-auto p-2 sm:p-3 md:p-4 pt-16 md:pt-20">
           <div className="mx-auto w-full max-w-[1600px]">
@@ -22,7 +38,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </main>
       </div>
-    </SidebarProvider>
+    </>
   );
 };
 

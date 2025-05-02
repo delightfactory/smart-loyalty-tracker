@@ -54,9 +54,16 @@ const BusinessTypeDistribution = (props: BusinessTypeDistributionProps) => {
                 <tr><td colSpan={2} className="text-center">جارٍ التحميل...</td></tr>
               ) : (
                 distribution.map((item, idx) => (
-                  <tr key={item.type} className={idx % 2 === 0 ? 'bg-teal-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-teal-700">{item.type}</td>
-                    <td className="p-2 text-blue-700 font-bold">{formatNumberEn(item.count)}</td>
+                  <tr
+                    key={item.type}
+                    className={
+                      idx % 2 === 0
+                        ? 'bg-teal-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'
+                    }
+                  >
+                    <td className="p-2 font-bold text-teal-700 dark:text-teal-300">{item.type}</td>
+                    <td className="p-2 text-blue-700 font-bold dark:text-blue-300">{formatNumberEn(item.count)}</td>
                   </tr>
                 ))
               )}

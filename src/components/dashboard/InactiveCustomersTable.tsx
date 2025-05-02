@@ -63,11 +63,18 @@ export default function InactiveCustomersTable({ customers, invoices, inactiveDa
                 <tr><td colSpan={4} className="text-center py-4">لا يوجد عملاء غير نشطين حالياً</td></tr>
               ) : (
                 inactiveCustomers.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-red-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-red-700">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold">{c.name}</td>
-                    <td className="p-2">{formatDateEn(c.lastPurchase)}</td>
-                    <td className="p-2 text-red-700 font-bold">{formatNumberEn(c.daysInactive)}</td>
+                  <tr
+                    key={c.id}
+                    className={
+                      idx % 2 === 0
+                        ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'
+                    }
+                  >
+                    <td className="p-2 font-bold text-gray-700 dark:text-gray-300">{formatNumberEn(idx + 1)}</td>
+                    <td className="p-2 font-semibold text-gray-900 dark:text-gray-200">{c.name}</td>
+                    <td className="p-2 text-gray-600 dark:text-gray-400">{c.lastPurchase}</td>
+                    <td className="p-2 text-red-600 font-bold dark:text-red-400">{formatNumberEn(c.daysInactive)}</td>
                   </tr>
                 ))
               )}

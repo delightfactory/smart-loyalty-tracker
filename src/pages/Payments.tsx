@@ -8,7 +8,7 @@ import PaymentsFilterBar from '@/components/payments/PaymentsFilterBar';
 import PaymentsSummaryBar from '@/components/payments/PaymentsSummaryBar';
 import PaymentCard from '@/components/payments/PaymentCard';
 import ViewToggle from '@/components/invoice/ViewToggle';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PageContainer from '@/components/layout/PageContainer';
 
@@ -137,9 +137,14 @@ const Payments: React.FC = () => {
       extra={
         <div className="flex gap-2 items-center">
           <ViewToggle view={view} setView={setView} storageKey="payments_view" />
-          <Button onClick={() => navigate('/create-payment')} className="rounded-xl bg-gradient-to-tr from-lime-400 via-emerald-300 to-teal-400 hover:from-teal-400 hover:to-lime-400 shadow-md text-emerald-900 dark:text-emerald-100 font-bold flex gap-2 items-center border-0 transition-all">
-            <span className="hidden md:inline">إضافة دفعة</span>
-            <span className="inline md:hidden">+</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-lg bg-gradient-to-l from-primary to-emerald-500 text-white shadow-md hover:from-emerald-600 hover:to-primary dark:from-emerald-900 dark:to-emerald-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
+            onClick={() => navigate('/create-payment')}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            إضافة دفعة
           </Button>
         </div>
       }
@@ -182,10 +187,10 @@ const Payments: React.FC = () => {
               ) : (
                 filteredPayments.map((payment, idx) => (
                   <tr key={payment.id} className="hover:bg-muted/20 dark:hover:bg-muted/10 transition-colors">
-                    <td className="px-4 py-3 font-mono text-sm">{idx + 1}</td>
+                    <td className="px-4 py-3 font-mono text-sm">{(idx + 1).toLocaleString('en-US')}</td>
                     <td className="px-4 py-3">{getCustomerName(payment.customerId)}</td>
                     <td className="px-4 py-3 text-primary font-mono">{payment.invoiceId ? getInvoiceNumber(payment.invoiceId) : '-'}</td>
-                    <td className="px-4 py-3 text-green-600 dark:text-green-400 font-bold font-mono">{Number(payment.amount).toLocaleString('ar-SA', { minimumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-green-600 dark:text-green-400 font-bold font-mono">{Number(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td className="px-4 py-3">{payment.method || '-'}</td>
                     <td className="px-4 py-3">{payment.type === 'refund' ? 'استرجاع' : 'دفعة'}</td>
                     <td className="px-4 py-3 font-mono text-muted-foreground">{payment.date ? formatDate(payment.date) : '-'}</td>

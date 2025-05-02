@@ -79,20 +79,16 @@ const InactivityFilter = ({
   };
   
   return (
-    <Card className="bg-white shadow-sm">
-      <CardContent className="p-4">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-muted-foreground" />
-            <span className="font-medium">تصفية حسب فترة عدم النشاط:</span>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-4">
+    <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors mb-4">
+      <CardContent>
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex flex-col gap-2 w-full md:w-1/4">
+            <label className="text-sm text-gray-700 dark:text-gray-200">الفترة الزمنية</label>
             <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="اختر الفترة" />
+              <SelectTrigger className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white">
+                <SelectValue placeholder="اختر الفترة الزمنية" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white">
                 <SelectItem value="7">آخر أسبوع</SelectItem>
                 <SelectItem value="15">آخر 15 يوم</SelectItem>
                 <SelectItem value="30">آخر شهر</SelectItem>
@@ -104,39 +100,27 @@ const InactivityFilter = ({
                 <SelectItem value="custom">فترة مخصصة</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-2 border border-gray-200"
-              onClick={handleReset}
-              aria-label="إعادة تعيين الفلتر الزمني"
-            >
-              إعادة تعيين
-            </Button>
-            
-            {period === "custom" ? (
-              <div className="flex items-center gap-2">
-                <DateRangePicker
-                  from={fromDateValue}
-                  to={toDateValue}
-                  onFromChange={handleFromDateChange}
-                  onToChange={handleToDateChange}
-                />
-              </div>
-            ) : (
-              period !== "all" && period !== "custom" && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>العملاء غير النشطين منذ {period} يوم أو أكثر</span>
-                </div>
-              )
-            )}
           </div>
+          {period === "custom" ? (
+            <>
+              <div className="flex flex-col gap-2 w-full md:w-1/4">
+                <label className="text-sm text-gray-700 dark:text-gray-200">من تاريخ</label>
+                <DatePicker value={fromDateValue} onChange={handleFromDateChange} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white" />
+              </div>
+              <div className="flex flex-col gap-2 w-full md:w-1/4">
+                <label className="text-sm text-gray-700 dark:text-gray-200">إلى تاريخ</label>
+                <DatePicker value={toDateValue} onChange={handleToDateChange} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white" />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-2 w-full md:w-1/2 justify-end">
+              <Button variant="outline" onClick={handleReset} className="mt-6 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700">إعادة تعيين</Button>
+            </div>
+          )}
         </div>
-        
-        <div className="mt-4 flex items-center gap-2 text-sm bg-blue-50 p-2 rounded-md">
-          <AlertCircle className="h-4 w-4 text-blue-500" />
-          <span>
+        <div className="mt-4 flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900 p-2 rounded-md">
+          <AlertCircle className="h-4 w-4 text-blue-500 dark:text-blue-200" />
+          <span className="text-gray-700 dark:text-gray-200">
             {period === "all" ? (
               "عرض جميع العملاء"
             ) : period === "custom" ? (

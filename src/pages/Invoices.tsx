@@ -244,9 +244,14 @@ const Invoices = () => {
             <CreditCard className="h-4 w-4 ml-2 text-primary" />
             تسجيل دفعة
           </Button>
-          <Button onClick={() => navigate('/create-invoice')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
-            <ShoppingCart className="h-4 w-4 ml-2" />
-            فاتورة جديدة
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-lg bg-gradient-to-l from-primary to-purple-500 text-white shadow-md hover:from-purple-600 hover:to-primary dark:from-purple-900 dark:to-purple-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
+            onClick={() => navigate('/create-invoice')}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            إنشاء فاتورة
           </Button>
         </div>
       </div>

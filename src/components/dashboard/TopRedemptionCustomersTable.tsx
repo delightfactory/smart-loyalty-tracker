@@ -79,11 +79,11 @@ const TopRedemptionCustomersTable = (props: TopRedemptionCustomersTableProps) =>
                 <tr><td colSpan={4} className="text-center">جارٍ التحميل...</td></tr>
               ) : (
                 topRedemptionCustomers.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-pink-50/50' : 'bg-white'}>
-                    <td className="p-2 font-bold text-pink-700">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold">{c.name}</td>
-                    <td className="p-2">{c.businessType}</td>
-                    <td className="p-2 text-purple-700 font-bold">{formatNumberEn(c.totalPoints)}</td>
+                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-pink-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'}>
+                    <td className="p-2 font-bold text-pink-600 dark:text-pink-300">{formatNumberEn(idx + 1)}</td>
+                    <td className="p-2 font-semibold dark:text-gray-100">{c.name}</td>
+                    <td className="p-2 dark:text-gray-200">{c.businessType}</td>
+                    <td className="p-2 text-purple-700 font-bold dark:text-purple-400">{formatNumberEn(c.totalPoints)}</td>
                   </tr>
                 ))
               )}

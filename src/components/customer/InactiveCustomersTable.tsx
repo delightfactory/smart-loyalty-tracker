@@ -1,4 +1,3 @@
-
 import { Customer } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,13 +56,13 @@ const InactiveCustomersTable = ({
   
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          <CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle>
+          <CardDescription className="text-muted-foreground dark:text-gray-300">{description}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[400px] w-full bg-gray-200 dark:bg-gray-800" />
         </CardContent>
       </Card>
     );
@@ -71,14 +70,14 @@ const InactiveCustomersTable = ({
   
   if (customers.length === 0) {
     return (
-      <Card>
+      <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          <CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle>
+          <CardDescription className="text-muted-foreground dark:text-gray-300">{description}</CardDescription>
         </CardHeader>
         <CardContent className="text-center py-12">
           <div className="flex flex-col items-center justify-center space-y-3">
-            <div className={`rounded-full p-3 ${warningLevel === 'destructive' ? 'bg-destructive/10' : warningLevel === 'warning' ? 'bg-amber-100' : 'bg-secondary/50'}`}>
+            <div className={`rounded-full p-3 ${warningLevel === 'destructive' ? 'bg-destructive/10 dark:bg-red-900/30' : warningLevel === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-secondary/50 dark:bg-gray-800/60'}`}>
               {warningLevel === 'destructive' ? (
                 <AlertCircle className="h-6 w-6 text-destructive" />
               ) : warningLevel === 'warning' ? (
@@ -88,7 +87,7 @@ const InactiveCustomersTable = ({
               )}
             </div>
             <div className="text-lg font-medium">{emptyMessage}</div>
-            <div className="text-sm text-muted-foreground">لا توجد بيانات لعرضها</div>
+            <div className="text-sm text-muted-foreground dark:text-gray-300">لا توجد بيانات لعرضها</div>
           </div>
         </CardContent>
       </Card>
@@ -96,67 +95,65 @@ const InactiveCustomersTable = ({
   }
   
   return (
-    <Card>
+    <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle>
+        <CardDescription className="text-muted-foreground dark:text-gray-300">{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>اسم العميل</TableHead>
-                <TableHead>نوع النشاط</TableHead>
-                <TableHead>آخر نشاط</TableHead>
-                <TableHead>مدة عدم النشاط</TableHead>
-                <TableHead>معلومات الاتصال</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.map(customer => {
-                const inactivityDays = calculateInactivityDays(customer.lastActive);
-                const badgeVariant = getInactivityBadge(inactivityDays);
-                const badgeCustomClass = inactivityDays > 30 && inactivityDays <= 90 ? getWarningLevelClass('warning') : '';
-                
-                return (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.businessType}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                        {customer.lastActive ? formatDate(customer.lastActive) : "لم يسجل نشاط"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={badgeVariant} className={`flex items-center gap-1 w-fit ${badgeCustomClass}`}>
-                        {getInactivityIcon(inactivityDays)}
-                        {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" title="الاتصال">
-                          <Phone className="h-4 w-4" />
+        <Table className="bg-white dark:bg-gray-900">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-gray-700 dark:text-gray-200">اسم العميل</TableHead>
+              <TableHead className="text-gray-700 dark:text-gray-200">نوع النشاط</TableHead>
+              <TableHead className="text-gray-700 dark:text-gray-200">آخر نشاط</TableHead>
+              <TableHead className="text-gray-700 dark:text-gray-200">مدة عدم النشاط</TableHead>
+              <TableHead className="text-gray-700 dark:text-gray-200">معلومات الاتصال</TableHead>
+              <TableHead className="text-gray-700 dark:text-gray-200">الإجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {customers.map(customer => {
+              const inactivityDays = calculateInactivityDays(customer.lastActive);
+              const badgeVariant = getInactivityBadge(inactivityDays);
+              const badgeCustomClass = inactivityDays > 30 && inactivityDays <= 90 ? getWarningLevelClass('warning') : '';
+              
+              return (
+                <TableRow key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                  <TableCell className="text-gray-900 dark:text-white font-medium">{customer.name}</TableCell>
+                  <TableCell className="text-gray-700 dark:text-gray-300">{customer.businessType}</TableCell>
+                  <TableCell className="text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1">
+                      <CalendarClock className="h-4 w-4 text-muted-foreground dark:text-gray-300" />
+                      {customer.lastActive ? formatDate(customer.lastActive) : "لم يسجل نشاط"}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-gray-700 dark:text-gray-300">
+                    <Badge variant={badgeVariant} className={`flex items-center gap-1 w-fit ${badgeCustomClass}`}>
+                      {getInactivityIcon(inactivityDays)}
+                      {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" title="الاتصال" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                      {customer.email && (
+                        <Button variant="outline" size="icon" title="إرسال بريد إلكتروني" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">
+                          <Mail className="h-4 w-4" />
                         </Button>
-                        {customer.email && (
-                          <Button variant="outline" size="icon" title="إرسال بريد إلكتروني">
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm">عرض التفاصيل</Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-gray-700 dark:text-gray-300">
+                    <Button variant="outline" size="sm" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">عرض التفاصيل</Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
