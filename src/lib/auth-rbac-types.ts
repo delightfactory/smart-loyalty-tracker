@@ -1,3 +1,4 @@
+
 // RBAC Types for User, Role, Permission management
 
 export type UUID = string;
@@ -29,6 +30,7 @@ export interface User {
   roles: Role[]; // List of roles assigned to the user
   permissions?: Permission[]; // Optional: direct permissions for the user
   avatarUrl?: string;
+  position?: string; // Added position field to fix TypeScript errors
 }
 
 // Assignment tables for DB (for Supabase/Postgres)

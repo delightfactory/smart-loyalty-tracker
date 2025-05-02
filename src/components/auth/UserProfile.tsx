@@ -54,6 +54,11 @@ export const UserProfile = () => {
     ? profile.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.substring(0, 2).toUpperCase() || 'UN';
   
+  // Get the first role name as a string for display purposes
+  const displayPosition = profile?.position || 
+    (profile?.roles && profile.roles.length > 0 ? 
+      profile.roles[0].name : 'مستخدم');
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-4 rtl:space-x-reverse">
@@ -64,7 +69,7 @@ export const UserProfile = () => {
         <div>
           <p className="font-medium">{profile?.fullName || user?.email}</p>
           <p className="text-sm text-muted-foreground">
-            {profile?.position || (profile?.roles && profile.roles.length > 0 ? profile.roles[0] : 'مستخدم')}
+            {displayPosition}
           </p>
         </div>
       </div>

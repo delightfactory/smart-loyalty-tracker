@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import {
   UUID,
@@ -257,8 +256,8 @@ export class UserService implements IUserService {
         full_name: user.fullName!,
         email: user.email,
         phone: user.phone || null,
-        position: user.position || null,
-        avatar_url: user.avatarUrl || null
+        avatar_url: user.avatarUrl || null,
+        position: user.position || null
       })
       .select()
       .single();
@@ -272,10 +271,10 @@ export class UserService implements IUserService {
       email: profile.email || '',
       phone: profile.phone || null,
       isActive: true,
-      position: profile.position || null,
-      avatarUrl: profile.avatar_url || null,
       createdAt: profile.created_at,
       lastSignInAt: null,
+      avatarUrl: profile.avatar_url || null,
+      position: profile.position || null,
       roles: [],
       permissions: []
     };
@@ -306,8 +305,8 @@ export class UserService implements IUserService {
         full_name: updates.fullName,
         email: updates.email,
         phone: updates.phone,
-        position: updates.position,
-        avatar_url: updates.avatarUrl
+        avatar_url: updates.avatarUrl,
+        position: updates.position || null
       })
       .eq('id', id)
       .select()

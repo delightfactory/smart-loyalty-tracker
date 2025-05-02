@@ -40,7 +40,7 @@ export const ensureUserHasAdminRole = async (userId: string) => {
   try {
     console.log('Ensuring user has admin role:', userId);
     
-    // التحقق مما إذا كان المستخدم لديه دور المسؤول بالفعل
+    // نستخدم نوع واضح للمتغير existingRole لمنع الخطأ
     const { data: existingRole, error: checkError } = await supabase
       .from('user_roles')
       .select('id')
@@ -56,9 +56,20 @@ export const ensureUserHasAdminRole = async (userId: string) => {
     // إذا لم يكن المستخدم لديه دور المسؤول، أضفه
     if (!existingRole) {
       console.log('Adding admin role to user:', userId);
+      
+      type InsertData = {
+        user_id: string;
+        role: UserRole;
+      };
+      
+      const insertData: InsertData = {
+        user_id: userId,
+        role: UserRole.ADMIN
+      };
+      
       const { error: insertError } = await supabase
         .from('user_roles')
-        .insert({ user_id: userId, role: UserRole.ADMIN });
+        .insert(insertData);
       
       if (insertError) {
         console.error("Error adding admin role:", insertError);

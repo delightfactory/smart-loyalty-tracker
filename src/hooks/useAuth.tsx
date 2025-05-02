@@ -51,8 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select(`
-          id, full_name, email, avatar_url, phone, position,
-          user_roles(role:roles(id, name, description, role_permissions(permission:permissions(id, name, description))))
+          id, full_name, email, avatar_url, phone, position
         `)
         .eq('id', userId)
         .single();
@@ -62,49 +61,67 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw userError || new Error('لم يتم العثور على بيانات المستخدم');
       }
 
-      // تعريف نوع userData مؤقتاً بعد التأكد من صحته
-      const userTyped = userData as {
-        id: string;
-        full_name: string;
-        email: string;
-        avatar_url: string;
-        phone: string;
-        position: string;
-        user_roles?: any[];
-      };
+      // جلب أدوار المستخدم بشكل منفصل
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select(`
+          role_id, roles:role_id(id, name, description)
+        `)
+        .eq('user_id', userId);
 
-      const roles = Array.isArray(userTyped.user_roles)
-        ? userTyped.user_roles.map((ur: any) => {
-            const r = ur.role;
-            return r && typeof r === 'object'
-              ? {
-                  id: r.id,
-                  name: r.name,
-                  description: r.description,
-                  permissions: Array.isArray(r.role_permissions)
-                    ? r.role_permissions.map((rp: any) => rp.permission)
-                    : [],
-                }
-              : null;
-          }).filter(Boolean)
-        : [];
+      if (rolesError) {
+        console.error("Error fetching user roles:", rolesError);
+        throw rolesError;
+      }
+
+      // تحويل الأدوار إلى النموذج المطلوب
+      const roles: Role[] = [];
+
+      // تحقق من أن userRoles هو مصفوفة وليست خطأ
+      if (Array.isArray(userRoles)) {
+        for (const userRole of userRoles) {
+          if (userRole.roles && typeof userRole.roles === 'object') {
+            // لكل دور، جلب الصلاحيات المرتبطة به
+            const { data: rolePerms, error: permsError } = await supabase
+              .from('role_permissions')
+              .select(`
+                permission_id, permissions:permission_id(id, name, description)
+              `)
+              .eq('role_id', userRole.roles.id);
+
+            if (permsError) {
+              console.error("Error fetching role permissions:", permsError);
+              continue;
+            }
+
+            const permissions = (Array.isArray(rolePerms) ? 
+              rolePerms.map(rp => rp.permissions).filter(Boolean) : 
+              []);
+
+            roles.push({
+              id: userRole.roles.id,
+              name: userRole.roles.name,
+              description: userRole.roles.description,
+              permissions: permissions
+            });
+          }
+        }
+      }
 
       // بناء الملف الشخصي
       interface UserProfile extends Omit<BaseUserProfile, 'roles'> {
-  roles: Role[];
-}
+        roles: Role[];
+      }
 
       const userProfile: AuthUserProfile = {
-        id: userTyped.id,
-        fullName: userTyped.full_name,
-        email: userTyped.email,
-        avatarUrl: userTyped.avatar_url,
-        phone: userTyped.phone,
-        position: userTyped.position,
+        id: userData.id,
+        fullName: userData.full_name,
+        email: userData.email,
+        avatarUrl: userData.avatar_url,
+        phone: userData.phone,
+        position: userData.position,
         roles: roles, // Role[]
       };
-
-
 
       setState(prev => ({
         ...prev,
@@ -121,7 +138,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }));
     }
   };
-
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(

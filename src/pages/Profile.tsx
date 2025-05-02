@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,9 +75,9 @@ const Profile = () => {
                     <h3 className="text-sm font-medium text-muted-foreground">الأدوار المسندة</h3>
                     <div className="flex flex-wrap gap-2">
                       {profile?.roles && profile.roles.length > 0 ? (
-                        profile.roles.map(role => (
-                          <Badge key={role} variant="secondary">
-                            {role}
+                        profile.roles.map((role, index) => (
+                          <Badge key={index} variant="secondary">
+                            {role.name}
                           </Badge>
                         ))
                       ) : (
