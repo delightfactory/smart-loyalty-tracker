@@ -81,8 +81,9 @@ const Invoices = () => {
     refetchInvoices();
   }, [refetchInvoices]);
   
-  useRealtime('invoices', handleRefetch);
-  useRealtime('payments', handleRefetch);
+  // Fix: Update useRealtime calls to pass only the table name parameter
+  useRealtime('invoices');
+  useRealtime('payments');
   
   const getCustomerById = (id: string) => {
     return customers.find(customer => customer.id === id);
