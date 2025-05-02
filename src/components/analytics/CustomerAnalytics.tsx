@@ -28,6 +28,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { ProductCategory, BusinessType } from '@/lib/types';
+import { formatNumberEn } from '@/lib/utils';
 
 interface CustomerAnalyticsProps {
   customers: any[];
@@ -167,7 +168,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-muted-foreground">Active Customers</p>
-                <h2 className="text-2xl font-bold">{customerActivity.active.toLocaleString('en-US')}</h2>
+                <h2 className="text-2xl font-bold">{formatNumberEn(customerActivity.active)}</h2>
               </div>
               <div className="bg-green-100 p-2 rounded-full">
                 <span role="img" aria-label="active">🟢</span>
@@ -176,7 +177,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Active %</span>
-                <span>{customerActivity.activePercentage}%</span>
+                <span>{formatNumberEn(customerActivity.activePercentage)}%</span>
               </div>
             </div>
           </CardContent>
@@ -186,7 +187,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-muted-foreground">Inactive Customers</p>
-                <h2 className="text-2xl font-bold">{customerActivity.inactive.toLocaleString('en-US')}</h2>
+                <h2 className="text-2xl font-bold">{formatNumberEn(customerActivity.inactive)}</h2>
               </div>
               <div className="bg-amber-100 p-2 rounded-full">
                 <span role="img" aria-label="inactive">🟡</span>
@@ -195,7 +196,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Inactive %</span>
-                <span>{customerActivity.inactivePercentage}%</span>
+                <span>{formatNumberEn(customerActivity.inactivePercentage)}%</span>
               </div>
             </div>
           </CardContent>
@@ -205,7 +206,7 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-muted-foreground">Average Customer Value</p>
-                <h2 className="text-2xl font-bold">{avgCustomerValue.toLocaleString('en-US', { maximumFractionDigits: 0 })} EGP</h2>
+                <h2 className="text-2xl font-bold">{formatNumberEn(avgCustomerValue)}</h2> EGP
               </div>
               <div className="bg-purple-100 p-2 rounded-full">
                 <span role="img" aria-label="wallet">💰</span>

@@ -13,14 +13,15 @@ const TABLE_ORDER = [
   'invoice_items',
   'payments',
   'redemptions',
-  'redemption_items'
+  'redemption_items',
+  'points_history'
 ] as const;
 
 // Define type for table names from the const array
 export type TableName = typeof TABLE_ORDER[number];
 
 // Tables with UUID primary keys
-const UUID_TABLES = ['redemption_items', 'invoice_items'] as const;
+const UUID_TABLES = ['redemption_items', 'invoice_items', 'points_history'] as const;
 type UuidTableName = typeof UUID_TABLES[number];
 
 /**
@@ -33,6 +34,8 @@ const isUuidTable = (tableName: TableName): tableName is UuidTableName => {
 /**
  * Creates a backup of all database tables and downloads it as a JSON file
  */
+const BACKUP_VERSION = "1.0.0";
+
 export async function createDatabaseBackup(withLogs = true): Promise<boolean> {
   try {
     const backupData: Record<string, any> = {};
@@ -51,6 +54,8 @@ export async function createDatabaseBackup(withLogs = true): Promise<boolean> {
       backupData[tableName] = data;
     }
     
+    // Add version to backup
+    backupData.__version = BACKUP_VERSION;
     // Create a JSON file with the backup data
     const backupBlob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
     const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
@@ -88,7 +93,25 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
       fileReader.onload = async (event) => {
         try {
           const backupData = JSON.parse(event.target?.result as string);
-          
+
+          // Check all tables exist in backup
+          const missingTables = TABLE_ORDER.filter(t => !(t in backupData));
+          if (missingTables.length > 0) {
+            toast({
+              title: "ملف النسخة الاحتياطية غير مكتمل",
+              description: `الجداول التالية مفقودة: ${missingTables.join(', ')}`,
+              variant: "destructive"
+            });
+            resolve(false);
+            return;
+          }
+
+          toast({
+            title: "جاري استعادة النسخة الاحتياطية...",
+            description: "يرجى الانتظار حتى اكتمال العملية.",
+            variant: "default"
+          });
+
           // Clear all tables in reverse order to avoid foreign key constraints
           for (const tableName of [...TABLE_ORDER].reverse()) {
             const { error } = await deleteAllFromTable(tableName);
@@ -100,24 +123,28 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           }
           
           // Restore data to all tables in the correct order
+          let summary: string[] = [];
           for (const tableName of TABLE_ORDER) {
             if (backupData[tableName] && backupData[tableName].length > 0) {
               const { error } = await supabase
                 .from(tableName)
                 .insert(backupData[tableName]);
-                
+
               if (error) {
                 console.error(`Error restoring ${tableName}:`, error);
                 throw new Error(`فشل في استعادة بيانات ${tableName}: ${error.message}`);
               }
+              summary.push(`${tableName}: ${backupData[tableName].length} سجل`);
+            } else {
+              summary.push(`${tableName}: 0 سجل`);
             }
           }
-          
+
           toast({
             title: "تم استعادة النسخة الاحتياطية بنجاح",
-            description: "تم استعادة جميع البيانات من النسخة الاحتياطية"
+            description: `تم استعادة جميع البيانات.\n${summary.join(' | ')}`
           });
-          
+
           resolve(true);
         } catch (error: any) {
           console.error('Error restoring backup:', error);
@@ -182,23 +209,28 @@ export async function factoryReset(): Promise<boolean> {
       .select('*')
       .single();
     
+    toast({
+      title: "جاري إعادة ضبط النظام...",
+      description: "يرجى الانتظار حتى اكتمال العملية.",
+      variant: "default"
+    });
+
     // Clear all tables in reverse order to avoid foreign key constraints
     for (const tableName of [...TABLE_ORDER].reverse()) {
       if (tableName !== 'settings') { // Skip settings table to preserve configurations
         const { error } = await deleteAllFromTable(tableName);
-          
         if (error) {
           console.error(`Error clearing ${tableName}:`, error);
           throw new Error(`فشل في حذف بيانات ${tableName}: ${error.message}`);
         }
       }
     }
-    
+
     toast({
       title: "تم إعادة ضبط النظام بنجاح",
       description: "تم حذف جميع البيانات ماعدا إعدادات النظام"
     });
-    
+
     return true;
   } catch (error: any) {
     console.error('Error performing factory reset:', error);

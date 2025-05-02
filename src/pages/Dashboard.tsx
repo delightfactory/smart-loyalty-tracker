@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select, 
@@ -103,11 +104,42 @@ const Dashboard = () => {
     totalPaid: 0,
     totalOverdue: 0,
     totalPointsIssued: 0,
-    totalPointsRedeemed: 0
+    totalPointsRedeemed: 0,
+    totalManualAdded: 0,
+    totalManualDeducted: 0
   });
 
-  useEffect(() => {
+
+// ... بقية الاستيرادات هنا ...
+
+useEffect(() => {
     setIsMounted(true);
+    // دالة async لجلب وتجميع النقاط اليدوية
+    const fetchManualPoints = async () => {
+      try {
+        const { data: allPointsHistory, error } = await supabase
+          .from('points_history')
+          .select('*');
+        let totalManualAdded = 0;
+        let totalManualDeducted = 0;
+        if (!error && Array.isArray(allPointsHistory)) {
+          totalManualAdded = allPointsHistory
+            .filter((entry) => entry.type === 'manual_add')
+            .reduce((sum, entry) => sum + (entry.points || 0), 0);
+          totalManualDeducted = allPointsHistory
+            .filter((entry) => entry.type === 'manual_deduct')
+            .reduce((sum, entry) => sum + Math.abs(entry.points || 0), 0);
+        }
+        setSummary(prev => ({
+          ...prev,
+          totalManualAdded,
+          totalManualDeducted
+        }));
+      } catch (e) {
+        console.error('Error aggregating manual points:', e);
+      }
+    };
+    fetchManualPoints();
     return () => setIsMounted(false);
   }, []);
 
@@ -304,7 +336,12 @@ const Dashboard = () => {
       const totalOverdue = filteredInvoices
         .filter(inv => inv.status === InvoiceStatus.OVERDUE)
         .reduce((sum, inv) => sum + inv.totalAmount, 0);
-      
+
+      // تلخيص النقاط اليدوية بشكل فعلي
+      let totalManualAdded = 0;
+      let totalManualDeducted = 0;
+      // سيتم جلب وتجميع النقاط اليدوية في دالة async منفصلة داخل useEffect
+
       setSummary({
         totalProducts: products.length,
         totalCustomers: customers.length,
@@ -313,7 +350,9 @@ const Dashboard = () => {
         totalPaid,
         totalOverdue,
         totalPointsIssued: filteredInvoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0),
-        totalPointsRedeemed: filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0)
+        totalPointsRedeemed: filteredRedemptions.reduce((sum, redemption) => sum + (redemption.totalPointsRedeemed || 0), 0),
+        totalManualAdded,
+        totalManualDeducted
       });
     }
   }, [filteredInvoices, products, customers, filteredRedemptions, isMounted]);
@@ -406,7 +445,9 @@ const Dashboard = () => {
             <PointsSummary
               totalEarned={summary.totalPointsIssued}
               totalRedeemed={totalPointsRedeemed}
-              totalRemaining={summary.totalPointsIssued - totalPointsRedeemed}
+              totalManualAdded={summary.totalManualAdded}
+              totalManualDeducted={summary.totalManualDeducted}
+              totalRemaining={customers.reduce((sum, c) => sum + (Number(c.currentPoints) || 0), 0)}
               loading={!isMounted || isRedemptionsLoading}
             />
             <DashboardCards

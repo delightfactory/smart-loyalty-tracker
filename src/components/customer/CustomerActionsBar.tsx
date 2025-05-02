@@ -7,7 +7,9 @@ import {
   Trash2, 
   FilePlus, 
   CreditCard,
-  Coins
+  Coins,
+  Gift,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -32,42 +34,61 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
   const [isPointsDialogOpen, setIsPointsDialogOpen] = useState(false);
   
   return (
-    <div className="flex justify-between items-center mb-6">
-      <div className="flex space-x-2 space-x-reverse">
+    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+      <div className="flex flex-wrap gap-2 w-full md:w-auto">
         <Button 
           variant="outline"
           size="sm"
           onClick={onEdit}
+          className="flex items-center"
         >
           <Pencil className="ml-2 h-4 w-4" />
           تعديل
         </Button>
-        
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate(`/invoices/new?customerId=${customer.id}`)}
+          onClick={() => navigate(`/create-invoice/${customer.id}`)}
+          className="flex items-center"
         >
           <FilePlus className="ml-2 h-4 w-4" />
           فاتورة جديدة
         </Button>
-        
         <Button
           variant="outline"
           size="sm"
           onClick={() => navigate(`/payments/new?customerId=${customer.id}`)}
+          className="flex items-center"
         >
           <CreditCard className="ml-2 h-4 w-4" />
           دفعة جديدة
         </Button>
-        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/create-redemption/${customer.id}`)}
+          className="flex items-center"
+        >
+          <Gift className="ml-2 h-4 w-4" />
+          استبدال نقاط
+        </Button>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsPointsDialogOpen(true)}
+          className="flex items-center"
         >
           <Coins className="ml-2 h-4 w-4" />
           تعديل النقاط
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate('/customers')}
+          className="flex items-center"
+        >
+          <ArrowLeft className="ml-2 h-4 w-4" />
+          العودة للعملاء
         </Button>
       </div>
       
