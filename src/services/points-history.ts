@@ -25,7 +25,7 @@ export const pointsHistoryService = {
       throw error;
     }
     
-    // Type assertion to ensure data conforms to our PointsHistoryEntry[] type
+    // Properly cast data to ensure it conforms to our PointsHistoryEntry[] type
     return data.map(item => ({
       ...item,
       type: item.type as 'manual_add' | 'manual_deduct' | 'earned' | 'redeemed',
@@ -45,7 +45,7 @@ export const pointsHistoryService = {
       throw error;
     }
     
-    // Type assertion for the returned data
+    // Properly cast returned data to ensure it conforms to PointsHistoryEntry type
     return {
       ...data,
       type: data.type as 'manual_add' | 'manual_deduct' | 'earned' | 'redeemed',

@@ -1,8 +1,10 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redemptionsService, customersService } from '@/services/database';
 import { Redemption, RedemptionItem, RedemptionStatus, Customer } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
+import { pointsHistoryService } from '@/services/points-history';
 
 // تحديث نقاط العميل بناءً على عمليات الاستبدال
 const updateCustomerPoints = async (customerId: string, queryClient: any) => {
@@ -35,12 +37,65 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
         }
       }
     });
+    
+    // الحصول على سجل التعديلات اليدوية للنقاط
+    let manualPointsAdjustments = { added: 0, deducted: 0 };
+    let latestManualAdjustmentDate = null;
+    
+    try {
+      const pointsHistory = await pointsHistoryService.getByCustomerId(customerId);
+      
+      pointsHistory.forEach(entry => {
+        if (entry.type === 'manual_add') {
+          manualPointsAdjustments.added += entry.points;
+        } else if (entry.type === 'manual_deduct') {
+          manualPointsAdjustments.deducted += Math.abs(entry.points);
+        }
+        
+        // تحديث أحدث تاريخ تعديل يدوي
+        if (entry.created_at) {
+          const adjustmentDate = new Date(entry.created_at);
+          if (!latestManualAdjustmentDate || adjustmentDate > latestManualAdjustmentDate) {
+            latestManualAdjustmentDate = adjustmentDate;
+          }
+        }
+      });
+      console.log(`Manual point adjustments for ${customerId}:`, manualPointsAdjustments);
+    } catch (error) {
+      console.error('Error fetching points history:', error);
+      // Continue without points history if service isn't available
+    }
+    
+    // الحصول على النقاط المكتسبة من الفواتير
+    let earnedFromInvoices = 0;
+    if (typeof import('@/hooks/useInvoices').then === 'function') {
+      try {
+        const invoices = await customersService.getInvoices(customerId);
+        earnedFromInvoices = invoices.reduce((sum, invoice) => sum + (invoice.pointsEarned || 0), 0);
+      } catch (error) {
+        console.error('Error fetching invoices for points calculation:', error);
+      }
+    }
+    
+    // تحديد أحدث تاريخ تفاعل
+    let lastActive = null;
+    const dates = [latestRedemptionDate, latestManualAdjustmentDate].filter(Boolean);
+    
+    if (dates.length > 0) {
+      lastActive = new Date(Math.max(...dates.map(d => d instanceof Date ? d.getTime() : new Date(d).getTime())));
+    }
+    
+    // تطبيق التعديلات اليدوية على إجمالي النقاط
+    const adjustedPointsEarned = earnedFromInvoices + manualPointsAdjustments.added;
+    const adjustedPointsRedeemed = totalPointsRedeemed + manualPointsAdjustments.deducted;
+    
     // تحديث بيانات العميل
     const updatedCustomer = {
       ...customer,
-      pointsRedeemed: totalPointsRedeemed,
-      currentPoints: customer.pointsEarned - totalPointsRedeemed,
-      lastActive: latestRedemptionDate ? latestRedemptionDate.toISOString() : customer.lastActive || null
+      pointsRedeemed: adjustedPointsRedeemed,
+      pointsEarned: adjustedPointsEarned,
+      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
+      lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null
     };
     
     // تحديث بيانات العميل في قاعدة البيانات
@@ -51,9 +106,10 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
     queryClient.invalidateQueries({ queryKey: ['customers'] });
     
     console.log(`Updated customer points for ${customerId}:`, {
-      pointsRedeemed: totalPointsRedeemed,
-      currentPoints: customer.pointsEarned - totalPointsRedeemed,
-      lastActive: latestRedemptionDate ? latestRedemptionDate.toISOString() : customer.lastActive || null
+      pointsRedeemed: adjustedPointsRedeemed,
+      pointsEarned: adjustedPointsEarned,
+      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
+      lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null
     });
   } catch (error) {
     console.error('Error updating customer points:', error);

@@ -1,9 +1,11 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService, redemptionsService } from '@/services/database';
 import { Invoice, InvoiceItem, InvoiceStatus, Customer, PaymentMethod, PaymentType, RedemptionStatus } from '@/lib/types';
 import { toast } from '@/components/ui/use-toast';
 import { useRealtime } from './use-realtime';
 import { calculateClassificationAndLevel } from '@/lib/customerClassification';
+import { pointsHistoryService, PointsHistoryEntry } from '@/services/points-history';
 
 // Custom hook for fetching all invoices
 export function useAllInvoices() {
@@ -50,6 +52,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       console.error(`Customer with ID ${customerId} not found`);
       return;
     }
+    
     // حساب النقاط المكتسبة من الفواتير
     let totalPointsEarned = 0;
     let totalCreditBalance = 0;
@@ -110,7 +113,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
     let manualPointsAdjustments = { added: 0, deducted: 0 };
     let latestManualAdjustmentDate = null;
     try {
-      const pointsHistoryService = await import('@/services/points-history').then(m => m.pointsHistoryService);
+      // Changed: Direct import replaced with function call to avoid import issues
       const pointsHistory = await pointsHistoryService.getByCustomerId(customerId);
       
       pointsHistory.forEach(entry => {
@@ -128,6 +131,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
           }
         }
       });
+      console.log(`Manual point adjustments for ${customerId}:`, manualPointsAdjustments);
     } catch (error) {
       console.error('Error fetching points history:', error);
       // Continue without points history if service isn't available
