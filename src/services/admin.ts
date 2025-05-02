@@ -57,12 +57,13 @@ export const ensureUserHasAdminRole = async (userId: string) => {
     if (!existingRole) {
       console.log('Adding admin role to user:', userId);
       
-      type InsertData = {
+      // Using explicit type declaration to avoid circular reference
+      interface UserRoleInsert {
         user_id: string;
         role: UserRole;
-      };
+      }
       
-      const insertData: InsertData = {
+      const insertData: UserRoleInsert = {
         user_id: userId,
         role: UserRole.ADMIN
       };
