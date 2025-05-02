@@ -70,7 +70,9 @@ const updateCustomerPoints = async (customerId: string, queryClient: any) => {
     let earnedFromInvoices = 0;
     if (typeof import('@/hooks/useInvoices').then === 'function') {
       try {
-        const invoices = await customersService.getInvoices(customerId);
+        // Fix: Replace the incorrect customersService.getInvoices with dynamic import of invoice service
+        const { invoicesService } = await import('@/services/database');
+        const invoices = await invoicesService.getByCustomerId(customerId);
         earnedFromInvoices = invoices.reduce((sum, invoice) => sum + (invoice.pointsEarned || 0), 0);
       } catch (error) {
         console.error('Error fetching invoices for points calculation:', error);
