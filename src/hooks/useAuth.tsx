@@ -1,17 +1,24 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile, UserRole } from '@/lib/auth-types';
+import { UserProfile as BaseUserProfile, UserRole } from '@/lib/auth-types';
+import type { Role } from '@/lib/auth-rbac-types';
+
+// تعريف مؤقت لملف المستخدم الخاص بالمصادقة، متوافق مع الأدوار الجديدة
+interface AuthUserProfile extends Omit<BaseUserProfile, 'roles'> {
+  roles: Role[];
+}
+
 import { useToast } from '@/components/ui/use-toast';
 import { adminCredentials } from '@/services/admin';
 
 interface AuthState {
   user: User | null;
-  profile: UserProfile | null;
+  profile: AuthUserProfile | null;
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  roles: UserRole[];
+  roles: Role[]; // تعديل النوع ليكون Role[]
   error: string | null;
 }
 
@@ -19,7 +26,7 @@ interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (profile: Partial<AuthUserProfile>) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
 }
@@ -40,43 +47,73 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: profileData, error: profileError } = await supabase
+      // جلب بيانات المستخدم مع جميع الأدوار والصلاحيات المرتبطة به عبر join
+      const { data: userData, error: userError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          id, full_name, email, avatar_url, phone, position,
+          user_roles(role:roles(id, name, description, role_permissions(permission:permissions(id, name, description))))
+        `)
         .eq('id', userId)
         .single();
-      
-      if (profileError) throw profileError;
-      
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-      
-      if (rolesError) throw rolesError;
-      
-      const userRoles = rolesData.map(r => r.role as UserRole);
-      
-      const userProfile: UserProfile = {
-        id: profileData.id,
-        fullName: profileData.full_name,
-        email: state.user?.email,
-        avatarUrl: profileData.avatar_url,
-        phone: profileData.phone,
-        position: profileData.position,
-        roles: userRoles,
+
+      // إذا كان الخطأ موجودًا أو لم يتم جلب بيانات صحيحة، أوقف التنفيذ
+      if (userError || !userData || typeof userData !== 'object' || Array.isArray(userData) || !('id' in userData)) {
+        throw userError || new Error('لم يتم العثور على بيانات المستخدم');
+      }
+
+      // تعريف نوع userData مؤقتاً بعد التأكد من صحته
+      const userTyped = userData as {
+        id: string;
+        full_name: string;
+        email: string;
+        avatar_url: string;
+        phone: string;
+        position: string;
+        user_roles?: any[];
       };
-      
+
+      const roles = Array.isArray(userTyped.user_roles)
+        ? userTyped.user_roles.map((ur: any) => {
+            const r = ur.role;
+            return r && typeof r === 'object'
+              ? {
+                  id: r.id,
+                  name: r.name,
+                  description: r.description,
+                  permissions: Array.isArray(r.role_permissions)
+                    ? r.role_permissions.map((rp: any) => rp.permission)
+                    : [],
+                }
+              : null;
+          }).filter(Boolean)
+        : [];
+
+      // بناء الملف الشخصي
+      interface UserProfile extends Omit<BaseUserProfile, 'roles'> {
+  roles: Role[];
+}
+
+      const userProfile: AuthUserProfile = {
+        id: userTyped.id,
+        fullName: userTyped.full_name,
+        email: userTyped.email,
+        avatarUrl: userTyped.avatar_url,
+        phone: userTyped.phone,
+        position: userTyped.position,
+        roles: roles, // Role[]
+      };
+
+
+
       setState(prev => ({
         ...prev,
         profile: userProfile,
-        roles: userRoles,
+        roles: roles, // Role[]
         isLoading: false,
         isAuthenticated: true,
       }));
-      
     } catch (error) {
-      console.error('Error fetching user profile:', error);
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -84,6 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }));
     }
   };
+
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -248,7 +286,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const updateProfile = async (profileData: Partial<UserProfile>) => {
+  const updateProfile = async (profileData: Partial<AuthUserProfile>) => {
     try {
       if (!state.user) {
         throw new Error('غير مصرح به');
@@ -311,8 +349,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const hasRole = (role: UserRole): boolean => {
-    return state.roles.includes(role);
+    // roles: Role[]
+    return state.roles.some(r => r.name === role);
   };
+
 
   const authContextValue: AuthContextType = {
     ...state,
