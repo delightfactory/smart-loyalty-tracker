@@ -25,7 +25,12 @@ export const pointsHistoryService = {
       throw error;
     }
     
-    return data;
+    // Type assertion to ensure data conforms to our PointsHistoryEntry[] type
+    return data.map(item => ({
+      ...item,
+      type: item.type as 'manual_add' | 'manual_deduct' | 'earned' | 'redeemed',
+      source: item.source as 'invoice' | 'redemption' | 'manual_adjustment'
+    }));
   },
   
   async addEntry(entry: PointsHistoryEntry): Promise<PointsHistoryEntry> {
@@ -40,6 +45,11 @@ export const pointsHistoryService = {
       throw error;
     }
     
-    return data;
+    // Type assertion for the returned data
+    return {
+      ...data,
+      type: data.type as 'manual_add' | 'manual_deduct' | 'earned' | 'redeemed',
+      source: data.source as 'invoice' | 'redemption' | 'manual_adjustment'
+    };
   }
 };

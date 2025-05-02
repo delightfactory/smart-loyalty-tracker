@@ -213,7 +213,7 @@ const Invoices = () => {
   }
 
   return (
-    <PageContainer title="إدارة الفواتير" subtitle="عرض وإنشاء وإدارة الفواتير">
+    <PageContainer title="إدارة الفواتير" subtitle="عرض وإنشاء وإدارة الفو��تير">
       <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
         <SmartSearch
           placeholder="بحث عن فاتورة أو عميل أو رقم أو مبلغ..."
