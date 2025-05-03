@@ -30,7 +30,7 @@ export interface User {
   roles: Role[]; // List of roles assigned to the user
   permissions?: Permission[]; // Optional: direct permissions for the user
   avatarUrl?: string;
-  position?: string; // Added position field to fix TypeScript errors
+  position?: string; // Position field (job title, etc.)
 }
 
 // Assignment tables for DB (for Supabase/Postgres)

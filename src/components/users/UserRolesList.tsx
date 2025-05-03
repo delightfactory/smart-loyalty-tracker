@@ -1,150 +1,102 @@
 
-import { UserRole } from "@/lib/auth-types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, ShieldAlert, ShieldCheck, Briefcase, User, DollarSign } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
+import RolesPermissionsManagement from './RolesPermissionsManagement';
+import UserPermissionOverrides from './UserPermissionOverrides';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { roleService, permissionService } from '@/lib/user-rbac-service';
 
 export function UserRolesList() {
-  // تعريف معلومات الأدوار
-  const roles = [
-    {
-      role: UserRole.ADMIN,
-      title: "مدير النظام",
-      description: "صلاحيات كاملة للنظام",
-      icon: <ShieldAlert className="h-12 w-12 text-primary" />,
-      permissions: [
-        "إدارة المستخدمين وصلاحياتهم",
-        "إدارة جميع الإعدادات",
-        "الوصول لكامل بيانات النظام",
-        "إدارة الفواتير والمدفوعات",
-        "إدارة العملاء والمنتجات",
-        "إنشاء وتعديل الحسابات"
-      ]
-    },
-    {
-      role: UserRole.MANAGER,
-      title: "مشرف",
-      description: "إدارة العمليات اليومية",
-      icon: <ShieldCheck className="h-12 w-12 text-blue-500" />,
-      permissions: [
-        "مراقبة أداء النظام",
-        "إدارة العملاء والمنتجات",
-        "مراجعة الفواتير والمدفوعات",
-        "مراقبة عمليات نقاط الولاء",
-        "إنشاء تقارير الأداء",
-        "متابعة العملاء"
-      ]
-    },
-    {
-      role: UserRole.ACCOUNTANT,
-      title: "محاسب",
-      description: "إدارة الحسابات والمدفوعات",
-      icon: <DollarSign className="h-12 w-12 text-amber-500" />,
-      permissions: [
-        "إدارة الفواتير بالكامل",
-        "إدارة المدفوعات وتسجيلها",
-        "إنشاء تقارير مالية",
-        "متابعة المديونيات",
-        "تسجيل المرتجعات",
-        "إدارة الائتمان"
-      ]
-    },
-    {
-      role: UserRole.SALES,
-      title: "مبيعات",
-      description: "إدارة المبيعات والعملاء",
-      icon: <Briefcase className="h-12 w-12 text-green-500" />,
-      permissions: [
-        "إنشاء فواتير جديدة",
-        "إضافة عملاء جدد",
-        "إدارة ملفات العملاء",
-        "عرض المنتجات وأسعارها",
-        "تسجيل عمليات استبدال النقاط",
-        "متابعة مديونيات العملاء"
-      ]
-    },
-    {
-      role: UserRole.USER,
-      title: "مستخدم عادي",
-      description: "صلاحيات محدودة للاستخدام",
-      icon: <User className="h-12 w-12 text-gray-400" />,
-      permissions: [
-        "عرض لوحة التحكم",
-        "عرض المنتجات",
-        "عرض العملاء",
-        "عرض الفواتير",
-        "تغيير بيانات الملف الشخصي",
-        "استخدام الأدوات الأساسية"
-      ]
-    },
-  ];
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [roleCount, setRoleCount] = useState(0);
+  const [permCount, setPermCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('roles');
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [roles, permissions] = await Promise.all([
+          roleService.getAllRoles(),
+          permissionService.getAllPermissions()
+        ]);
+        
+        setRoleCount(roles.length);
+        setPermCount(permissions.length);
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+        toast({
+          title: 'خطأ في تحميل البيانات',
+          description: 'حدث خطأ أثناء جلب بيانات الأدوار والصلاحيات',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCounts();
+  }, [toast]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary ml-2" />
+        <span className="text-lg">جاري تحميل البيانات...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {roles.map((roleInfo) => (
-          <Card key={roleInfo.role} className={
-            roleInfo.role === UserRole.ADMIN 
-              ? "border-primary" 
-              : roleInfo.role === UserRole.MANAGER
-              ? "border-blue-200"
-              : roleInfo.role === UserRole.ACCOUNTANT
-              ? "border-amber-200"
-              : roleInfo.role === UserRole.SALES
-              ? "border-green-200"
-              : "border-gray-200"
-          }>
-            <CardHeader className="flex flex-row items-center gap-4">
-              {roleInfo.icon}
-              <div>
-                <CardTitle>{roleInfo.title}</CardTitle>
-                <CardDescription>{roleInfo.description}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <h4 className="font-medium mb-2">الصلاحيات:</h4>
-              <ul className="space-y-1 list-inside">
-                {roleInfo.permissions.map((permission, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <span className="text-sm">{permission}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center">
+              <h3 className="text-2xl font-bold">{roleCount}</h3>
+              <p className="text-muted-foreground">عدد الأدوار</p>
+              <Badge className="mt-4" variant="outline">
+                يتم تعيين الأدوار للمستخدمين لتحديد صلاحياتهم
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center">
+              <h3 className="text-2xl font-bold">{permCount}</h3>
+              <p className="text-muted-foreground">عدد الصلاحيات</p>
+              <Badge className="mt-4" variant="outline">
+                الصلاحيات هي إجراءات محددة يمكن منحها للأدوار أو المستخدمين
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>معلومات عن الصلاحيات</CardTitle>
-          <CardDescription>
-            كيفية استخدام نظام الصلاحيات في التطبيق
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="prose max-w-none">
-          <p>
-            يتم التحقق من صلاحيات المستخدمين من خلال دالة <code>hasRole</code> التي يمكن استخدامها في أي مكون للتحقق من صلاحيات المستخدم الحالي.
-          </p>
-          <pre className="bg-muted p-2 rounded-md text-sm overflow-x-auto rtl:text-left ltr:text-left">
-            {`
-// مثال للتحقق من صلاحيات المستخدم
-const { hasRole } = useAuth();
-
-if (hasRole(UserRole.ADMIN)) {
-  // إجراء خاص بالمسؤولين فقط
-}
-            `}
-          </pre>
-          <p>
-            يمكن للمستخدم أن يكون لديه أكثر من صلاحية في نفس الوقت، وذلك يتيح مرونة أكبر في تحديد صلاحيات المستخدمين.
-          </p>
-          <p>
-            يتم تخزين الصلاحيات في قاعدة البيانات ويتم تحميلها عند تسجيل دخول المستخدم.
-            وعند تغيير صلاحيات المستخدم من قبل مدير النظام، يحتاج المستخدم لتسجيل الخروج وإعادة تسجيل الدخول لتفعيل الصلاحيات الجديدة.
-          </p>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full justify-start h-12">
+          <TabsTrigger value="roles" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-base py-3">
+            الأدوار والصلاحيات
+          </TabsTrigger>
+          <TabsTrigger value="user-permissions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-base py-3">
+            الصلاحيات الفردية
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="roles" className="mt-6">
+          <RolesPermissionsManagement />
+        </TabsContent>
+        
+        <TabsContent value="user-permissions" className="mt-6">
+          <UserPermissionOverrides />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
