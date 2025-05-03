@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { updateUserProfile } from '@/services/users-api';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole, convertRolesToUserRoles, isUserRoleArray } from '@/lib/auth-types';
+import { Role } from '@/lib/auth-rbac-types'; // Add this import for Role type
 
 export const UserProfile = () => {
   const { profile, user } = useAuth();
