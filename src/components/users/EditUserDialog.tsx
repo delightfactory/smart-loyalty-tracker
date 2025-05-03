@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { UserRole, isUserRoleArray, convertRoleToUserRole } from '@/lib/auth-types';
+import { UserRole, isUserRoleArray, convertRolesToUserRoles } from '@/lib/auth-types';
 import { getUserById, updateUserProfile } from '@/services/users-api';
 import { ROLES_PERMISSIONS, Permission } from '@/lib/roles-permissions';
+import { Role } from '@/lib/auth-rbac-types';
 
 // تحديد نموذج بيانات المستخدم للتعديل
 const userEditFormSchema = z.object({
@@ -74,7 +75,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       const roleNames: UserRole[] = Array.isArray(user.roles) ? 
         (isUserRoleArray(user.roles) ?
           user.roles as UserRole[] :
-          (user.roles as any[]).map(role => convertRoleToUserRole(role))
+          convertRolesToUserRoles(user.roles as Role[])
         ) : [UserRole.USER];
         
       form.reset({
@@ -92,6 +93,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     mutationFn: async (values: UserEditFormValues) => {
       if (!user) return;
       
+      // Process roles to ensure they're UserRole[] type
+      const userRoles = values.roles as UserRole[];
+      
       // Update user profile with form values
       await updateUserProfile({
         id: userId,
@@ -99,8 +103,8 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         email: user.email || '',
         phone: values.phone || null,
         position: values.position || null,
-        avatarUrl: user.avatarUrl,
-        roles: values.roles as UserRole[],
+        avatarUrl: user.avatarUrl, // Pass along the existing avatarUrl
+        roles: userRoles,
         customPermissions: values.customPermissions
       });
     },

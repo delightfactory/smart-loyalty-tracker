@@ -48,10 +48,15 @@ export interface CreateUserParams {
 
 // Helper function to check if roles array contains UserRole or Role objects
 export function isUserRoleArray(roles: UserRole[] | Role[]): roles is UserRole[] {
-  return roles.length === 0 || typeof roles[0] === 'string';
+  return roles.length === 0 || typeof roles[0] === 'string' || !('id' in roles[0]);
 }
 
 // Helper function to convert Role objects to UserRole enum values
 export function convertRoleToUserRole(role: Role): UserRole {
   return role.name as UserRole;
+}
+
+// Helper function to convert Role[] to UserRole[]
+export function convertRolesToUserRoles(roles: Role[]): UserRole[] {
+  return roles.map(role => convertRoleToUserRole(role));
 }

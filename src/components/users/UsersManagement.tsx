@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserProfile, UserRole, isUserRoleArray, convertRoleToUserRole } from '@/lib/auth-types';
+import { UserProfile, UserRole, isUserRoleArray, convertRoleToUserRole, convertRolesToUserRoles } from '@/lib/auth-types';
 import { getAllUsers, createUser, deleteUser } from '@/services/users-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { UserRolesList } from './UserRolesList';
 import UserForm from './UserForm';
 import UsersTable from './UsersTable';
 import { EditUserDialog } from './EditUserDialog';
-import { User } from '@/lib/auth-rbac-types';
+import { User, Role } from '@/lib/auth-rbac-types';
 
 export function UsersManagement() {
   const { toast } = useToast();
@@ -37,7 +37,7 @@ export function UsersManagement() {
           description: undefined,
           permissions: []
         })) : 
-        (user.roles as any[]).map(role => ({
+        (user.roles as Role[]).map(role => ({
           id: role.id || '',
           name: role.name,
           description: role.description,
