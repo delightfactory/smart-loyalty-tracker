@@ -19,12 +19,13 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Role } from '@/lib/auth-rbac-types';
 
 interface User {
   id: string;
   fullName: string;
   email: string;
-  roles: UserRole[];
+  roles: Role[];
   avatarUrl?: string | null;
   phone?: string | null;
   position?: string | null;
@@ -48,8 +49,8 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, onEdit, onDelete }) => {
       .substring(0, 2);
   };
 
-  const getRoleBadgeColor = (role: UserRole) => {
-    switch (role) {
+  const getRoleBadgeColor = (roleName: string) => {
+    switch (roleName) {
       case UserRole.ADMIN:
         return 'bg-red-100 text-red-800';
       case UserRole.MANAGER:
@@ -101,8 +102,8 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, onEdit, onDelete }) => {
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {user.roles.map((role, i) => (
-                      <Badge key={i} variant="outline" className={getRoleBadgeColor(role)}>
-                        {role}
+                      <Badge key={i} variant="outline" className={getRoleBadgeColor(role.name)}>
+                        {role.name}
                       </Badge>
                     ))}
                   </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserProfile, UserRole } from '@/lib/auth-types';
+import { UserProfile, UserRole, isUserRoleArray, convertRoleToUserRole } from '@/lib/auth-types';
 import { getAllUsers, createUser, deleteUser } from '@/services/users-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,24 +27,38 @@ export function UsersManagement() {
   });
   
   // تحويل UserProfile[] إلى User[] لتوافق مع UsersTable
-  const users: User[] = usersData.map((user: UserProfile) => ({
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email || '',
-    roles: user.roles.map(role => ({
-      id: typeof role === 'string' ? role : role.id || '',
-      name: typeof role === 'string' ? role : role.name,
-      description: undefined,
+  const users = usersData.map((user: UserProfile) => {
+    // Process roles to ensure they have the correct format
+    const processedRoles = user.roles ? 
+      (isUserRoleArray(user.roles) ? 
+        user.roles.map(role => ({
+          id: typeof role === 'string' ? role : '',
+          name: typeof role === 'string' ? role : '',
+          description: undefined,
+          permissions: []
+        })) : 
+        (user.roles as any[]).map(role => ({
+          id: role.id || '',
+          name: role.name,
+          description: role.description,
+          permissions: role.permissions || []
+        }))
+      ) : [];
+      
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email || '',
+      roles: processedRoles,
+      avatarUrl: user.avatarUrl,
+      phone: user.phone,
+      isActive: true,
+      position: user.position,
+      createdAt: user.createdAt || '',
+      lastSignInAt: user.lastSignInAt || null,
       permissions: []
-    })),
-    avatarUrl: user.avatarUrl,
-    phone: user.phone,
-    isActive: true,
-    position: user.position,
-    createdAt: user.createdAt || '',
-    lastSignInAt: user.lastSignInAt || null,
-    permissions: []
-  }));
+    };
+  });
 
   // إضافة مستخدم جديد
   const createUserMutation = useMutation({

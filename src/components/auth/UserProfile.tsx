@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { updateUserProfile } from '@/services/users-api';
 import { useToast } from '@/components/ui/use-toast';
-import { UserRole } from '@/lib/auth-types';
+import { UserRole, convertRoleToUserRole, isUserRoleArray } from '@/lib/auth-types';
 
 export const UserProfile = () => {
   const { profile, user } = useAuth();
@@ -33,8 +32,10 @@ export const UserProfile = () => {
     try {
       // Convert Role[] to UserRole[] when updating the profile
       const userRoles: UserRole[] = profile.roles ? 
-        profile.roles.map(role => role.name as UserRole) : 
-        [];
+        (isUserRoleArray(profile.roles) ? 
+          profile.roles as UserRole[] : 
+          (profile.roles as any[]).map(role => convertRoleToUserRole(role))
+        ) : [];
         
       await updateUserProfile({
         id: profile.id,

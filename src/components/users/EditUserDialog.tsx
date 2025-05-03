@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { UserRole } from '@/lib/auth-types';
-import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users-api';
+import { UserRole, isUserRoleArray, convertRoleToUserRole } from '@/lib/auth-types';
+import { getUserById, updateUserProfile } from '@/services/users-api';
 import { ROLES_PERMISSIONS, Permission } from '@/lib/roles-permissions';
 
 // تحديد نموذج بيانات المستخدم للتعديل
@@ -70,10 +70,12 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث النموذج عند جلب البيانات
   useEffect(() => {
     if (user) {
-      // تحويل الأدوار من Role[] إلى string[] للنموذج
-      const roleNames = Array.isArray(user.roles) ? 
-        user.roles.map(role => typeof role === 'string' ? role : role.name) : 
-        [UserRole.USER];
+      // Convert roles to UserRole array
+      const roleNames: UserRole[] = Array.isArray(user.roles) ? 
+        (isUserRoleArray(user.roles) ?
+          user.roles as UserRole[] :
+          (user.roles as any[]).map(role => convertRoleToUserRole(role))
+        ) : [UserRole.USER];
         
       form.reset({
         fullName: user.fullName || '',
@@ -90,14 +92,15 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     mutationFn: async (values: UserEditFormValues) => {
       if (!user) return;
       
-      // تحديث الملف الشخصي
+      // Update user profile with form values
       await updateUserProfile({
         id: userId,
         fullName: values.fullName,
         email: user.email || '',
         phone: values.phone || null,
         position: values.position || null,
-        roles: values.roles.map(role => role as UserRole),
+        avatarUrl: user.avatarUrl,
+        roles: values.roles as UserRole[],
         customPermissions: values.customPermissions
       });
     },
