@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserProfile, UserRole, isUserRoleArray, convertRoleToUserRole, convertRolesToUserRoles } from '@/lib/auth-types';
@@ -62,10 +63,11 @@ export function UsersManagement() {
 
   // إضافة مستخدم جديد
   const createUserMutation = useMutation({
-    mutationFn: (userData: { fullName: string; email: string; role: string }) => {
+    mutationFn: (userData: { fullName: string; email: string; password: string; role: string }) => {
       return createUser({
         email: userData.email,
         fullName: userData.fullName,
+        password: userData.password,
         roles: [userData.role as UserRole],
       });
     },
@@ -78,6 +80,7 @@ export function UsersManagement() {
       setIsAddUserOpen(false);
     },
     onError: (error: any) => {
+      console.error('Create user error:', error);
       toast({
         title: 'خطأ في إضافة المستخدم',
         description: error.message || 'حدث خطأ أثناء إضافة المستخدم',
@@ -97,6 +100,7 @@ export function UsersManagement() {
       setDeleteUserId(null);
     },
     onError: (error: any) => {
+      console.error('Delete user error:', error);
       toast({
         title: 'خطأ في حذف المستخدم',
         description: error.message || 'حدث خطأ أثناء حذف المستخدم',
@@ -110,6 +114,7 @@ export function UsersManagement() {
     createUserMutation.mutate({
       fullName: data.fullName,
       email: data.email,
+      password: data.password,
       role: data.role,
     });
   };

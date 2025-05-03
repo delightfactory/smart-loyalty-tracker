@@ -1,20 +1,29 @@
 
-import React from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useToast } from '@/components/ui/use-toast';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
+import { UserRole } from '@/lib/auth-types';
 
+// تعريف سكيما نموذج إضافة المستخدم
 const formSchema = z.object({
-  fullName: z.string().min(1, { message: "Please enter full name" }),
-  email: z.string().email({ message: "Please enter a valid email" }),
-  role: z.string().min(1, { message: "Please select a role" })
+  fullName: z.string().min(3, {
+    message: 'الاسم الكامل يجب أن يكون 3 أحرف على الأقل.',
+  }),
+  email: z.string().email({
+    message: 'يرجى إدخال بريد إلكتروني صحيح.',
+  }),
+  password: z.string().min(6, {
+    message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.',
+  }),
+  role: z.string({
+    required_error: 'يرجى اختيار الدور.',
+  }),
 });
 
 interface UserFormProps {
@@ -22,107 +31,114 @@ interface UserFormProps {
   isLoading: boolean;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   onCancel: () => void;
-  initialValues?: z.infer<typeof formSchema>;
   roles: string[];
 }
 
-const UserForm: React.FC<UserFormProps> = ({ 
-  open, 
-  isLoading, 
-  onSubmit, 
-  onCancel, 
-  initialValues, 
-  roles 
-}) => {
-  const { toast } = useToast();
+const UserForm = ({ open, isLoading, onSubmit, onCancel, roles }: UserFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialValues || {
+    defaultValues: {
       fullName: '',
       email: '',
-      role: ''
+      password: '',
+      role: UserRole.USER,
     },
   });
 
-  React.useEffect(() => {
-    if (open && initialValues) {
-      form.reset(initialValues);
-    }
-  }, [open, initialValues, form]);
-
-  const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = (values: z.infer<typeof formSchema>) => {
     onSubmit(values);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onCancel}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen && !isLoading) {
+        form.reset();
+        onCancel();
+      }
+    }}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{initialValues ? 'Edit User' : 'Add User'}</DialogTitle>
+          <DialogTitle>إضافة مستخدم جديد</DialogTitle>
         </DialogHeader>
-        
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="fullName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>الاسم الكامل</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter full name" {...field} />
+                    <Input placeholder="أدخل الاسم الكامل" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>البريد الإلكتروني</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter email" type="email" {...field} />
+                    <Input placeholder="أدخل البريد الإلكتروني" type="email" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
-            
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>كلمة المرور</FormLabel>
+                  <FormControl>
+                    <Input placeholder="أدخل كلمة المرور" type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
+                  <FormLabel>الدور</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
+                        <SelectValue placeholder="اختر الدور" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {roles.map(role => (
+                      {roles.map((role) => (
                         <SelectItem key={role} value={role}>
-                          {role}
+                          {role === UserRole.ADMIN && 'مدير النظام'}
+                          {role === UserRole.MANAGER && 'مشرف'}
+                          {role === UserRole.ACCOUNTANT && 'محاسب'}
+                          {role === UserRole.SALES && 'مبيعات'}
+                          {role === UserRole.USER && 'مستخدم عادي'}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
-            
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                إلغاء
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {initialValues ? 'Update' : 'Create'}
+                حفظ
               </Button>
             </DialogFooter>
           </form>

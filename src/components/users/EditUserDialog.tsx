@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,13 +92,13 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث بيانات المستخدم
   const updateUserMutation = useMutation({
     mutationFn: async (values: UserEditFormValues) => {
-      if (!user) return;
+      if (!user) return null;
       
       // Process roles to ensure they're UserRole[] type
       const userRoles = values.roles as UserRole[];
       
       // Update user profile with form values
-      await updateUserProfile({
+      return await updateUserProfile({
         id: userId,
         fullName: values.fullName,
         email: user.email || '',
@@ -109,15 +110,16 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['users', userId] });
       toast({
         title: 'تم تحديث المستخدم بنجاح',
         description: 'تم تحديث بيانات المستخدم والصلاحيات',
       });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users', userId] });
       onClose();
     },
     onError: (error: any) => {
+      console.error('Update user error:', error);
       toast({
         title: 'خطأ في تحديث بيانات المستخدم',
         description: error.message || 'حدث خطأ أثناء تحديث المستخدم',
@@ -131,7 +133,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>تعديل بيانات المستخدم</DialogTitle>
@@ -213,7 +217,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                                             field.value?.filter(
                                               (value) => value !== role.id
                                             )
-                                          )
+                                          );
                                     }}
                                   />
                                 </FormControl>
@@ -221,7 +225,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                                   {role.label}
                                 </FormLabel>
                               </FormItem>
-                            )
+                            );
                           }}
                         />
                       ))}

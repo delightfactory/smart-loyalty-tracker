@@ -16,8 +16,10 @@ const SidebarLink = ({ href, icon, label, isSidebarOpen }: SidebarLinkProps) => 
   const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
   // إغلاق القائمة الجانبية تلقائياً عند الضغط على الرابط في وضع الجوال
-  const handleClick = (e: React.MouseEvent) => {
-    if (isMobile && setOpenMobile) setOpenMobile(false);
+  const handleClick = () => {
+    if (isMobile && setOpenMobile) {
+      setOpenMobile(false);
+    }
   };
 
   return (
