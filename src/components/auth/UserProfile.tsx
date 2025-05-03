@@ -32,7 +32,12 @@ export const UserProfile = () => {
     try {
       await updateUserProfile({
         id: profile.id,
-        ...formData
+        fullName: formData.fullName,
+        email: profile.email || user?.email || '',
+        phone: formData.phone,
+        position: formData.position,
+        avatarUrl: formData.avatarUrl,
+        roles: profile.roles || []
       });
       
       toast({

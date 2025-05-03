@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -87,8 +88,10 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       await updateUserProfile({
         id: userId,
         fullName: values.fullName,
+        email: user?.email || '',
         phone: values.phone || null,
         position: values.position || null,
+        roles: values.roles.map(role => role as UserRole),
       });
       
       // تحديث الصلاحيات
