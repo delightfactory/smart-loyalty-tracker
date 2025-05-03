@@ -1,143 +1,83 @@
-
 import React from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { UserRole } from '@/lib/auth-types';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Role } from '@/lib/auth-rbac-types';
+import { Table, Button, Space, Input, Tag } from 'antd';
+import { format } from 'date-fns';
 
 interface User {
   id: string;
-  fullName: string;
+  full_name: string;
   email: string;
-  roles: Role[];
-  avatarUrl?: string | null;
-  phone?: string | null;
-  position?: string | null;
-  lastSignInAt?: string | null;
+  roles: string[];
+  created_at: string;
 }
 
 interface UsersTableProps {
   users: User[];
-  onEdit: (userId: string) => void;
-  onDelete: (userId: string) => void;
+  loading: boolean;
+  onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
+  onAdd: () => void;
+  onSearch: (search: string) => void;
 }
 
-const UsersTable: React.FC<UsersTableProps> = ({ users, onEdit, onDelete }) => {
-  // Function to create initials from name
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part.charAt(0))
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
+const UsersTable: React.FC<UsersTableProps> = ({ users, loading, onEdit, onDelete, onAdd, onSearch }) => {
+  const [search, setSearch] = React.useState('');
 
-  const getRoleBadgeColor = (roleName: string) => {
-    switch (roleName) {
-      case UserRole.ADMIN:
-        return 'bg-red-100 text-red-800';
-      case UserRole.MANAGER:
-        return 'bg-blue-100 text-blue-800';
-      case UserRole.ACCOUNTANT:
-        return 'bg-amber-100 text-amber-800';
-      case UserRole.SALES:
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const columns = [
+    {
+      title: 'Full Name',
+      dataIndex: 'full_name',
+      key: 'full_name',
+      sorter: (a: User, b: User) => a.full_name.localeCompare(b.full_name),
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+    },
+    {
+      title: 'Roles',
+      dataIndex: 'roles',
+      key: 'roles',
+      render: (roles: string[]) => roles.map(role => <Tag color="blue" key={role}>{role}</Tag>),
+    },
+    {
+      title: 'Created At',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => format(new Date(date), 'yyyy-MM-dd HH:mm'),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, user: User) => (
+        <Space>
+          <Button onClick={() => onEdit(user)} type="link">Edit</Button>
+          <Button onClick={() => onDelete(user)} type="link" danger>Delete</Button>
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>المستخدم</TableHead>
-            <TableHead>البريد الإلكتروني</TableHead>
-            <TableHead>الدور</TableHead>
-            <TableHead>آخر تسجيل دخول</TableHead>
-            <TableHead className="text-right">الإجراءات</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center py-8">
-                لا توجد بيانات متاحة
-              </TableCell>
-            </TableRow>
-          ) : (
-            users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatarUrl || ''} />
-                      <AvatarFallback>{getInitials(user.fullName)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.fullName}</p>
-                      <p className="text-xs text-muted-foreground">{user.position || 'مستخدم'}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {user.roles.map((role, i) => (
-                      <Badge key={i} variant="outline" className={getRoleBadgeColor(role.name)}>
-                        {role.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString('ar') : 'لم يسجل بعد'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(user.id)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        تعديل
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => onDelete(user.id)}
-                        className="text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        حذف
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+    <div>
+      <Space style={{ marginBottom: 16 }}>
+        <Input.Search
+          placeholder="Search by name or email"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onSearch={onSearch}
+          allowClear
+          style={{ width: 250 }}
+        />
+        <Button type="primary" onClick={onAdd}>Add User</Button>
+      </Space>
+      <Table
+        columns={columns}
+        dataSource={users}
+        rowKey="id"
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+      />
     </div>
   );
 };

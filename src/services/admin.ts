@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from '@/lib/auth-types';
 
@@ -16,7 +15,8 @@ export const isAdminExists = async () => {
     // اجلب user_roles مع بيانات الدور المرتبط بدون أي join أو علاقة متداخلة
     const { data, error } = await supabase
       .from('user_roles')
-      .select('user_id, role_id');
+      .select('user_id, role_id')
+      ;
     if (error) {
       console.error("Error checking if admin exists:", error);
       throw error;
@@ -25,13 +25,13 @@ export const isAdminExists = async () => {
     let adminExists = false;
     if (data && data.length > 0) {
       // جلب كل أدوار الأدمن دفعة واحدة
-      const roleIds = data.map((ur) => ur.role_id);
+      const roleIds = data.map((ur: any) => ur.role_id);
       const { data: roles, error: rolesError } = await supabase
         .from('roles')
         .select('id, name')
         .in('id', roleIds);
       if (!rolesError && roles) {
-        adminExists = roles.some((role) => role.name === UserRole.ADMIN);
+        adminExists = roles.some((role: any) => role.name === UserRole.ADMIN);
       }
     }
     console.log('Admin exists check result:', adminExists, 'data:', data);
@@ -60,13 +60,13 @@ export const ensureUserHasAdminRole = async (userId: string) => {
     // 2. جلب بيانات الدور من جدول roles
     let hasAdminRole = false;
     if (userRoles && userRoles.length > 0) {
-      const roleIds = userRoles.map((ur) => ur.role_id);
+      const roleIds = userRoles.map((ur: any) => ur.role_id);
       const { data: roles, error: rolesError } = await supabase
         .from('roles')
         .select('id, name')
         .in('id', roleIds);
       if (!rolesError && roles) {
-        hasAdminRole = roles.some((role) => role.name === UserRole.ADMIN);
+        hasAdminRole = roles.some((role: any) => role.name === UserRole.ADMIN);
       }
     }
 

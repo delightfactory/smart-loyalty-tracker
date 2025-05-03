@@ -326,7 +326,6 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
-          custom_permissions: Json | null
           email: string | null
           full_name: string
           id: string
@@ -337,7 +336,6 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
-          custom_permissions?: Json | null
           email?: string | null
           full_name: string
           id: string
@@ -348,7 +346,6 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
-          custom_permissions?: Json | null
           email?: string | null
           full_name?: string
           id?: string
@@ -562,13 +559,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_role"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_roles_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"

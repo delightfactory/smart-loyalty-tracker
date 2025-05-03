@@ -11,10 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { UserRole, isUserRoleArray, convertRolesToUserRoles } from '@/lib/auth-types';
-import { getUserById, updateUserProfile } from '@/services/users-api';
-import { ROLES_PERMISSIONS, Permission } from '@/lib/roles-permissions';
-import { Role } from '@/lib/auth-rbac-types';
+import { UserRole } from '@/lib/auth-types';
+import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users-api';
 
 // تحديد نموذج بيانات المستخدم للتعديل
 const userEditFormSchema = z.object({
@@ -22,7 +20,6 @@ const userEditFormSchema = z.object({
   phone: z.string().optional(),
   position: z.string().optional(),
   roles: z.array(z.string()).min(1, { message: 'يجب اختيار صلاحية واحدة على الأقل' }),
-  customPermissions: z.array(z.string()).optional(),
 });
 
 type UserEditFormValues = z.infer<typeof userEditFormSchema>;
@@ -44,7 +41,6 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       phone: '',
       position: '',
       roles: [UserRole.USER],
-      customPermissions: [],
     },
   });
   
@@ -57,11 +53,6 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     { id: UserRole.USER, label: 'مستخدم عادي' },
   ];
   
-  // جميع الصلاحيات المتاحة من جميع الأدوار
-  const allPermissions: Permission[] = Array.from(
-    new Set(Object.values(ROLES_PERMISSIONS).flat())
-  );
-  
   // جلب بيانات المستخدم
   const { data: user, isLoading } = useQuery({
     queryKey: ['users', userId],
@@ -72,19 +63,11 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث النموذج عند جلب البيانات
   useEffect(() => {
     if (user) {
-      // Convert roles to UserRole array
-      const roleNames: UserRole[] = Array.isArray(user.roles) ? 
-        (isUserRoleArray(user.roles) ?
-          user.roles as UserRole[] :
-          convertRolesToUserRoles(user.roles as Role[])
-        ) : [UserRole.USER];
-        
       form.reset({
         fullName: user.fullName || '',
         phone: user.phone || '',
         position: user.position || '',
-        roles: roleNames,
-        customPermissions: user.customPermissions || [],
+        roles: user.roles || [UserRole.USER],
       });
     }
   }, [user, form]);
@@ -92,34 +75,28 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث بيانات المستخدم
   const updateUserMutation = useMutation({
     mutationFn: async (values: UserEditFormValues) => {
-      if (!user) return null;
-      
-      // Process roles to ensure they're UserRole[] type
-      const userRoles = values.roles as UserRole[];
-      
-      // Update user profile with form values
-      return await updateUserProfile({
+      // تحديث الملف الشخصي
+      await updateUserProfile({
         id: userId,
         fullName: values.fullName,
-        email: user.email || '',
         phone: values.phone || null,
         position: values.position || null,
-        avatarUrl: user.avatarUrl, // تمرير avatarUrl الحالي
-        roles: userRoles,
-        customPermissions: values.customPermissions
       });
+      
+      // تحديث الصلاحيات
+      const userRoles = values.roles.map(role => role as UserRole);
+      await updateUserRoles(userId, userRoles);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users', userId] });
       toast({
         title: 'تم تحديث المستخدم بنجاح',
         description: 'تم تحديث بيانات المستخدم والصلاحيات',
       });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['users', userId] });
       onClose();
     },
     onError: (error: any) => {
-      console.error('Update user error:', error);
       toast({
         title: 'خطأ في تحديث بيانات المستخدم',
         description: error.message || 'حدث خطأ أثناء تحديث المستخدم',
@@ -133,9 +110,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) onClose();
-    }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>تعديل بيانات المستخدم</DialogTitle>
@@ -217,7 +192,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                                             field.value?.filter(
                                               (value) => value !== role.id
                                             )
-                                          );
+                                          )
                                     }}
                                   />
                                 </FormControl>
@@ -225,38 +200,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                                   {role.label}
                                 </FormLabel>
                               </FormItem>
-                            );
+                            )
                           }}
                         />
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="customPermissions"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>صلاحيات إضافية مخصصة لهذا المستخدم</FormLabel>
-                    <div className="flex flex-wrap gap-2">
-                      {allPermissions.map((perm) => (
-                        <label key={perm} className="flex items-center gap-1">
-                          <Checkbox
-                            checked={field.value?.includes(perm) || false}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                field.onChange([...(field.value || []), perm]);
-                              } else {
-                                field.onChange((field.value || []).filter((p: string) => p !== perm));
-                              }
-                            }}
-                            id={`perm-${perm}`}
-                          />
-                          <span>{perm}</span>
-                        </label>
                       ))}
                     </div>
                     <FormMessage />

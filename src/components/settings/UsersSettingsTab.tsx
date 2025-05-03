@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
 import { UserCog, Users } from 'lucide-react';
 import { getAllUsers } from '@/services/users-api';
-import { UserRole, isUserRoleArray } from '@/lib/auth-types';
+import { UserRole } from '@/lib/auth-types';
 
 export function UsersSettingsTab() {
   const navigate = useNavigate();
@@ -17,25 +17,14 @@ export function UsersSettingsTab() {
     queryFn: getAllUsers,
   });
 
-  // Helper function to check if a user has a specific role
-  const hasRole = (user: any, role: UserRole) => {
-    if (!user.roles || user.roles.length === 0) return false;
-    
-    if (isUserRoleArray(user.roles)) {
-      return user.roles.includes(role);
-    } else {
-      return user.roles.some((r: any) => r.name === role);
-    }
-  };
-
   // إحصائيات المستخدمين
   const totalUsers = users.length;
-  const adminUsers = users.filter(user => hasRole(user, UserRole.ADMIN)).length;
-  const managerUsers = users.filter(user => hasRole(user, UserRole.MANAGER)).length;
-  const accountantUsers = users.filter(user => hasRole(user, UserRole.ACCOUNTANT)).length;
-  const salesUsers = users.filter(user => hasRole(user, UserRole.SALES)).length;
+  const adminUsers = users.filter(user => user.roles.includes(UserRole.ADMIN)).length;
+  const managerUsers = users.filter(user => user.roles.includes(UserRole.MANAGER)).length;
+  const accountantUsers = users.filter(user => user.roles.includes(UserRole.ACCOUNTANT)).length;
+  const salesUsers = users.filter(user => user.roles.includes(UserRole.SALES)).length;
   const regularUsers = users.filter(user => 
-    user.roles.length === 1 && hasRole(user, UserRole.USER)
+    user.roles.length === 1 && user.roles.includes(UserRole.USER)
   ).length;
 
   return (

@@ -3,7 +3,6 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile as BaseUserProfile, UserRole } from '@/lib/auth-types';
 import type { Role } from '@/lib/auth-rbac-types';
-import { getPermissionsForRole, Permission } from '@/lib/roles-permissions';
 
 // تعريف مؤقت لملف المستخدم الخاص بالمصادقة، متوافق مع الأدوار الجديدة
 interface AuthUserProfile extends Omit<BaseUserProfile, 'roles'> {
@@ -30,7 +29,6 @@ interface AuthContextType extends AuthState {
   updateProfile: (profile: Partial<AuthUserProfile>) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasRole: (role: UserRole) => boolean;
-  hasPermission: (permission: Permission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -345,14 +343,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return state.roles.some(r => r.name === role);
   };
 
-  const hasPermission = (permission: Permission): boolean => {
-    if (!state.roles || state.roles.length === 0) return false;
-    for (const role of state.roles) {
-      const perms = getPermissionsForRole(role.name);
-      if (perms.includes(permission)) return true;
-    }
-    return false;
-  };
 
   const authContextValue: AuthContextType = {
     ...state,
@@ -362,14 +352,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     updateProfile,
     updatePassword,
     hasRole,
-    hasPermission,
   };
 
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

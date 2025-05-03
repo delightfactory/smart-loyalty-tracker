@@ -1,27 +1,83 @@
-
-import { Routes, Route } from 'react-router-dom';
-import Layout from './components/layout/Layout';
-import RequireAuth from './components/auth/RequireAuth';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
-import Profile from './pages/Profile';
-// استيراد بقية الصفحات...
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ThemeProvider } from '@/components/ui/theme-provider';
+import { Toaster } from '@/components/ui/toaster';
+import { QueryProvider } from '@/providers/QueryProvider';
+import { AuthProvider } from '@/hooks/useAuth';
+import Layout from '@/components/layout/Layout';
+import Index from '@/pages/Index';
+import Products from '@/pages/Products';
+import ProductDetails from '@/pages/ProductDetails';
+import Customers from '@/pages/Customers';
+import CustomerDetails from '@/pages/CustomerDetails';
+import CustomerFollowup from '@/pages/CustomerFollowup';
+import Invoices from '@/pages/Invoices';
+import InvoiceDetails from '@/pages/InvoiceDetails';
+import CreateInvoice from '@/pages/CreateInvoice';
+import CreateRedemption from '@/pages/CreateRedemption';
+import CreatePayment from '@/pages/CreatePayment';
+import Dashboard from '@/pages/Dashboard';
+import Analytics from '@/pages/Analytics';
+import Settings from '@/pages/Settings';
+import NotFound from '@/pages/NotFound';
+import Auth from '@/pages/Auth';
+import Profile from '@/pages/Profile';
+import UsersPage from '@/pages/Users';
+import Payments from '@/pages/Payments';
+import RedemptionsList from '@/pages/RedemptionsList';
+import RedemptionDetails from '@/pages/RedemptionDetails';
+import EditRedemption from '@/pages/EditRedemption';
+import RequireAuth from '@/components/auth/RequireAuth';
+import FloatingQuickActions from '@/components/FloatingQuickActions';
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      
-      {/* تغليف المسارات المحمية بمكون Layout */}
-      <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-      <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-      <Route path="/users" element={<RequireAuth><Layout><Users /></Layout></RequireAuth>} />
-      <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
-      <Route path="/profile" element={<RequireAuth><Layout><Profile /></Layout></RequireAuth>} />
-      {/* إضافة بقية المسارات مع حماية RequireAuth */}
-    </Routes>
+    <BrowserRouter>
+      <ThemeProvider defaultTheme="light" storageKey="car-care-theme">
+        <QueryProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              
+              <Route element={
+                <RequireAuth>
+                  <Layout>
+                    <Outlet />
+                  </Layout>
+                </RequireAuth>
+              }>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/products/:id" element={<ProductDetails />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/customers/:id" element={<CustomerDetails />} />
+                <Route path="/customer-followup" element={<CustomerFollowup />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices/:id" element={<InvoiceDetails />} />
+                <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />
+                <Route path="/create-invoice" element={<CreateInvoice />} />
+                <Route path="/create-invoice/:customerId/edit/:edit" element={<CreateInvoice />} />
+                <Route path="/create-redemption" element={<CreateRedemption />} />
+                <Route path="/create-redemption/:customerId" element={<CreateRedemption />} />
+                <Route path="/create-payment/:customerId" element={<CreatePayment />} />
+                <Route path="/create-payment" element={<CreatePayment />} />
+                <Route path="/payments" element={<Payments />} />
+                <Route path="/redemptions" element={<RedemptionsList />} />
+                <Route path="/redemption/:id" element={<RedemptionDetails />} />
+                <Route path="/edit-redemption/:id" element={<EditRedemption />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+            <FloatingQuickActions />
+            <Toaster />
+          </AuthProvider>
+        </QueryProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 

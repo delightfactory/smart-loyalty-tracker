@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,11 +10,9 @@ import { SecuritySettingsTab } from '@/components/settings/SecuritySettingsTab';
 import { BackupSettingsTab } from '@/components/settings/BackupSettingsTab';
 import { DatabaseManagementTab } from '@/components/settings/DatabaseManagementTab';
 import { useSettings } from '@/hooks/useSettings';
-import RolesPermissionsManagement from '@/components/users/RolesPermissionsManagement';
-import UserPermissionOverrides from '@/components/users/UserPermissionOverrides';
 
 const Settings = () => {
-  const { hasPermission } = useAuth();
+  const { hasRole } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('profile');
   const { 
@@ -30,7 +29,7 @@ const Settings = () => {
           <TabsTrigger value="security">الأمان</TabsTrigger>
           <TabsTrigger value="backup">النسخ الاحتياطي</TabsTrigger>
           <TabsTrigger value="database">قاعدة البيانات</TabsTrigger>
-          {hasPermission('manage_users') && (
+          {hasRole(UserRole.ADMIN) && (
             <TabsTrigger value="users">المستخدمين</TabsTrigger>
           )}
         </TabsList>
@@ -59,21 +58,9 @@ const Settings = () => {
           <DatabaseManagementTab />
         </TabsContent>
         
-        {hasPermission('manage_users') && (
+        {hasRole(UserRole.ADMIN) && (
           <TabsContent value="users">
             <UsersSettingsTab />
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-2">إدارة الأدوار والصلاحيات</h3>
-              <div className="border rounded bg-white p-4">
-                <RolesPermissionsManagement />
-              </div>
-            </div>
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-2">إدارة صلاحيات المستخدمين الفردية</h3>
-              <div className="border rounded bg-white p-4">
-                <UserPermissionOverrides />
-              </div>
-            </div>
           </TabsContent>
         )}
       </Tabs>

@@ -8,14 +8,6 @@ export enum UserRole {
   USER = "user"
 }
 
-// Role Interface (for compatibility with auth-rbac-types.ts)
-export interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  permissions?: any[];
-}
-
 // User Profile Interface
 export interface UserProfile {
   id: string;
@@ -24,10 +16,9 @@ export interface UserProfile {
   avatarUrl: string | null;
   phone: string | null;
   position: string | null;
-  roles: UserRole[] | Role[];
+  roles: UserRole[];
   createdAt?: string;
   lastSignInAt?: string | null;
-  customPermissions?: string[]; // صلاحيات مخصصة لكل مستخدم
 }
 
 // Auth State Interface
@@ -44,31 +35,4 @@ export interface CreateUserParams {
   password: string;
   fullName: string;
   roles: UserRole[];
-}
-
-// Update User Interface
-export interface UpdateUserParams {
-  id: string;
-  fullName: string;
-  email: string;
-  roles: UserRole[];
-  customPermissions?: string[];
-  phone?: string | null;
-  position?: string | null;
-  avatarUrl?: string | null; // إضافة خاصية avatarUrl
-}
-
-// Helper function to check if roles array contains UserRole or Role objects
-export function isUserRoleArray(roles: UserRole[] | Role[]): roles is UserRole[] {
-  return roles.length === 0 || typeof roles[0] === 'string' || !('id' in roles[0]);
-}
-
-// Helper function to convert Role objects to UserRole enum values
-export function convertRoleToUserRole(role: Role): UserRole {
-  return role.name as UserRole;
-}
-
-// Helper function to convert Role[] to UserRole[]
-export function convertRolesToUserRoles(roles: Role[]): UserRole[] {
-  return roles.map(role => convertRoleToUserRole(role));
 }
