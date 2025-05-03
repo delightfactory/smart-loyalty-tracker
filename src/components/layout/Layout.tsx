@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SidebarProvider, useSidebar, Sidebar } from '@/components/ui/sidebar';
