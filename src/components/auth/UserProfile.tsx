@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { updateUserProfile } from '@/services/users-api';
 import { useToast } from '@/components/ui/use-toast';
+import { UserRole } from '@/lib/auth-types';
 
 export const UserProfile = () => {
   const { profile, user } = useAuth();
@@ -30,6 +31,11 @@ export const UserProfile = () => {
     if (!profile) return;
     
     try {
+      // Convert Role[] to UserRole[] when updating the profile
+      const userRoles: UserRole[] = profile.roles ? 
+        profile.roles.map(role => role.name as UserRole) : 
+        [];
+        
       await updateUserProfile({
         id: profile.id,
         fullName: formData.fullName,
@@ -37,7 +43,8 @@ export const UserProfile = () => {
         phone: formData.phone,
         position: formData.position,
         avatarUrl: formData.avatarUrl,
-        roles: profile.roles || []
+        roles: userRoles,
+        customPermissions: []
       });
       
       toast({

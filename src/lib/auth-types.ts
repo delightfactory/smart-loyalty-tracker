@@ -1,3 +1,4 @@
+
 // User Roles Enum
 export enum UserRole {
   ADMIN = "admin",
@@ -15,7 +16,7 @@ export interface UserProfile {
   avatarUrl: string | null;
   phone: string | null;
   position: string | null;
-  roles: UserRole[];
+  roles: UserRole[] | { id: string; name: string }[];
   createdAt?: string;
   lastSignInAt?: string | null;
   customPermissions?: string[]; // صلاحيات مخصصة لكل مستخدم

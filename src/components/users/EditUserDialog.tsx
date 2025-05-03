@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -71,11 +70,16 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث النموذج عند جلب البيانات
   useEffect(() => {
     if (user) {
+      // تحويل الأدوار من Role[] إلى string[] للنموذج
+      const roleNames = Array.isArray(user.roles) ? 
+        user.roles.map(role => typeof role === 'string' ? role : role.name) : 
+        [UserRole.USER];
+        
       form.reset({
         fullName: user.fullName || '',
         phone: user.phone || '',
         position: user.position || '',
-        roles: user.roles || [UserRole.USER],
+        roles: roleNames,
         customPermissions: user.customPermissions || [],
       });
     }
@@ -84,20 +88,18 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   // تحديث بيانات المستخدم
   const updateUserMutation = useMutation({
     mutationFn: async (values: UserEditFormValues) => {
+      if (!user) return;
+      
       // تحديث الملف الشخصي
       await updateUserProfile({
         id: userId,
         fullName: values.fullName,
-        email: user?.email || '',
+        email: user.email || '',
         phone: values.phone || null,
         position: values.position || null,
         roles: values.roles.map(role => role as UserRole),
+        customPermissions: values.customPermissions
       });
-      
-      // تحديث الصلاحيات
-      const userRoles = values.roles.map(role => role as UserRole);
-      const customPermissions = values.customPermissions || [];
-      await updateUserRoles(userId, userRoles, customPermissions);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });

@@ -1,7 +1,6 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserRole } from '@/lib/auth-types';
+import { UserProfile, UserRole } from '@/lib/auth-types';
 import { getAllUsers, createUser, deleteUser } from '@/services/users-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { UserRolesList } from './UserRolesList';
 import UserForm from './UserForm';
 import UsersTable from './UsersTable';
 import { EditUserDialog } from './EditUserDialog';
+import { User } from '@/lib/auth-rbac-types';
 
 export function UsersManagement() {
   const { toast } = useToast();
@@ -21,10 +21,30 @@ export function UsersManagement() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
 
   // جلب جميع المستخدمين
-  const { data: users = [], isLoading, error } = useQuery({
+  const { data: usersData = [], isLoading, error } = useQuery({
     queryKey: ['users'],
     queryFn: getAllUsers,
   });
+  
+  // تحويل UserProfile[] إلى User[] لتوافق مع UsersTable
+  const users: User[] = usersData.map((user: UserProfile) => ({
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email || '',
+    roles: user.roles.map(role => ({
+      id: typeof role === 'string' ? role : role.id || '',
+      name: typeof role === 'string' ? role : role.name,
+      description: undefined,
+      permissions: []
+    })),
+    avatarUrl: user.avatarUrl,
+    phone: user.phone,
+    isActive: true,
+    position: user.position,
+    createdAt: user.createdAt || '',
+    lastSignInAt: user.lastSignInAt || null,
+    permissions: []
+  }));
 
   // إضافة مستخدم جديد
   const createUserMutation = useMutation({
