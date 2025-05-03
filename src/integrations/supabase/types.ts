@@ -17,7 +17,6 @@ export type Database = {
           contact_person: string
           created_at: string
           credit_balance: number
-          opening_balance: number
           credit_limit: number | null
           credit_period: number | null
           current_points: number
@@ -26,6 +25,7 @@ export type Database = {
           lastactive: string | null
           level: number
           name: string
+          opening_balance: number | null
           phone: string
           points_earned: number
           points_redeemed: number
@@ -38,7 +38,6 @@ export type Database = {
           contact_person: string
           created_at?: string
           credit_balance?: number
-          opening_balance?: number
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number
@@ -47,6 +46,7 @@ export type Database = {
           lastactive?: string | null
           level?: number
           name: string
+          opening_balance?: number | null
           phone: string
           points_earned?: number
           points_redeemed?: number
@@ -59,7 +59,6 @@ export type Database = {
           contact_person?: string
           created_at?: string
           credit_balance?: number
-          opening_balance?: number
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number
@@ -68,6 +67,7 @@ export type Database = {
           lastactive?: string | null
           level?: number
           name?: string
+          opening_balance?: number | null
           phone?: string
           points_earned?: number
           points_redeemed?: number
@@ -562,6 +562,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_role"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"

@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { User, Phone, Building, CreditCard } from 'lucide-react';
 import { Customer } from '@/lib/types';
@@ -9,6 +10,16 @@ interface CustomerBasicInfoProps {
 const CustomerBasicInfo = ({ customer }: CustomerBasicInfoProps) => {
   const formatNumberEn = (value: number) => {
     return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Calculate the complete current balance
+  const calculateCurrentBalance = () => {
+    // Opening balance is always included as is
+    const openingBalance = customer.openingBalance ?? 0;
+    // Credit balance from invoices minus payments
+    const creditBalance = customer.creditBalance ?? 0;
+    
+    return openingBalance + creditBalance;
   };
 
   return (
@@ -54,7 +65,14 @@ const CustomerBasicInfo = ({ customer }: CustomerBasicInfoProps) => {
               <CreditCard className="h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">رصيد العميل</p>
-                <p className="font-medium">{formatNumberEn(customer.openingBalance + (customer.creditBalance ?? 0))} ج.م</p>
+                <p className="font-medium">{formatNumberEn(calculateCurrentBalance())} ج.م</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">الرصيد الافتتاحي</p>
+                <p className="font-medium">{formatNumberEn(customer.openingBalance ?? 0)} ج.م</p>
               </div>
             </div>
             {customer.credit_period !== undefined && (

@@ -1,3 +1,4 @@
+
 import { FC } from 'react';
 import { Customer, BusinessType } from '@/lib/types';
 import { Eye, Pencil, Trash, Phone, User, MapPin, Star, Building2 } from 'lucide-react';
@@ -12,7 +13,20 @@ interface CustomerCardProps {
   getClassificationDisplay: (classification: number) => string;
 }
 
+// Calculate the total balance for a customer
+const calculateTotalBalance = (customer: Customer): number => {
+  // Always include opening balance
+  const openingBalance = customer.openingBalance ?? 0;
+  // Include credit balance from invoices and payments
+  const creditBalance = customer.creditBalance ?? 0;
+  
+  return openingBalance + creditBalance;
+};
+
 const CustomerCard: FC<CustomerCardProps> = ({ customer, onView, onEdit, onDelete, getLevelBadgeClass, getClassificationDisplay }) => {
+  // Calculate the current balance
+  const currentBalance = calculateTotalBalance(customer);
+  
   return (
     <div
       className={cn(
@@ -60,7 +74,12 @@ const CustomerCard: FC<CustomerCardProps> = ({ customer, onView, onEdit, onDelet
         <div className="flex flex-col gap-2 mt-2">
           <div className="flex flex-col items-start bg-yellow-50 dark:bg-yellow-900 rounded-lg p-2 shadow-sm w-full">
             <span className="text-xs text-yellow-800 dark:text-yellow-200 font-semibold">الرصيد الحالي</span>
-            <span className="text-yellow-700 font-bold text-lg dark:text-yellow-300">{formatNumberEn((customer.openingBalance ?? 0) + (customer.creditBalance ?? 0))} ج.م</span>
+            <span className="text-yellow-700 font-bold text-lg dark:text-yellow-300">{formatNumberEn(currentBalance)} ج.م</span>
+            {customer.openingBalance > 0 && (
+              <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                منه رصيد افتتاحي: {formatNumberEn(customer.openingBalance)} ج.م
+              </span>
+            )}
           </div>
         </div>
       {/* الموقع */}

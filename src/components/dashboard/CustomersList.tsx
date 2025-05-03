@@ -1,3 +1,4 @@
+
 import { 
   Card, 
   CardContent, 
@@ -22,6 +23,17 @@ interface CustomersListProps {
 
 const formatNumberEn = (num: number) => {
   return num.toLocaleString('en-US');
+};
+
+// Calculate the current balance considering all factors
+const calculateCurrentBalance = (customer: Customer) => {
+  // Opening balance is always included as is
+  const openingBalance = customer.openingBalance ?? 0;
+  // Credit balance comes from unpaid/partially paid invoices
+  const creditBalance = customer.creditBalance ?? 0;
+  
+  // Return the total balance
+  return openingBalance + creditBalance;
 };
 
 const CustomersList = ({ customers }: CustomersListProps) => {
@@ -53,7 +65,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
                 <TableCell>{customer.region}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_period ?? 0)}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_limit ?? 0)}</TableCell>
-                <TableCell>{formatNumberEn((customer.openingBalance ?? 0) + (customer.creditBalance ?? 0))}</TableCell>
+                <TableCell>{formatNumberEn(calculateCurrentBalance(customer))}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className={cn(

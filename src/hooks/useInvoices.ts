@@ -59,20 +59,28 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
     let totalPointsEarned = 0;
     let totalCreditBalance = 0;
     let latestInvoiceDate = null;
+    
+    // Calculate unpaid amount from invoices
     invoices.forEach(invoice => {
+      // Add points earned from invoice
       totalPointsEarned += invoice.pointsEarned;
-      // حساب الرصيد الآجل للفواتير غير المدفوعة أو المدفوعة جزئياً
+      
+      // Calculate credit balance for unpaid or partially paid invoices
       if (invoice.status === InvoiceStatus.UNPAID || 
           invoice.status === InvoiceStatus.PARTIALLY_PAID || 
           invoice.status === InvoiceStatus.OVERDUE) {
-        // حساب المبلغ المدفوع
+        
+        // Calculate the paid amount for this invoice
         const paidAmount = invoice.payments?.reduce((sum, payment) => {
+          // Add payments, subtract refunds
           return payment.type === PaymentType.PAYMENT ? sum + payment.amount : sum - payment.amount;
         }, 0) || 0;
-        // إضافة المبلغ المتبقي إلى الرصيد الآجل
+        
+        // Add the remaining balance to the total credit balance
         totalCreditBalance += (invoice.totalAmount - paidAmount);
       }
-      // تحديث أحدث تاريخ فاتورة
+      
+      // Update latest invoice date
       if (invoice.date) {
         const invoiceDate = new Date(invoice.date);
         if (!latestInvoiceDate || invoiceDate > latestInvoiceDate) {
@@ -81,20 +89,32 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       }
     });
     
-    // --- إضافة: جلب جميع المدفوعات المستقلة لهذا العميل ---
+    // Get all standalone payments (not linked to any invoice) for this customer
     let standalonePayments = [];
     try {
       standalonePayments = await paymentsService.getByCustomerId(customerId);
-      // تصفية المدفوعات غير المرتبطة بأي فاتورة
+      // Filter payments not linked to any invoice
       standalonePayments = standalonePayments.filter((p: any) => !p.invoiceId);
+      console.log(`Found ${standalonePayments.length} standalone payments for customer ${customerId}`);
     } catch (e) {
+      console.error(`Error fetching standalone payments for customer ${customerId}:`, e);
       standalonePayments = [];
     }
 
-    // حساب مجموع المدفوعات المستقلة
-    const totalStandalonePayments = standalonePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-    // حساب قيمة الائتمان (Credit Limit): متوسط مسحوبات العميل آخر 3 شهور
+    // Calculate total standalone payments
+    const totalStandalonePayments = standalonePayments.reduce((sum: number, payment: any) => {
+      // Consider payment type (payment/refund)
+      if (payment.type === PaymentType.PAYMENT) {
+        return sum + (payment.amount || 0);
+      } else if (payment.type === PaymentType.REFUND) {
+        return sum - (payment.amount || 0);
+      }
+      return sum;
+    }, 0);
+    
+    console.log(`Total standalone payments for customer ${customerId}: ${totalStandalonePayments}`);
+    
+    // Calculate credit limit: average of last 3 months purchases
     let creditLimit = 0;
     const now = new Date();
     const threeMonthsAgo = new Date(now);
@@ -105,7 +125,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       creditLimit = total / 3;
     }
     
-    // الحصول على جميع عمليات الاستبدال للعميل
+    // Get all redemptions for the customer
     let totalPointsRedeemed = 0;
     let latestRedemptionDate = null;
     if (typeof redemptionsService !== 'undefined' && redemptionsService.getByCustomerId) {
@@ -113,7 +133,8 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       redemptions.forEach(redemption => {
         if (redemption.status !== RedemptionStatus.CANCELLED) {
           totalPointsRedeemed += redemption.totalPointsRedeemed;
-          // تحديث أحدث تاريخ استبدال
+          
+          // Update latest redemption date
           if (redemption.date) {
             const redemptionDate = new Date(redemption.date);
             if (!latestRedemptionDate || redemptionDate > latestRedemptionDate) {
@@ -124,11 +145,10 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       });
     }
     
-    // الحصول على سجل التعديلات اليدوية للنقاط
+    // Get manual points adjustments history
     let manualPointsAdjustments = { added: 0, deducted: 0 };
     let latestManualAdjustmentDate = null;
     try {
-      // Changed: Direct import replaced with function call to avoid import issues
       const pointsHistory = await pointsHistoryService.getByCustomerId(customerId);
       
       pointsHistory.forEach(entry => {
@@ -138,7 +158,7 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
           manualPointsAdjustments.deducted += Math.abs(entry.points);
         }
         
-        // تحديث أحدث تاريخ تعديل يدوي
+        // Update latest manual adjustment date
         if (entry.created_at) {
           const adjustmentDate = new Date(entry.created_at);
           if (!latestManualAdjustmentDate || adjustmentDate > latestManualAdjustmentDate) {
@@ -149,10 +169,9 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       console.log(`Manual point adjustments for ${customerId}:`, manualPointsAdjustments);
     } catch (error) {
       console.error('Error fetching points history:', error);
-      // Continue without points history if service isn't available
     }
     
-    // تحديد أحدث تاريخ تفاعل
+    // Determine latest activity date
     let lastActive = null;
     const dates = [
       latestInvoiceDate, 
@@ -164,28 +183,31 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       lastActive = new Date(Math.max(...dates.map(d => d instanceof Date ? d.getTime() : new Date(d).getTime())));
     }
     
-    // تحديث بيانات العميل
+    // Update customer data
     const { classification, level } = calculateClassificationAndLevel(customer, invoices);
     
-    // تطبيق التعديلات اليدوية على إجمالي النقاط
+    // Apply manual adjustments to total points
     const adjustedPointsEarned = totalPointsEarned + manualPointsAdjustments.added;
     const adjustedPointsRedeemed = totalPointsRedeemed + manualPointsAdjustments.deducted;
     
+    // Final credit balance calculation:
+    // Credit balance from invoices MINUS standalone payments
+    // (Opening balance remains untouched as a separate value)
+    const finalCreditBalance = totalCreditBalance - totalStandalonePayments;
+
+    // Update customer with new values
     await customersService.update({
       ...customer,
       pointsEarned: totalPointsEarned,
       pointsRedeemed: totalPointsRedeemed,
-      // خصم المدفوعات المستقلة من الرصيد الآجل النهائي
-      creditBalance: totalCreditBalance - totalStandalonePayments,
+      creditBalance: finalCreditBalance, // Only the credit balance without opening balance
       lastActive,
       credit_limit: creditLimit,
       classification,
       level,
     });
     
-
-    
-    // تحديث الذاكرة المؤقتة
+    // Update cache
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
     queryClient.invalidateQueries({ queryKey: ['points_history', customerId] });
@@ -194,7 +216,8 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       pointsEarned: adjustedPointsEarned,
       pointsRedeemed: adjustedPointsRedeemed,
       currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
-      creditBalance: totalCreditBalance,
+      creditBalance: finalCreditBalance,
+      openingBalance: customer.openingBalance || 0,
       lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
       credit_limit: creditLimit,
     });
