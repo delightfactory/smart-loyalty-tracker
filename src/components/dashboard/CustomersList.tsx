@@ -40,6 +40,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
               <TableHead>المنطقة</TableHead>
               <TableHead>مدة الائتمان (يوم)</TableHead>
               <TableHead>قيمة الائتمان (EGP)</TableHead>
+              <TableHead>الرصيد الحالي (EGP)</TableHead>
               <TableHead>...</TableHead>
             </TableRow>
           </TableHeader>
@@ -52,6 +53,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
                 <TableCell>{customer.region}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_period ?? 0)}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_limit ?? 0)}</TableCell>
+                <TableCell>{formatNumberEn((customer.openingBalance ?? 0) + (customer.creditBalance ?? 0))}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className={cn(

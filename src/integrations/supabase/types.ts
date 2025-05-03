@@ -17,6 +17,7 @@ export type Database = {
           contact_person: string
           created_at: string
           credit_balance: number
+          opening_balance: number
           credit_limit: number | null
           credit_period: number | null
           current_points: number
@@ -37,6 +38,7 @@ export type Database = {
           contact_person: string
           created_at?: string
           credit_balance?: number
+          opening_balance?: number
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number
@@ -57,6 +59,7 @@ export type Database = {
           contact_person?: string
           created_at?: string
           credit_balance?: number
+          opening_balance?: number
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number

@@ -41,6 +41,8 @@ export function useCustomerInvoices(customerId: string) {
 }
 
 // تحقق من حالة الفواتير وتحديث بيانات العميل
+import { paymentsService } from '@/services/database';
+
 export const updateCustomerDataBasedOnInvoices = async (customerId: string, queryClient: any) => {
   try {
     console.log(`Updating customer data for ${customerId} based on invoices`);
@@ -79,6 +81,19 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
       }
     });
     
+    // --- إضافة: جلب جميع المدفوعات المستقلة لهذا العميل ---
+    let standalonePayments = [];
+    try {
+      standalonePayments = await paymentsService.getByCustomerId(customerId);
+      // تصفية المدفوعات غير المرتبطة بأي فاتورة
+      standalonePayments = standalonePayments.filter((p: any) => !p.invoiceId);
+    } catch (e) {
+      standalonePayments = [];
+    }
+
+    // حساب مجموع المدفوعات المستقلة
+    const totalStandalonePayments = standalonePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
     // حساب قيمة الائتمان (Credit Limit): متوسط مسحوبات العميل آخر 3 شهور
     let creditLimit = 0;
     const now = new Date();
@@ -156,20 +171,19 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
     const adjustedPointsEarned = totalPointsEarned + manualPointsAdjustments.added;
     const adjustedPointsRedeemed = totalPointsRedeemed + manualPointsAdjustments.deducted;
     
-    const updatedCustomer = {
+    await customersService.update({
       ...customer,
-      pointsEarned: adjustedPointsEarned,
-      pointsRedeemed: adjustedPointsRedeemed,
-      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
-      creditBalance: totalCreditBalance,
-      lastActive: lastActive ? lastActive.toISOString() : customer.lastActive || null,
+      pointsEarned: totalPointsEarned,
+      pointsRedeemed: totalPointsRedeemed,
+      // خصم المدفوعات المستقلة من الرصيد الآجل النهائي
+      creditBalance: totalCreditBalance - totalStandalonePayments,
+      lastActive,
       credit_limit: creditLimit,
       classification,
       level,
-    };
+    });
     
-    // تحديث بيانات العميل في قاعدة البيانات
-    await customersService.update(updatedCustomer);
+
     
     // تحديث الذاكرة المؤقتة
     queryClient.invalidateQueries({ queryKey: ['customers', customerId] });

@@ -11,8 +11,10 @@ import ViewToggle from '@/components/invoice/ViewToggle';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PageContainer from '@/components/layout/PageContainer';
+import AddStandalonePaymentDialog from '@/components/payments/AddStandalonePaymentDialog';
 
 const Payments: React.FC = () => {
+  const [showStandaloneDialog, setShowStandaloneDialog] = useState(false);
   const { getAll } = usePayments();
   const { data: payments = [], isLoading } = getAll;
   const { getAll: getAllCustomers } = useCustomers();
@@ -139,6 +141,15 @@ const Payments: React.FC = () => {
           <ViewToggle view={view} setView={setView} storageKey="payments_view" />
           <Button
             size="sm"
+            variant="secondary"
+            className="rounded-lg bg-gradient-to-l from-yellow-400 to-yellow-600 text-white shadow-md hover:from-yellow-500 hover:to-yellow-700 px-5 py-2 font-bold text-base transition-all min-w-[180px] flex items-center gap-2"
+            onClick={() => setShowStandaloneDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            إضافة دفعة غير مرتبطة بفاتورة
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             className="rounded-lg bg-gradient-to-l from-primary to-emerald-500 text-white shadow-md hover:from-emerald-600 hover:to-primary dark:from-emerald-900 dark:to-emerald-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
             onClick={() => navigate('/create-payment')}
@@ -146,6 +157,7 @@ const Payments: React.FC = () => {
             <Plus className="h-4 w-4 mr-1" />
             إضافة دفعة
           </Button>
+          <AddStandalonePaymentDialog open={showStandaloneDialog} onClose={() => setShowStandaloneDialog(false)} />
         </div>
       }
     >

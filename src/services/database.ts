@@ -477,9 +477,23 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
     
     console.log(`Customer ${customerId} - Total credit balance: ${totalAmountDue}`);
     
+    // جلب الرصيد الافتتاحي من قاعدة البيانات
+    const { data: customerData, error: customerError } = await supabase
+      .from('customers')
+      .select('opening_balance')
+      .eq('id', customerId)
+      .single();
+      
+    if (customerError) {
+      console.error(`Error fetching opening_balance for customer ${customerId}:`, customerError);
+      throw customerError;
+    }
+    
+    const openingBalance = customerData.opening_balance ?? 0;
+    
     const { error: updateError } = await supabase
       .from('customers')
-      .update({ credit_balance: totalAmountDue })
+      .update({ credit_balance: totalAmountDue + openingBalance })
       .eq('id', customerId);
       
     if (updateError) {
@@ -487,7 +501,7 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
       throw updateError;
     }
     
-    console.log(`Credit balance for customer ${customerId} updated successfully to ${totalAmountDue}`);
+    console.log(`Credit balance for customer ${customerId} updated successfully to ${totalAmountDue + openingBalance}`);
   } catch (error) {
     console.error(`Failed to update credit balance for customer ${customerId}:`, error);
     throw error;
@@ -598,6 +612,9 @@ export const invoicesService = {
       await supabase.from('payments').insert(payment);
     }
     
+    // تحديث رصيد العميل بعد إنشاء الفاتورة
+    await updateCustomerCreditBalance(invoice.customerId);
+    
     return this.getById(invoiceId);
   },
   
@@ -616,6 +633,9 @@ export const invoicesService = {
       throw error;
     }
     
+    // تحديث رصيد العميل بعد تحديث الفاتورة
+    await updateCustomerCreditBalance(invoice.customerId);
+    
     return dbInvoiceToAppInvoice({
       ...data,
       items: invoice.items,
@@ -624,6 +644,18 @@ export const invoicesService = {
   },
   
   async delete(id: string): Promise<void> {
+    // جلب customer_id قبل حذف الفاتورة
+    const { data: deletedInvoice, error: fetchError } = await supabase
+      .from('invoices')
+      .select('customer_id')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) {
+      console.error(`Error fetching invoice ${id}:`, fetchError);
+      throw fetchError;
+    }
+    
     const { error: itemsError } = await supabase
       .from('invoice_items')
       .delete()
@@ -643,6 +675,9 @@ export const invoicesService = {
       console.error(`Error deleting invoice with id ${id}:`, error);
       throw error;
     }
+    
+    // تحديث رصيد العميل بعد حذف الفاتورة
+    await updateCustomerCreditBalance(deletedInvoice.customer_id);
   }
 };
 

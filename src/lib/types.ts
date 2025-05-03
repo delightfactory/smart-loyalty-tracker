@@ -54,6 +54,7 @@ export interface Customer {
   pointsRedeemed: number;
   currentPoints: number;
   creditBalance: number;
+  openingBalance?: number; // الرصيد الافتتاحي
   classification: number; // Auto-calculated based on categories purchased from
   level: number; // Ranking compared to other customers
   created_at?: string;

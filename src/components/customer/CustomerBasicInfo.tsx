@@ -53,8 +53,8 @@ const CustomerBasicInfo = ({ customer }: CustomerBasicInfoProps) => {
             <div className="flex items-center gap-3">
               <CreditCard className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">رصيد الآجل</p>
-                <p className="font-medium">{formatNumberEn(customer.creditBalance)} ج.م</p>
+                <p className="text-sm text-muted-foreground">رصيد العميل</p>
+                <p className="font-medium">{formatNumberEn(customer.openingBalance + (customer.creditBalance ?? 0))} ج.م</p>
               </div>
             </div>
             {customer.credit_period !== undefined && (

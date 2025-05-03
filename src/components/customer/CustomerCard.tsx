@@ -57,28 +57,12 @@ const CustomerCard: FC<CustomerCardProps> = ({ customer, onView, onEdit, onDelet
         </span>
       </div>
       {/* النقاط والرصد وبيانات الائتمان */}
-      <div className="grid grid-cols-2 gap-3 mt-2">
-        <div className="flex flex-col items-start bg-emerald-50 dark:bg-emerald-900 rounded-lg p-2 shadow-sm">
-          <span className="text-xs text-emerald-800 dark:text-emerald-200 font-semibold">النقاط الحالية</span>
-          <span className="text-emerald-700 font-bold text-lg dark:text-emerald-300">{formatNumberEn(customer.currentPoints)}</span>
+        <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col items-start bg-yellow-50 dark:bg-yellow-900 rounded-lg p-2 shadow-sm w-full">
+            <span className="text-xs text-yellow-800 dark:text-yellow-200 font-semibold">الرصيد الحالي</span>
+            <span className="text-yellow-700 font-bold text-lg dark:text-yellow-300">{formatNumberEn((customer.openingBalance ?? 0) + (customer.creditBalance ?? 0))} ج.م</span>
+          </div>
         </div>
-        <div className="flex flex-col items-start bg-orange-50 dark:bg-orange-900 rounded-lg p-2 shadow-sm">
-          <span className="text-xs text-orange-800 dark:text-orange-200 font-semibold">رصيد الآجل</span>
-          <span className="text-orange-700 font-bold text-lg dark:text-orange-300">{formatNumberEn(customer.creditBalance)} ج.م</span>
-        </div>
-        <div className="flex flex-col items-start bg-cyan-50 dark:bg-cyan-900 rounded-lg p-2 shadow-sm">
-          <span className="text-xs text-cyan-800 dark:text-cyan-200 font-semibold">مدة الائتمان</span>
-          <span className="text-cyan-700 font-bold text-lg dark:text-cyan-300">
-            {formatNumberEn(customer.credit_period)} يوم
-          </span>
-        </div>
-        <div className="flex flex-col items-start bg-fuchsia-50 dark:bg-fuchsia-900 rounded-lg p-2 shadow-sm">
-          <span className="text-xs text-fuchsia-800 dark:text-fuchsia-200 font-semibold">قيمة الائتمان</span>
-          <span className="text-fuchsia-700 font-bold text-lg dark:text-fuchsia-300">
-            {formatNumberEn(customer.credit_limit)} EGP
-          </span>
-        </div>
-      </div>
       {/* الموقع */}
       <div className="flex items-center gap-2 mt-2 text-xs text-blue-900 dark:text-blue-200 font-semibold">
         <MapPin className="w-4 h-4" />

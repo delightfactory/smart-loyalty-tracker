@@ -112,6 +112,7 @@ const Customers = () => {
     phone: '',
     businessType: BusinessType.SERVICE_CENTER,
     creditBalance: 0,
+    openingBalance: 0,
     governorate: '',
     city: ''
   });
@@ -175,6 +176,7 @@ const Customers = () => {
       phone: newCustomer.phone!,
       businessType: newCustomer.businessType || BusinessType.SERVICE_CENTER,
       creditBalance: newCustomer.creditBalance || 0,
+      openingBalance: newCustomer.openingBalance || 0,
       currentPoints: 0,
       pointsEarned: 0,
       pointsRedeemed: 0,
@@ -193,6 +195,7 @@ const Customers = () => {
           phone: '',
           businessType: BusinessType.SERVICE_CENTER,
           creditBalance: 0,
+          openingBalance: 0,
           governorate: '',
           city: ''
         });
@@ -386,25 +389,45 @@ const Customers = () => {
   }
 
   // --- Real-time balance cell ---
+  // دالة لحساب صافي تعاملات العميل (فواتير الآجل - المدفوعات المرتبطة)
+  function calculateCustomerNetTransactions(invoices: any[], payments: any[]): number {
+    const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
+    const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const creditInvoiceIds = creditInvoices.map(inv => inv.id);
+    const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
+    const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    return totalCreditInvoices - totalPayments;
+  }
+
+  // مكون عرض رصيد العميل بشكل موحد
   function CustomerBalanceCell({ customerId }: { customerId: string }) {
+    const { getAll } = useCustomers();
+    const { data: customers = [] } = getAll;
+    const openingBalance = customers.find(c => c.id === customerId)?.openingBalance ?? 0;
     const { getByCustomerId: getInvoices } = useInvoices();
     const { getByCustomerId: getPayments } = usePayments();
     const invoicesQuery = getInvoices(customerId);
     const paymentsQuery = getPayments(customerId);
-    const totalBalance = useMemo(() => {
+    const { netTransactions, total } = useMemo(() => {
       const invoices = invoicesQuery.data || [];
       const payments = paymentsQuery.data || [];
-      const invoiceTotal = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-      const paymentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-      return invoiceTotal - paymentTotal;
-    }, [invoicesQuery.data, paymentsQuery.data]);
-    if (invoicesQuery.isLoading || paymentsQuery.isLoading) {
+      const net = calculateCustomerNetTransactions(invoices, payments);
+      return {
+        netTransactions: net,
+        total: openingBalance + net
+      };
+    }, [invoicesQuery.data, paymentsQuery.data, openingBalance]);
+    if (invoicesQuery.isLoading || paymentsQuery.isLoading || customers.length === 0) {
       return <span className="text-muted-foreground">...</span>;
     }
     if (invoicesQuery.isError || paymentsQuery.isError) {
       return <span className="text-destructive">خطأ</span>;
     }
-    return <>{formatNumberEn(totalBalance)} ج.م</>;
+    return (
+      <span className="font-bold text-base text-right">
+        <span className="text-gray-700">رصيد العميل:</span> {formatNumberEn(total)} ج.م
+      </span>
+    );
   }
 
   // فتح نافذة إضافة عميل تلقائياً إذا تم التوجيه مع state مناسب
@@ -543,6 +566,7 @@ const Customers = () => {
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المحافظة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المدينة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">النقاط الحالية</TableHead>
+                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">الرصيد الافتتاحي</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">رصيد العميل</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">مدة الائتمان (يوم)</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">قيمة الائتمان (EGP)</TableHead>
@@ -587,6 +611,11 @@ const Customers = () => {
                     <TableCell className="text-center align-middle">
                       <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-emerald-50 dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-700">
                         <CustomerPointsCell customerId={customer.id} />
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center align-middle">
+                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-yellow-50 dark:bg-zinc-800 text-yellow-700 dark:text-yellow-300 font-bold border border-yellow-200 dark:border-yellow-700">
+                        {formatNumberEn(customer.openingBalance)} ج.م
                       </span>
                     </TableCell>
                     <TableCell className="text-center align-middle">
@@ -745,9 +774,24 @@ const Customers = () => {
                 type="number"
                 value={newCustomer.creditBalance}
                 onChange={(e) => {
-                  // Always store as number, but display as English digits only
                   const val = e.target.value.replace(/[^0-9.\-]/g, '');
                   setNewCustomer({ ...newCustomer, creditBalance: val === '' ? '' : Number(val) });
+                }}
+                className="mt-1 text-left ltr"
+                inputMode="decimal"
+                pattern="[0-9]*"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="openingBalance">الرصيد الافتتاحي (ج.م)</Label>
+              <Input
+                id="openingBalance"
+                type="number"
+                value={newCustomer.openingBalance}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9.\-]/g, '');
+                  setNewCustomer({ ...newCustomer, openingBalance: val === '' ? '' : Number(val) });
                 }}
                 className="mt-1 text-left ltr"
                 inputMode="decimal"

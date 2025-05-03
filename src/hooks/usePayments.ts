@@ -62,6 +62,7 @@ export function usePayments() {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       
       // تحديث رصيد العميل بشكل لحظي بعد الدفع
+      // تحديث رصيد العميل بشكل لحظي بعد الدفع
       await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
       
       toast({

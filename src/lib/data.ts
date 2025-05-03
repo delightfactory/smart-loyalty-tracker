@@ -128,6 +128,7 @@ export const customers: Customer[] = [
     pointsRedeemed: 300,
     currentPoints: 900,
     creditBalance: 0,
+    openingBalance: 0,
     classification: 4, // Purchases from 4 categories
     level: 1 // Top customer
   },
@@ -141,6 +142,7 @@ export const customers: Customer[] = [
     pointsRedeemed: 150,
     currentPoints: 700,
     creditBalance: 500,
+    openingBalance: 0,
     classification: 3, // Purchases from 3 categories
     level: 2
   },
@@ -154,6 +156,7 @@ export const customers: Customer[] = [
     pointsRedeemed: 100,
     currentPoints: 400,
     creditBalance: 200,
+    openingBalance: 0,
     classification: 2, // Purchases from 2 categories
     level: 3
   },
@@ -167,6 +170,7 @@ export const customers: Customer[] = [
     pointsRedeemed: 500,
     currentPoints: 1300,
     creditBalance: 800,
+    openingBalance: 0,
     classification: 5, // Purchases from all 5 categories
     level: 4
   },
@@ -180,6 +184,7 @@ export const customers: Customer[] = [
     pointsRedeemed: 0,
     currentPoints: 350,
     creditBalance: 100,
+    openingBalance: 0,
     classification: 1, // Purchases from 1 category
     level: 5
   },
@@ -617,7 +622,7 @@ const updateCustomerCreditBalance = (customerId: string): void => {
     totalAmountDue += (invoice.totalAmount - totalPaidForInvoice);
   }
   
-  // Update customer credit balance
-  customer.creditBalance = totalAmountDue;
+  // Update customer credit balance including opening balance
+  customer.creditBalance = totalAmountDue + (customer.openingBalance ?? 0);
   updateCustomer(customer);
 };

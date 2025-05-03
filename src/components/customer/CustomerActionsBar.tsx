@@ -57,7 +57,7 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate(`/payments/new?customerId=${customer.id}`)}
+          onClick={() => navigate(`/create-payment/${customer.id}`)}
           className="flex items-center"
         >
           <CreditCard className="ml-2 h-4 w-4" />
