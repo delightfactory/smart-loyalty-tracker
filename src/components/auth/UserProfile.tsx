@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { updateUserProfile } from '@/services/users-api';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole, convertRolesToUserRoles, isUserRoleArray } from '@/lib/auth-types';
-import { Role } from '@/lib/auth-rbac-types'; // Add this import for Role type
+import { Role } from '@/lib/auth-rbac-types'; // استيراد نوع Role
 
 export const UserProfile = () => {
   const { profile, user } = useAuth();
@@ -32,7 +32,7 @@ export const UserProfile = () => {
     if (!profile) return;
     
     try {
-      // Convert Role[] to UserRole[] when updating the profile
+      // تحويل Role[] إلى UserRole[] عند تحديث الملف الشخصي
       const userRoles: UserRole[] = profile.roles ? 
         (isUserRoleArray(profile.roles) ? 
           profile.roles as UserRole[] : 
@@ -45,9 +45,9 @@ export const UserProfile = () => {
         email: profile.email || user?.email || '',
         phone: formData.phone,
         position: formData.position,
-        avatarUrl: formData.avatarUrl,
+        avatarUrl: formData.avatarUrl, // تم إضافة avatarUrl
         roles: userRoles,
-        customPermissions: []
+        customPermissions: profile.customPermissions || []
       });
       
       toast({

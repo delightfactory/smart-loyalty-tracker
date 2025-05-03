@@ -103,7 +103,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         email: user.email || '',
         phone: values.phone || null,
         position: values.position || null,
-        avatarUrl: user.avatarUrl, // Pass along the existing avatarUrl
+        avatarUrl: user.avatarUrl, // تمرير avatarUrl الحالي
         roles: userRoles,
         customPermissions: values.customPermissions
       });

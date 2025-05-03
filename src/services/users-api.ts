@@ -1,6 +1,7 @@
+
 import { getAllUsersWithRoles, createUser as createUserReal, updateUser as updateUserReal, deleteUser as deleteUserReal } from './users';
 import { setPermissionsForUser, setRolesForUser } from './roles-permissions-api';
-import { UserRole, UserProfile } from '@/lib/auth-types';
+import { UserRole, UserProfile, UpdateUserParams } from '@/lib/auth-types';
 
 // جلب كل المستخدمين مع أدوارهم من Supabase
 export const getAllUsers = async (): Promise<UserProfile[]> => {
@@ -43,16 +44,7 @@ export const createUser = async (userData: {
 };
 
 // تحديث مستخدم شاملاً تحديث الأدوار والصلاحيات الفردية
-export const updateUserProfile = async (profile: {
-  id: string;
-  fullName: string;
-  email: string;
-  roles: UserRole[];
-  customPermissions?: string[];
-  phone?: string | null;
-  position?: string | null;
-  avatarUrl?: string | null; // Added avatarUrl property
-}): Promise<UserProfile> => {
+export const updateUserProfile = async (profile: UpdateUserParams): Promise<UserProfile> => {
   // إعداد كائن التحديث فقط بالحقول الموجودة فعليًا في جدول profiles
   const updateObj: any = {
     full_name: profile.fullName,
@@ -60,7 +52,7 @@ export const updateUserProfile = async (profile: {
   };
   if (profile.phone !== undefined) updateObj.phone = profile.phone;
   if (profile.position !== undefined) updateObj.position = profile.position;
-  if (profile.avatarUrl !== undefined) updateObj.avatar_url = profile.avatarUrl; // Added avatarUrl update
+  if (profile.avatarUrl !== undefined) updateObj.avatar_url = profile.avatarUrl; // تم إضافة avatarUrl
   if (profile.customPermissions !== undefined) updateObj.custom_permissions = profile.customPermissions;
 
   // تحديث بيانات المستخدم في جدول profiles

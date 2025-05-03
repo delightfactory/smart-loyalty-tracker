@@ -46,6 +46,18 @@ export interface CreateUserParams {
   roles: UserRole[];
 }
 
+// Update User Interface
+export interface UpdateUserParams {
+  id: string;
+  fullName: string;
+  email: string;
+  roles: UserRole[];
+  customPermissions?: string[];
+  phone?: string | null;
+  position?: string | null;
+  avatarUrl?: string | null; // إضافة خاصية avatarUrl
+}
+
 // Helper function to check if roles array contains UserRole or Role objects
 export function isUserRoleArray(roles: UserRole[] | Role[]): roles is UserRole[] {
   return roles.length === 0 || typeof roles[0] === 'string' || !('id' in roles[0]);
