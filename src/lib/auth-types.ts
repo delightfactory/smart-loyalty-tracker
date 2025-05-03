@@ -1,4 +1,3 @@
-
 // User Roles Enum
 export enum UserRole {
   ADMIN = "admin",
@@ -19,6 +18,7 @@ export interface UserProfile {
   roles: UserRole[];
   createdAt?: string;
   lastSignInAt?: string | null;
+  customPermissions?: string[]; // صلاحيات مخصصة لكل مستخدم
 }
 
 // Auth State Interface

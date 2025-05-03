@@ -70,12 +70,14 @@ export const createUser = async (fullName: string, email: string, role: string, 
   return profile;
 };
 
-// جلب جميع المستخدمين مع أدوارهم
-export const getAllUsersWithRoles = async () => {
-  // جلب كل المستخدمين
-  const { data: users, error: usersError } = await supabase
-    .from('profiles')
-    .select('*');
+// جلب جميع المستخدمين مع أدوارهم وصلاحياتهم المخصصة
+export const getAllUsersWithRoles = async (userId?: string) => {
+  // جلب كل المستخدمين أو مستخدم واحد فقط
+  let query = supabase.from('profiles').select('*');
+  if (userId) {
+    query = query.eq('id', userId);
+  }
+  const { data: users, error: usersError } = await query;
   if (usersError) throw usersError;
 
   // جلب كل user_roles
@@ -91,22 +93,47 @@ export const getAllUsersWithRoles = async () => {
   if (rolesError) throw rolesError;
 
   // دمج البيانات
-  return users.map((user: any) => {
+  const usersArr = Array.isArray(users) ? users : [users].filter(Boolean);
+  const result = usersArr.map((user: any) => {
+    if (!user) return null;
     const userRoleLinks = userRoles.filter((ur: any) => ur.user_id === user.id);
     const userRoleNames = userRoleLinks.map((ur: any) => {
       const role = roles.find((r: any) => r.id === ur.role_id);
       return role ? role.name : null;
     }).filter(Boolean);
-    // ضمان وجود خاصية roles دائمًا
-    return { ...user, roles: userRoleNames.length > 0 ? userRoleNames : [] };
-  });
+    // ضمان وجود خاصية roles
+    return {
+      ...user,
+      roles: userRoleNames.length > 0 ? userRoleNames : [],
+      // لا تعتمد على custom_permissions إذا لم يكن العمود موجودًا
+    };
+  }).filter(Boolean);
+  return userId ? result[0] : result;
 };
 
-// تحديث بيانات مستخدم
+// تحديث بيانات مستخدم مع دعم custom_permissions
 export const updateUser = async (userId: string, updates: any) => {
+  // السماح فقط بالحقول المسموحة في جدول profiles
+  const allowedFields = [
+    'full_name',
+    'email',
+    'avatar_url',
+    'phone',
+    'position',
+    'custom_permissions',
+    'updated_at'
+  ];
+  const filteredUpdates: Record<string, any> = {};
+  for (const key of Object.keys(updates)) {
+    if (allowedFields.includes(key)) {
+      filteredUpdates[key] = updates[key];
+    }
+  }
+  filteredUpdates['updated_at'] = new Date().toISOString();
+
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(filteredUpdates)
     .eq('id', userId)
     .select()
     .maybeSingle();
@@ -116,10 +143,17 @@ export const updateUser = async (userId: string, updates: any) => {
 
 // حذف مستخدم
 export const deleteUser = async (userId: string) => {
+  // حذف كل علاقات المستخدم
+  await supabase.from('user_roles').delete().eq('user_id', userId);
+  await supabase.from('user_permissions').delete().eq('user_id', userId);
+  // حذف من جدول profiles
   const { error } = await supabase
     .from('profiles')
     .delete()
     .eq('id', userId);
   if (error) throw error;
+  // حذف من جدول Auth (Supabase)
+  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+  if (authError) throw authError;
   return true;
 };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { UserRole } from '@/lib/auth-types';
 import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users-api';
+import { ROLES_PERMISSIONS, Permission } from '@/lib/roles-permissions';
 
 // تحديد نموذج بيانات المستخدم للتعديل
 const userEditFormSchema = z.object({
@@ -20,6 +20,7 @@ const userEditFormSchema = z.object({
   phone: z.string().optional(),
   position: z.string().optional(),
   roles: z.array(z.string()).min(1, { message: 'يجب اختيار صلاحية واحدة على الأقل' }),
+  customPermissions: z.array(z.string()).optional(),
 });
 
 type UserEditFormValues = z.infer<typeof userEditFormSchema>;
@@ -41,6 +42,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       phone: '',
       position: '',
       roles: [UserRole.USER],
+      customPermissions: [],
     },
   });
   
@@ -52,6 +54,11 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     { id: UserRole.SALES, label: 'مبيعات' },
     { id: UserRole.USER, label: 'مستخدم عادي' },
   ];
+  
+  // جميع الصلاحيات المتاحة من جميع الأدوار
+  const allPermissions: Permission[] = Array.from(
+    new Set(Object.values(ROLES_PERMISSIONS).flat())
+  );
   
   // جلب بيانات المستخدم
   const { data: user, isLoading } = useQuery({
@@ -68,6 +75,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         phone: user.phone || '',
         position: user.position || '',
         roles: user.roles || [UserRole.USER],
+        customPermissions: user.customPermissions || [],
       });
     }
   }, [user, form]);
@@ -85,7 +93,8 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       
       // تحديث الصلاحيات
       const userRoles = values.roles.map(role => role as UserRole);
-      await updateUserRoles(userId, userRoles);
+      const customPermissions = values.customPermissions || [];
+      await updateUserRoles(userId, userRoles, customPermissions);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -203,6 +212,35 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                             )
                           }}
                         />
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="customPermissions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>صلاحيات إضافية مخصصة لهذا المستخدم</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {allPermissions.map((perm) => (
+                        <label key={perm} className="flex items-center gap-1">
+                          <Checkbox
+                            checked={field.value?.includes(perm) || false}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), perm]);
+                              } else {
+                                field.onChange((field.value || []).filter((p: string) => p !== perm));
+                              }
+                            }}
+                            id={`perm-${perm}`}
+                          />
+                          <span>{perm}</span>
+                        </label>
                       ))}
                     </div>
                     <FormMessage />

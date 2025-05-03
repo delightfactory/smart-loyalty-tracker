@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -16,10 +15,12 @@ import { AddUserDialog } from './AddUserDialog';
 import { EditUserDialog } from './EditUserDialog';
 import { DeleteUserDialog } from './DeleteUserDialog';
 import { formatDate } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 export function UsersList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
@@ -92,10 +93,12 @@ export function UsersList() {
             className="pl-8"
           />
         </div>
-        <Button onClick={() => setIsAddUserOpen(true)}>
-          <Plus className="ml-2 h-4 w-4" />
-          إضافة مستخدم جديد
-        </Button>
+        {hasPermission('manage_users') && (
+          <Button onClick={() => setIsAddUserOpen(true)}>
+            <Plus className="ml-2 h-4 w-4" />
+            إضافة مستخدم جديد
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -141,31 +144,33 @@ export function UsersList() {
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell>{user.lastSignInAt ? formatDate(user.lastSignInAt) : 'لم يسجل الدخول بعد'}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setEditUserId(user.id)}
-                        title="تعديل المستخدم"
-                      >
-                        <UserCog className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setDeleteUserId(user.id)}
-                        className="text-destructive"
-                        title="حذف المستخدم"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2">
-                          <path d="M3 6h18"></path>
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                          <line x1="10" x2="10" y1="11" y2="17"></line>
-                          <line x1="14" x2="14" y1="11" y2="17"></line>
-                        </svg>
-                      </Button>
-                    </div>
+                    {hasPermission('manage_users') && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setEditUserId(user.id)}
+                          title="تعديل المستخدم"
+                        >
+                          <UserCog className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setDeleteUserId(user.id)}
+                          className="text-destructive"
+                          title="حذف المستخدم"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trash-2">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            <line x1="10" x2="10" y1="11" y2="17"></line>
+                            <line x1="14" x2="14" y1="11" y2="17"></line>
+                          </svg>
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
