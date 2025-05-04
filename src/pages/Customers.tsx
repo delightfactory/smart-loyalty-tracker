@@ -566,7 +566,6 @@ const Customers = () => {
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المحافظة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المدينة</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">النقاط الحالية</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">الرصيد الافتتاحي</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">رصيد العميل</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">مدة الائتمان (يوم)</TableHead>
                 <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">قيمة الائتمان (EGP)</TableHead>
@@ -578,7 +577,7 @@ const Customers = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={13} className="h-24 text-center">
+                  <TableCell colSpan={12} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Loader2 className="h-10 w-10 animate-spin" />
                       <p>جاري تحميل البيانات...</p>
@@ -611,11 +610,6 @@ const Customers = () => {
                     <TableCell className="text-center align-middle">
                       <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-emerald-50 dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-700">
                         <CustomerPointsCell customerId={customer.id} />
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center align-middle">
-                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-yellow-50 dark:bg-zinc-800 text-yellow-700 dark:text-yellow-300 font-bold border border-yellow-200 dark:border-yellow-700">
-                        {formatNumberEn(customer.openingBalance)} ج.م
                       </span>
                     </TableCell>
                     <TableCell className="text-center align-middle">
@@ -672,7 +666,7 @@ const Customers = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={13} className="h-24 text-center">
+                  <TableCell colSpan={12} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground dark:text-zinc-400">
                       <Users className="h-10 w-10 mb-2" />
                       <p>لا يوجد عملاء</p>

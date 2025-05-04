@@ -1,4 +1,3 @@
-
 import { 
   Card, 
   CardContent, 
@@ -16,6 +15,10 @@ import {
 } from '@/components/ui/table';
 import { Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
+import { useCustomers } from '@/hooks/useCustomers';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
 
 interface CustomersListProps {
   customers: Customer[];
@@ -25,15 +28,42 @@ const formatNumberEn = (num: number) => {
   return num.toLocaleString('en-US');
 };
 
-// Calculate the current balance considering all factors
-const calculateCurrentBalance = (customer: Customer) => {
-  // Opening balance is always included as is
-  const openingBalance = customer.openingBalance ?? 0;
-  // Credit balance comes from unpaid/partially paid invoices
-  const creditBalance = customer.creditBalance ?? 0;
-  
-  // Return the total balance
-  return openingBalance + creditBalance;
+function calculateCustomerNetTransactions(invoices: any[], payments: any[]): number {
+  const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
+  const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const creditInvoiceIds = creditInvoices.map(inv => inv.id);
+  const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
+  const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  return totalCreditInvoices - totalPayments;
+}
+
+const CustomerBalanceCell = ({ customerId }: { customerId: string }) => {
+  const { getAll } = useCustomers();
+  const { data: customersData = [] } = getAll;
+  const openingBalance = customersData.find(c => c.id === customerId)?.openingBalance ?? 0;
+  const { getByCustomerId: getInvoices } = useInvoices();
+  const { getByCustomerId: getPayments } = usePayments();
+  const invoicesQuery = getInvoices(customerId);
+  const paymentsQuery = getPayments(customerId);
+
+  const { total } = useMemo(() => {
+    const invoices = invoicesQuery.data || [];
+    const payments = paymentsQuery.data || [];
+    const net = calculateCustomerNetTransactions(invoices, payments);
+    return { total: openingBalance + net };
+  }, [invoicesQuery.data, paymentsQuery.data, openingBalance]);
+
+  if (invoicesQuery.isLoading || paymentsQuery.isLoading || customersData.length === 0) {
+    return <span className="text-muted-foreground">...</span>;
+  }
+  if (invoicesQuery.isError || paymentsQuery.isError) {
+    return <span className="text-destructive">خطأ</span>;
+  }
+  return (
+    <span className="font-bold text-base text-right">
+      <span className="text-gray-700">رصيد العميل:</span> {formatNumberEn(total)} ج.م
+    </span>
+  );
 };
 
 const CustomersList = ({ customers }: CustomersListProps) => {
@@ -52,7 +82,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
               <TableHead>المنطقة</TableHead>
               <TableHead>مدة الائتمان (يوم)</TableHead>
               <TableHead>قيمة الائتمان (EGP)</TableHead>
-              <TableHead>الرصيد الحالي (EGP)</TableHead>
+              <TableHead>رصيد العميل</TableHead>
               <TableHead>...</TableHead>
             </TableRow>
           </TableHeader>
@@ -65,7 +95,7 @@ const CustomersList = ({ customers }: CustomersListProps) => {
                 <TableCell>{customer.region}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_period ?? 0)}</TableCell>
                 <TableCell>{formatNumberEn(customer.credit_limit ?? 0)}</TableCell>
-                <TableCell>{formatNumberEn(calculateCurrentBalance(customer))}</TableCell>
+                <TableCell><CustomerBalanceCell customerId={customer.id} /></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className={cn(
