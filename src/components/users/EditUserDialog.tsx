@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import UserForm from './UserForm';
 import UserRolesForm from './UserRolesForm';
+import UserPermissionsForm from './UserPermissionsForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface EditUserDialogProps {
@@ -43,14 +44,14 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       }
     };
 
-    if (isOpen) {
+    if (isOpen && userId) {
       fetchUser();
     }
   }, [userId, isOpen, toast]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: (profile: { id: string; fullName: string; phone?: string | null; position?: string | null }) => 
-      updateUserProfile(profile),
+    mutationFn: async (profile: { id: string; fullName: string; phone?: string | null; position?: string | null }) => 
+      await updateUserProfile(profile),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', userId] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -63,13 +64,10 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         description: error.message,
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
   });
 
   const updateRolesMutation = useMutation({
-    mutationFn: (roles: UserRole[]) => updateUserRoles(userId, roles),
+    mutationFn: async (roles: UserRole[]) => await updateUserRoles(userId, roles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', userId] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -82,9 +80,6 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         description: error.message,
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
   });
 
   const handleProfileUpdate = async (profileData: { fullName: string; phone?: string | null; position?: string | null }) => {
@@ -95,6 +90,12 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   const handleRolesUpdate = async (roles: UserRole[]) => {
     setUserRoles(roles);
     await updateRolesMutation.mutateAsync(roles);
+  };
+
+  const handlePermissionsUpdated = () => {
+    queryClient.invalidateQueries({ queryKey: ['users', userId] });
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+    queryClient.invalidateQueries({ queryKey: ['permissions'] });
   };
 
   if (!isOpen) return null;
@@ -113,12 +114,13 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
           </div>
         ) : user ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-              <TabsTrigger value="roles">الصلاحيات</TabsTrigger>
+              <TabsTrigger value="roles">الأدوار</TabsTrigger>
+              <TabsTrigger value="permissions">الصلاحيات المباشرة</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="profile">
+            <TabsContent value="profile" className="space-y-4">
               <UserForm
                 user={user}
                 onSubmit={handleProfileUpdate}
@@ -126,12 +128,19 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
               />
             </TabsContent>
 
-            <TabsContent value="roles">
+            <TabsContent value="roles" className="space-y-4">
               <UserRolesForm
                 userId={userId}
                 initialRoles={user.roles}
                 onChange={handleRolesUpdate}
                 isLoading={updateRolesMutation.isPending}
+              />
+            </TabsContent>
+            
+            <TabsContent value="permissions" className="space-y-4">
+              <UserPermissionsForm 
+                userId={userId}
+                onSuccess={handlePermissionsUpdated}
               />
             </TabsContent>
           </Tabs>

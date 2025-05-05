@@ -10,7 +10,14 @@ const UsersPage = () => {
   const { hasRole } = useAuth();
   
   // Subscribe to realtime updates for user-related tables
-  useRealtimeSubscription(['profiles', 'user_roles', 'roles']);
+  useRealtimeSubscription([
+    'profiles', 
+    'user_roles', 
+    'roles', 
+    'permissions', 
+    'user_permissions',
+    'role_permissions'
+  ]);
 
   // التحقق من صلاحيات المستخدم للوصول إلى هذه الصفحة
   if (!hasRole(UserRole.ADMIN)) {
@@ -18,7 +25,10 @@ const UsersPage = () => {
   }
 
   return (
-    <PageContainer title="إدارة المستخدمين" subtitle="إدارة مستخدمي النظام وصلاحياتهم">
+    <PageContainer 
+      title="إدارة المستخدمين" 
+      subtitle="إدارة مستخدمي النظام وصلاحياتهم"
+    >
       <UsersManagement />
     </PageContainer>
   );
