@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -11,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { updateCurrentUserPassword } from '@/services/users-api';
 
 // تعريف نموذج تحديث كلمة المرور
 const passwordFormSchema = z
@@ -35,7 +33,7 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 export function SecuritySettingsTab() {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, updatePassword } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // تهيئة نموذج تحديث كلمة المرور
@@ -53,7 +51,7 @@ export function SecuritySettingsTab() {
     mutationFn: async (data: PasswordFormValues) => {
       setIsLoading(true);
       try {
-        await updateCurrentUserPassword(data.currentPassword, data.newPassword);
+        await updatePassword(data.currentPassword, data.newPassword);
       } finally {
         setIsLoading(false);
       }
