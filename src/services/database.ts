@@ -844,10 +844,15 @@ export const redemptionsService = {
     }
     
     if (items.length > 0) {
-      const redemptionItems = items.map(item => ({
-        ...appRedemptionItemToDbRedemptionItem(item),
-        redemption_id: redemptionId
-      }));
+      const redemptionItems = items.map(item => {
+        // استبعاد id لاستخدام التسلسل الافتراضي أو التحكّم في توليده
+        const dbItem = appRedemptionItemToDbRedemptionItem(item);
+        const { id: _ignoreId, ...dbFields } = dbItem;
+        return {
+          ...dbFields,
+          redemption_id: redemptionId
+        };
+      });
       
       const { error: itemsError } = await supabase
         .from('redemption_items')
@@ -877,10 +882,36 @@ export const redemptionsService = {
       throw error;
     }
     
-    return dbRedemptionToAppRedemption({
-      ...data,
-      items: redemption.items
-    });
+    // حذف أصناف الاستبدال القديمة
+    const { error: deleteError } = await supabase
+      .from('redemption_items')
+      .delete()
+      .eq('redemption_id', redemption.id);
+    if (deleteError) {
+      console.error(`Error deleting old redemption items for ${redemption.id}:`, deleteError);
+      throw deleteError;
+    }
+    // إضافة أصناف الاستبدال الجديدة
+    if (redemption.items && redemption.items.length > 0) {
+      const newItems = redemption.items.map(item => {
+        // استبعاد id لاستخدام التسلسل الافتراضي أو التحكّم في توليده
+        const dbItem = appRedemptionItemToDbRedemptionItem(item);
+        const { id: _ignoreId, ...dbFields } = dbItem;
+        return {
+          ...dbFields,
+          redemption_id: redemption.id
+        };
+      });
+      const { error: insertError } = await supabase
+        .from('redemption_items')
+        .insert(newItems);
+      if (insertError) {
+        console.error(`Error inserting new redemption items for ${redemption.id}:`, insertError);
+        throw insertError;
+      }
+    }
+    // إعادة جلب الاستبدال مع الأصناف المحدثة
+    return this.getById(redemption.id);
   },
   
   async delete(id: string): Promise<void> {

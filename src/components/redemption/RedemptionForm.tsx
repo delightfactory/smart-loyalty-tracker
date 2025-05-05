@@ -115,6 +115,7 @@ const RedemptionForm = ({
   };
   
   const addRedemptionItem = () => {
+    // تأكد من اختيار منتج وتحديد الكمية
     if (!newRedemptionItem.productId || !newRedemptionItem.quantity) {
       toast({
         title: "خطأ",
@@ -139,26 +140,32 @@ const RedemptionForm = ({
       }
     }
     
+    // إنشاء عنصر جديد
     const item: RedemptionItem = {
       productId: newRedemptionItem.productId || '',
       quantity: newRedemptionItem.quantity || 1,
       pointsRequired: newRedemptionItem.pointsRequired || 0,
       totalPointsRequired: newRedemptionItem.totalPointsRequired || 0
     };
-    
-    setRedemptionItems([...redemptionItems, item]);
-    
-    setNewRedemptionItem({
-      productId: '',
-      quantity: 1,
-      pointsRequired: 0,
-      totalPointsRequired: 0
-    });
-    
-    toast({
-      title: "تمت الإضافة",
-      description: "تم إضافة المنتج إلى القائمة بنجاح",
-    });
+    // دمج الكمية إذا كان المنتج موجوداً مسبقاً
+    const existingIndex = redemptionItems.findIndex(i => i.productId === item.productId);
+    let updatedItems: RedemptionItem[];
+    if (existingIndex >= 0) {
+      const existing = redemptionItems[existingIndex];
+      const mergedQty = existing.quantity + item.quantity;
+      updatedItems = redemptionItems.map((i, idx) =>
+        idx === existingIndex
+          ? { ...i, quantity: mergedQty, totalPointsRequired: i.pointsRequired * mergedQty }
+          : i
+      );
+      toast({ title: "تم تحديث الكمية", description: "تم تعديل كمية المنتج الموجود مسبقاً", variant: "default" });
+    } else {
+      updatedItems = [...redemptionItems, item];
+      toast({ title: "تمت الإضافة", description: "تم إضافة المنتج إلى القائمة بنجاح", variant: "default" });
+    }
+    setRedemptionItems(updatedItems);
+    // إعادة تعيين الحقول
+    setNewRedemptionItem({ productId: '', quantity: 1, pointsRequired: 0, totalPointsRequired: 0 });
   };
   
   const removeRedemptionItem = (index: number) => {
@@ -170,6 +177,15 @@ const RedemptionForm = ({
       title: "تم الحذف",
       description: "تم حذف المنتج من القائمة بنجاح",
     });
+  };
+
+  const handleItemQuantityChange = (index: number, quantity: number) => {
+    const updated = redemptionItems.map((item, idx) =>
+      idx === index
+        ? { ...item, quantity, totalPointsRequired: item.pointsRequired * quantity }
+        : item
+    );
+    setRedemptionItems(updated);
   };
 
   // تأكد من أن لدينا منتجات متاحة للاستبدال
@@ -305,6 +321,7 @@ const RedemptionForm = ({
       <RedemptionItemsList 
         redemptionItems={redemptionItems} 
         onRemoveItem={removeRedemptionItem}
+        onQuantityChange={handleItemQuantityChange}
         products={products}
         numberFormat="en-US"
       />

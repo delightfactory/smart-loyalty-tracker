@@ -111,20 +111,16 @@ const EditRedemption = () => {
       });
       return;
     }
-    const customerCurrentPoints = Number(customer.currentPoints) || 0;
+    // حساب نقاط التعديل: إضافة النقاط المخصومة قديمًا للتحقق من الرصيد الفعلي
+    const currentPoints = Number(customer.currentPoints) || 0;
     const oldTotalPoints = Number(redemption.totalPointsRedeemed) || 0;
+    const effectiveCurrentPoints = currentPoints + oldTotalPoints;
     const newTotalPoints = totalRedemptionPoints;
-    // 1. If decreasing, refund difference
-    // 2. If increasing, check if customer has enough points
-    let allowed = true;
-    let diff = newTotalPoints - oldTotalPoints;
-    if (diff > 0 && diff > customerCurrentPoints) {
-      allowed = false;
-    }
-    if (!allowed) {
+    const diff = newTotalPoints - oldTotalPoints;
+    if (diff > effectiveCurrentPoints) {
       toast({
         title: "نقاط غير كافية",
-        description: `النقاط المتاحة للعميل (${customerCurrentPoints}) أقل من الزيادة المطلوبة (${diff})` ,
+        description: `رصيد العميل ${effectiveCurrentPoints} أقل من الزيادة المطلوبة ${diff}`,
         variant: "destructive"
       });
       return;
@@ -134,8 +130,8 @@ const EditRedemption = () => {
       ...redemption,
       items: redemptionItems,
       totalPointsRedeemed: newTotalPoints,
-      status: RedemptionStatus.PENDING // or keep as before
-    };
+      status: redemption.status // الحفاظ على الحالة الحالية بعد التعديل
+    } as Redemption;
     updateRedemption.mutate(updatedRedemption, {
       onSuccess: () => {
         setSubmitting(false);
@@ -188,6 +184,16 @@ const EditRedemption = () => {
     );
   }
 
+  // إعداد بيانات العميل للملخص مع الرصيد الفعلي عند التعديل
+  const oldTotalPoints = Number(redemption.totalPointsRedeemed) || 0;
+  const effectiveCurrentPoints = (Number(customer.currentPoints) || 0) + oldTotalPoints;
+  const summaryCustomer: Customer = {
+    ...customer,
+    currentPoints: effectiveCurrentPoints,
+    pointsRedeemed: (Number(customer.pointsRedeemed) || 0) - oldTotalPoints,
+  } as Customer;
+  const diff = totalRedemptionPoints - oldTotalPoints;
+
   return (
     <PageContainer 
       title="تعديل الاستبدال" 
@@ -210,7 +216,7 @@ const EditRedemption = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <RedemptionForm
-            customer={customer}
+            customer={summaryCustomer}
             selectedCustomerId={selectedCustomerId}
             redemptionItems={redemptionItems}
             setRedemptionItems={setRedemptionItems}
@@ -230,13 +236,12 @@ const EditRedemption = () => {
             </CardHeader>
             <CardContent>
               <RedemptionSummary
-                customer={customer}
+                customer={summaryCustomer}
                 totalRedemptionPoints={totalRedemptionPoints}
                 onConfirm={handleUpdateRedemption}
                 disableConfirm={
-                  !customer ||
                   redemptionItems.length === 0 ||
-                  (totalRedemptionPoints - (Number(redemption.totalPointsRedeemed) || 0) > (Number(customer.currentPoints) || 0)) ||
+                  diff > effectiveCurrentPoints ||
                   hasUnpaidInvoices() ||
                   submitting
                 }

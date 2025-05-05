@@ -2,10 +2,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { RedemptionItem, Product } from '@/lib/types';
 import { Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface RedemptionItemsListProps {
   redemptionItems: RedemptionItem[];
   onRemoveItem: (index: number) => void;
+  onQuantityChange: (index: number, quantity: number) => void;
   products: Product[];
   numberFormat?: string;
 }
@@ -13,6 +15,7 @@ interface RedemptionItemsListProps {
 const RedemptionItemsList = ({ 
   redemptionItems, 
   onRemoveItem,
+  onQuantityChange,
   products,
   numberFormat = 'en-US'
 }: RedemptionItemsListProps) => {
@@ -52,7 +55,15 @@ const RedemptionItemsList = ({
           {redemptionItems.map((item, index) => (
             <TableRow key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800">
               <TableCell className="font-medium text-gray-900 dark:text-gray-100">{getProductName(item.productId)}</TableCell>
-              <TableCell className="text-center text-blue-900 dark:text-blue-300">{Number(item.quantity).toLocaleString(numberFormat)}</TableCell>
+              <TableCell className="text-center">
+                <Input
+                  type="number"
+                  min={1}
+                  value={item.quantity}
+                  onChange={e => onQuantityChange(index, Number(e.target.value))}
+                  className="w-16 text-center"
+                />
+              </TableCell>
               <TableCell className="text-center text-amber-700 dark:text-amber-300">{Number(item.pointsRequired).toLocaleString(numberFormat)}</TableCell>
               <TableCell className="text-center font-medium text-green-800 dark:text-green-300">{Number(item.totalPointsRequired).toLocaleString(numberFormat)}</TableCell>
               <TableCell>
