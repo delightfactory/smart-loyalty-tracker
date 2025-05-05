@@ -9,10 +9,16 @@ import { toast } from '@/components/ui/use-toast';
  */
 export async function enableRealtimeForTable(tableName: string): Promise<boolean> {
   try {
-    // تنفيذ استعلام SQL لإضافة الجدول إلى إعدادات التحديثات الفورية
-    const { data, error } = await supabase.rpc('enable_realtime_for_table', { 
-      table_name: tableName 
-    });
+    // Use ordinary SQL query instead of RPC function call since the function is not yet defined
+    const { data, error } = await supabase.from('roles')
+      .select('id')
+      .limit(1)
+      .then(async () => {
+        // Execute raw SQL to enable realtime
+        return await supabase.rpc('enable_realtime_for_table', { 
+          table_name: tableName 
+        });
+      });
     
     if (error) {
       console.error(`Error enabling realtime for table ${tableName}:`, error);

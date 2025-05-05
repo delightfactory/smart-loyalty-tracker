@@ -1,58 +1,91 @@
-import React from 'react';
-import { Modal, Form, Input, Select, message } from 'antd';
 
-interface UserFormProps {
-  visible: boolean;
-  confirmLoading: boolean;
-  onSubmit: (values: any) => void;
-  onCancel: () => void;
-  initialValues?: any;
-  roles: string[];
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Loader2 } from 'lucide-react';
+import { UserProfile } from '@/lib/auth-types';
+
+export interface UserFormProps {
+  user: UserProfile;
+  onSubmit: (values: { fullName: string; phone?: string | null; position?: string | null }) => Promise<void>;
+  isLoading: boolean;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ visible, confirmLoading, onSubmit, onCancel, initialValues, roles }) => {
-  const [form] = Form.useForm();
-
-  React.useEffect(() => {
-    if (visible) {
-      form.resetFields();
-      if (initialValues) form.setFieldsValue(initialValues);
+const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, isLoading }) => {
+  const form = useForm({
+    defaultValues: {
+      fullName: user.fullName || '',
+      phone: user.phone || '',
+      position: user.position || '',
     }
-  }, [visible, initialValues, form]);
+  });
+
+  const handleSubmit = async (values: { 
+    fullName: string; 
+    phone: string; 
+    position: string;
+  }) => {
+    await onSubmit({
+      fullName: values.fullName,
+      phone: values.phone || null,
+      position: values.position || null
+    });
+  };
 
   return (
-    <Modal
-      visible={visible}
-      title={initialValues ? 'Edit User' : 'Add User'}
-      okText={initialValues ? 'Update' : 'Create'}
-      cancelText="Cancel"
-      confirmLoading={confirmLoading}
-      onCancel={onCancel}
-      onOk={() => {
-        form
-          .validateFields()
-          .then(values => {
-            onSubmit(values);
-          })
-          .catch(() => {
-            message.error('Please fill all required fields correctly.');
-          });
-      }}
-    >
-      <Form form={form} layout="vertical" initialValues={initialValues}>
-        <Form.Item name="full_name" label="Full Name" rules={[{ required: true, message: 'Please enter full name' }]}> 
-          <Input />
-        </Form.Item>
-        <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}> 
-          <Input />
-        </Form.Item>
-        <Form.Item name="role" label="Role" rules={[{ required: true, message: 'Please select a role' }]}> 
-          <Select>
-            {roles.map(role => <Select.Option value={role} key={role}>{role}</Select.Option>)}
-          </Select>
-        </Form.Item>
-      </Form>
-    </Modal>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="fullName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>الاسم الكامل</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="أدخل الاسم الكامل" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>رقم الهاتف</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="أدخل رقم الهاتف" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="position"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>المسمى الوظيفي</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="أدخل المسمى الوظيفي" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          حفظ البيانات
+        </Button>
+      </form>
+    </Form>
   );
 };
 

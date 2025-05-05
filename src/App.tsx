@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/hooks/useAuth';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { ThemeProvider } from '@/components/ui/theme-provider';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import FloatingQuickActions from '@/components/FloatingQuickActions';
 import { useAuthSync } from './hooks/useAuthSync';
 

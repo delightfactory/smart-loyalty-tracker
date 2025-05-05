@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateUserProfile, getUserById, updateUserRoles } from '@/services/users-api';
 import { UserProfile, UserRole } from '@/lib/auth-types';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -47,7 +48,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     }
   }, [userId, isOpen, toast]);
 
-  const updateProfileMutation = useMutation(updateUserProfile, {
+  const updateProfileMutation = useMutation({
+    mutationFn: (profile: { id: string; fullName: string; phone?: string | null; position?: string | null }) => 
+      updateUserProfile(profile),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', userId] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -65,26 +68,24 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     },
   });
 
-  const updateRolesMutation = useMutation(
-    () => updateUserRoles(userId, userRoles),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['users', userId] });
-        queryClient.invalidateQueries({ queryKey: ['users'] });
-        toast({ title: 'تم تحديث صلاحيات المستخدم بنجاح' });
-      },
-      onError: (error: any) => {
-        toast({
-          variant: 'destructive',
-          title: 'Error updating user roles',
-          description: error.message,
-        });
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: ['users'] });
-      },
-    }
-  );
+  const updateRolesMutation = useMutation({
+    mutationFn: (roles: UserRole[]) => updateUserRoles(userId, roles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', userId] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({ title: 'تم تحديث صلاحيات المستخدم بنجاح' });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error updating user roles',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
 
   const handleProfileUpdate = async (profileData: { fullName: string; phone?: string | null; position?: string | null }) => {
     if (!user) return;
@@ -93,7 +94,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
 
   const handleRolesUpdate = async (roles: UserRole[]) => {
     setUserRoles(roles);
-    await updateRolesMutation.mutateAsync();
+    await updateRolesMutation.mutateAsync(roles);
   };
 
   if (!isOpen) return null;
@@ -121,7 +122,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
               <UserForm
                 user={user}
                 onSubmit={handleProfileUpdate}
-                isLoading={updateProfileMutation.isLoading}
+                isLoading={updateProfileMutation.isPending}
               />
             </TabsContent>
 
@@ -130,7 +131,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                 userId={userId}
                 initialRoles={user.roles}
                 onChange={handleRolesUpdate}
-                isLoading={updateRolesMutation.isLoading}
+                isLoading={updateRolesMutation.isPending}
               />
             </TabsContent>
           </Tabs>
