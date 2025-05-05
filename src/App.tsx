@@ -1,6 +1,5 @@
 
 import { useState } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
 import { Routes } from './routes';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/hooks/useAuth';
@@ -22,12 +21,10 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="light">
         <AuthProvider>
           <QueryProvider>
-            <Router>
-              <SyncManager />
-              <Routes />
-              <Toaster />
-              <FloatingQuickActions />
-            </Router>
+            <SyncManager />
+            <Routes />
+            <Toaster />
+            <FloatingQuickActions />
           </QueryProvider>
         </AuthProvider>
       </ThemeProvider>

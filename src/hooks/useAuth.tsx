@@ -1,6 +1,6 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, NavigateFunction } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile } from '@/lib/auth-types';
 import { getAllUsers, getUserById } from '@/services/users-api';
@@ -20,6 +20,7 @@ interface AuthContextType {
   hasRole: (role: UserRole) => boolean;
   refreshProfile?: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  navigate?: NavigateFunction;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,12 +33,15 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Create version of AuthProvider that doesn't require Router context
+export const AuthProviderNoRouter: React.FC<{ 
+  children: React.ReactNode;
+  navigate?: NavigateFunction;
+}> = ({ children, navigate }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Fix the getSession call and ensure we handle the Promise correctly
@@ -78,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userProfile = await getUserById(userId);
       if (userProfile) {
-        setUser(userProfile);
+        setUser(userProfile as unknown as User); // Type assertion to handle the mismatch
         setProfile(userProfile);
       }
     } catch (error) {
@@ -98,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setIsAuthenticated(true);
       await loadUserProfile(data.user?.id);
-      navigate('/dashboard');
+      navigate && navigate('/dashboard');
     } catch (error: any) {
       console.error("Sign-in error:", error);
       throw error;
@@ -114,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
       setUser(null);
       setProfile(null);
-      navigate('/auth');
+      navigate && navigate('/auth');
     } catch (error) {
       console.error("Sign-out error:", error);
     } finally {
@@ -162,7 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     hasRole,
     refreshProfile,
-    updatePassword, // Add the new method to the context
+    updatePassword,
+    navigate
   };
 
   return (
@@ -170,4 +175,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Version that uses Router context
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  return <AuthProviderNoRouter navigate={navigate}>{children}</AuthProviderNoRouter>;
 };
