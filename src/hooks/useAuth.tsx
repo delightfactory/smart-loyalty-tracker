@@ -44,13 +44,24 @@ export const AuthProviderNoRouter: React.FC<{
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
+    console.log("AuthProvider initialized - setting up auth listeners");
+    let isMounted = true;
+    
     // Set up the auth state change listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.id);
+      
+      if (!isMounted) return;
+      
       if (session) {
         setIsAuthenticated(true);
         setUser(session.user);
-        await loadUserProfile(session.user.id);
+        // Defer profile loading to avoid potential auth deadlocks
+        setTimeout(() => {
+          if (isMounted && session.user) {
+            loadUserProfile(session.user.id);
+          }
+        }, 0);
       } else {
         setIsAuthenticated(false);
         setUser(null);
@@ -59,28 +70,43 @@ export const AuthProviderNoRouter: React.FC<{
       setIsLoading(false);
     });
 
-    // THEN check for existing session
+    // THEN check for existing session (with a timeout to prevent eternal loading)
     const checkSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
-        console.log("Current session:", data?.session?.user?.id);
+        console.log("Current session check:", data?.session?.user?.id);
+        
+        if (!isMounted) return;
         
         if (data.session) {
           setIsAuthenticated(true);
           setUser(data.session.user);
-          await loadUserProfile(data.session.user.id);
-        } 
-        setIsLoading(false);
+          loadUserProfile(data.session.user.id);
+        }
       } catch (err) {
         console.error("Error checking session:", err);
-        setIsLoading(false);
+      } finally {
+        if (isMounted) {
+          // Ensure loading state is cleared even if there was an error
+          setIsLoading(false);
+        }
       }
     };
 
     checkSession();
+    
+    // Add a safety timeout to prevent eternal loading
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.log("Safety timeout triggered to prevent eternal loading");
+        setIsLoading(false);
+      }
+    }, 3000);
 
-    // Clean up the subscription when the component unmounts
+    // Clean up the subscription and timers when the component unmounts
     return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);

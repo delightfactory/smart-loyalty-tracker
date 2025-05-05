@@ -1,11 +1,9 @@
 
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { useAuth } from '@/hooks/useAuth';
 import PageContainer from '@/components/layout/PageContainer';
-import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 
 const Auth = () => {
@@ -13,11 +11,11 @@ const Auth = () => {
   const navigate = useNavigate();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
-  // Set a loading timeout to prevent infinite loading display
+  // Set a loading timeout to prevent infinite loading display (reduced to 2 seconds)
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 5000);
+    }, 2000);
     
     return () => clearTimeout(timer);
   }, []);
