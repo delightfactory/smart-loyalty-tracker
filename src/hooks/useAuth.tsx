@@ -44,24 +44,12 @@ export const AuthProviderNoRouter: React.FC<{
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    // Fix the getSession call and ensure we handle the Promise correctly
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (data.session) {
-        setIsAuthenticated(true);
-        await loadUserProfile(data.session.user.id);
-      } else {
-        setIsAuthenticated(false);
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-
-    // Set up the auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Set up the auth state change listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id);
       if (session) {
         setIsAuthenticated(true);
+        setUser(session.user);
         await loadUserProfile(session.user.id);
       } else {
         setIsAuthenticated(false);
@@ -70,6 +58,26 @@ export const AuthProviderNoRouter: React.FC<{
       }
       setIsLoading(false);
     });
+
+    // THEN check for existing session
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        console.log("Current session:", data?.session?.user?.id);
+        
+        if (data.session) {
+          setIsAuthenticated(true);
+          setUser(data.session.user);
+          await loadUserProfile(data.session.user.id);
+        } 
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error checking session:", err);
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
 
     // Clean up the subscription when the component unmounts
     return () => {
@@ -80,27 +88,31 @@ export const AuthProviderNoRouter: React.FC<{
   const loadUserProfile = async (userId: string | undefined) => {
     if (!userId) return;
     try {
+      console.log("Loading profile for user:", userId);
       const userProfile = await getUserById(userId);
+      console.log("User profile loaded:", userProfile);
       if (userProfile) {
-        setUser(userProfile as unknown as User); // Type assertion to handle the mismatch
         setProfile(userProfile);
       }
     } catch (error) {
       console.error("Error loading user profile:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      console.log("Signing in user:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+      console.log("Sign-in successful for user:", data.user?.id);
       setIsAuthenticated(true);
+      setUser(data.user);
       await loadUserProfile(data.user?.id);
       navigate && navigate('/dashboard');
     } catch (error: any) {
@@ -114,6 +126,7 @@ export const AuthProviderNoRouter: React.FC<{
   const signOut = async () => {
     setIsLoading(true);
     try {
+      console.log("Signing out user");
       await supabase.auth.signOut();
       setIsAuthenticated(false);
       setUser(null);
@@ -146,6 +159,7 @@ export const AuthProviderNoRouter: React.FC<{
   // Add updatePassword method to change user password
   const updatePassword = async (currentPassword: string, newPassword: string) => {
     try {
+      console.log("Updating password");
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
