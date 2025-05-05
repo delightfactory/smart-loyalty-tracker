@@ -1,5 +1,5 @@
 
-import { Route, Routes as RouterRoutes } from 'react-router-dom';
+import { Route, Routes as RouterRoutes, Outlet } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
@@ -34,30 +34,34 @@ export function Routes() {
       <Route path="/auth" element={<Auth />} />
       
       {/* Protected routes */}
-      <Route element={<RequireAuth />}>
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/customers/:id" element={<CustomerDetails />} />
-          <Route path="/customer-followup" element={<CustomerFollowup />} />
-          <Route path="/invoices" element={<Invoices />} />
-          <Route path="/invoices/:id" element={<InvoiceDetails />} />
-          <Route path="/create-invoice" element={<CreateInvoice />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/create-payment" element={<CreatePayment />} />
-          <Route path="/redemptions" element={<RedemptionsList />} />
-          <Route path="/redemptions/create" element={<CreateRedemption />} />
-          <Route path="/redemptions/:id" element={<RedemptionDetails />} />
-          <Route path="/redemptions/:id/edit" element={<EditRedemption />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/roles" element={<Roles />} />
-          <Route path="/roles/:id" element={<RoleDetails />} />
-        </Route>
+      <Route element={
+        <RequireAuth>
+          <Layout>
+            <Outlet />
+          </Layout>
+        </RequireAuth>
+      }>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetails />} />
+        <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/:id" element={<CustomerDetails />} />
+        <Route path="/customer-followup" element={<CustomerFollowup />} />
+        <Route path="/invoices" element={<Invoices />} />
+        <Route path="/invoices/:id" element={<InvoiceDetails />} />
+        <Route path="/create-invoice" element={<CreateInvoice />} />
+        <Route path="/payments" element={<Payments />} />
+        <Route path="/create-payment" element={<CreatePayment />} />
+        <Route path="/redemptions" element={<RedemptionsList />} />
+        <Route path="/redemptions/create" element={<CreateRedemption />} />
+        <Route path="/redemptions/:id" element={<RedemptionDetails />} />
+        <Route path="/redemptions/:id/edit" element={<EditRedemption />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/users" element={<Users />} />
+        <Route path="/roles" element={<Roles />} />
+        <Route path="/roles/:id" element={<RoleDetails />} />
       </Route>
       
       <Route path="*" element={<NotFound />} />
