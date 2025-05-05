@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { UserRole } from '@/lib/auth-types';
-import { getUserById, updateUserProfile, updateUserRoles } from '@/services/users-api';
+import { getUserById, updateUserProfile, updateUserRoles, updateUserPermissions, fetchUserPermissions } from '@/services/users-api';
+import UserPermissionsForm from '@/components/users/UserPermissionsForm';
 
 // تحديد نموذج بيانات المستخدم للتعديل
 const userEditFormSchema = z.object({
@@ -33,6 +33,7 @@ interface EditUserDialogProps {
 export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [permissions, setPermissions] = useState<string[]>([]);
   
   const form = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditFormSchema),
@@ -60,6 +61,15 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     enabled: isOpen && !!userId,
   });
   
+  // جلب صلاحيات المستخدم الحالية عند فتح الحوار
+  useEffect(() => {
+    if (isOpen) {
+      fetchUserPermissions(userId)
+        .then(perms => setPermissions(perms))
+        .catch(error => toast({ variant: 'destructive', title: 'خطأ في جلب صلاحيات المستخدم', description: error.message }));
+    }
+  }, [isOpen, userId]);
+  
   // تحديث النموذج عند جلب البيانات
   useEffect(() => {
     if (user) {
@@ -83,9 +93,12 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
         position: values.position || null,
       });
       
-      // تحديث الصلاحيات
+      // تحديث الأدوار
       const userRoles = values.roles.map(role => role as UserRole);
       await updateUserRoles(userId, userRoles);
+      
+      // تحديث الصلاحيات المخصصة
+      await updateUserPermissions(userId, permissions);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -209,6 +222,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                   </FormItem>
                 )}
               />
+              
+              {/* نموذج إدارة صلاحيات المستخدم */}
+              <UserPermissionsForm userId={userId} onChange={setPermissions} />
               
               <DialogFooter>
                 <Button 

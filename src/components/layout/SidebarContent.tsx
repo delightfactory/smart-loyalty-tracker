@@ -1,5 +1,5 @@
-import { useAuth } from '@/hooks/useAuth';
 import SidebarLink from './SidebarLink';
+import { useAuth } from '@/hooks/useAuth';
 import { UserRole } from '@/lib/auth-types';
 import { 
   BarChartBig, 
@@ -12,7 +12,8 @@ import {
   Package, 
   Receipt, 
   ShoppingCart,
-  Users
+  Users,
+  Shield
 } from 'lucide-react';
 
 interface SidebarContentProps {
@@ -35,6 +36,7 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
       <SidebarLink href="/payments" icon={<CreditCard />} label="المدفوعات" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/redemptions" icon={<Gift />} label="الاستبدالات" isSidebarOpen={isSidebarOpen} />
       {isAdmin && <SidebarLink href="/users" icon={<Users />} label="إدارة المستخدمين" isSidebarOpen={isSidebarOpen} />}
+      {isAdmin && <SidebarLink href="/roles" icon={<Shield />} label="الأدوار" isSidebarOpen={isSidebarOpen} />}
       <SidebarLink href="/settings" icon={<Cog />} label="الإعدادات" isSidebarOpen={isSidebarOpen} />
     </div>
   );

@@ -23,10 +23,16 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
 export const createUser = async (userData: {
   email: string;
   fullName: string;
+  password: string;
   roles: UserRole[];
 }): Promise<UserProfile> => {
-  // نستخدم أول دور فقط (يمكنك توسيعها لاحقًا لدعم تعدد الأدوار)
-  const user = await createUserReal(userData.fullName, userData.email, userData.roles[0]);
+  // بناء المستخدم مع تمرير كلمة المرور المدخلة
+  const user = await createUserReal(
+    userData.fullName,
+    userData.email,
+    userData.roles[0],
+    userData.password
+  );
   return {
     id: user.id,
     fullName: user.full_name,
@@ -44,25 +50,14 @@ export const createUser = async (userData: {
 export const updateUserProfile = async (profile: {
   id: string;
   fullName: string;
-  email: string;
-  roles: UserRole[];
-}): Promise<UserProfile> => {
-  const updated = await updateUserReal(profile.id, {
-    full_name: profile.fullName,
-    email: profile.email,
-    // تحديث الدور يتطلب منطق منفصل إذا أردت دعم تعدد الأدوار
-  });
-  return {
-    id: updated.id,
-    fullName: updated.full_name,
-    email: updated.email,
-    avatarUrl: updated.avatar_url,
-    phone: updated.phone,
-    position: updated.position,
-    roles: profile.roles,
-    createdAt: updated.created_at,
-    lastSignInAt: null,
-  };
+  phone?: string | null;
+  position?: string | null;
+}): Promise<void> => {
+  // تحديث الاسم والهاتف والمسمى الوظيفي في جدول profiles
+  const updates: any = { full_name: profile.fullName };
+  if (profile.phone !== undefined) updates.phone = profile.phone;
+  if (profile.position !== undefined) updates.position = profile.position;
+  await updateUserReal(profile.id, updates);
 };
 
 // حذف مستخدم
@@ -125,3 +120,45 @@ export const assignAdminRole = async (userId: string): Promise<{success: boolean
   // Mock implementation
   return { success: true };
 };
+
+// 1) جلب كل الصلاحيات المتاحة
+export async function fetchAllPermissions(): Promise<{ id: string; name: string; description: string }[]> {
+  const { data, error } = await supabase
+    .from('permissions')
+    .select('id, name, description')
+    .order('name');
+  if (error) throw error;
+  return data!;
+}
+
+// 2) جلب صلاحيات مستخدم محدد
+export async function fetchUserPermissions(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('user_permissions')
+    .select('permission_id')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return data!.map(r => r.permission_id);
+}
+
+// 3) تحديث صلاحيات المستخدم (حذف ثم إدخال جديدة)
+export async function updateUserPermissions(
+  userId: string,
+  permissions: string[]
+): Promise<void> {
+  // 3.1 حذف الصلاحيات القديمة
+  const { error: deleteError } = await supabase
+    .from('user_permissions')
+    .delete()
+    .eq('user_id', userId);
+  if (deleteError) throw deleteError;
+
+  // 3.2 إدخال الصلاحيات الجديدة
+  if (permissions.length > 0) {
+    const inserts = permissions.map(pid => ({ user_id: userId, permission_id: pid }));
+    const { error: insertError } = await supabase
+      .from('user_permissions')
+      .insert(inserts);
+    if (insertError) throw insertError;
+  }
+}

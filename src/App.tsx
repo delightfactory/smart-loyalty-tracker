@@ -28,6 +28,8 @@ import RedemptionDetails from '@/pages/RedemptionDetails';
 import EditRedemption from '@/pages/EditRedemption';
 import RequireAuth from '@/components/auth/RequireAuth';
 import FloatingQuickActions from '@/components/FloatingQuickActions';
+import RolesPage from '@/pages/Roles';
+import RoleDetails from '@/pages/RoleDetails';
 
 function App() {
   return (
@@ -69,6 +71,8 @@ function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/users" element={<UsersPage />} />
+                <Route path="/roles" element={<RolesPage />} />
+                <Route path="/roles/:id" element={<RoleDetails />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
