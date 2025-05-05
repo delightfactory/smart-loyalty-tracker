@@ -86,7 +86,7 @@ const RedemptionListPage = () => {
             <h1 className="text-2xl font-bold">قائمة الاستبدالات</h1>
             <button
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-green-400"
-              onClick={() => navigate('/create-redemption')}
+              onClick={() => navigate('/redemptions/create')}
             >
               <Plus className="h-5 w-5" />
               إنشاء استبدال جديد
@@ -131,14 +131,14 @@ const RedemptionListPage = () => {
                         <TableCell>
                           <div className="flex gap-2">
                             <button
-                              onClick={() => navigate(`/redemption/${redemption.id}`)}
+                              onClick={() => navigate(`/redemptions/${redemption.id}`)}
                               className="rounded-full p-2 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400"
                               aria-label="View"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => navigate(`/edit-redemption/${redemption.id}`)}
+                              onClick={() => navigate(`/redemptions/${redemption.id}/edit`)}
                               className="rounded-full p-2 bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-700 text-green-700 dark:text-green-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-green-400"
                               aria-label="Edit"
                             >
@@ -171,8 +171,8 @@ const RedemptionListPage = () => {
                     key={redemption.id}
                     redemption={redemption}
                     customerName={getCustomerName(redemption.customerId)}
-                    onView={() => navigate(`/redemption/${redemption.id}`)}
-                    onEdit={() => navigate(`/edit-redemption/${redemption.id}`)}
+                    onView={() => navigate(`/redemptions/${redemption.id}`)}
+                    onEdit={() => navigate(`/redemptions/${redemption.id}/edit`)}
                     onDelete={() => handleDeleteRedemption(redemption.id, redemption.customerId, redemption.status)}
                   />
                 ))

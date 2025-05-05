@@ -368,7 +368,7 @@ const CreateRedemption = () => {
                 <div className="space-y-4">
                   {customerRedemptions.slice(0, 3).map((redemption) => (
                     <div key={redemption.id} className="border rounded-lg p-3 flex justify-between items-center hover:bg-slate-50 cursor-pointer"
-                      onClick={() => navigate(`/redemption/${redemption.id}`)}
+                      onClick={() => navigate(`/redemptions/${redemption.id}`)}
                     >
                       <div>
                         <p className="font-medium">تاريخ: {new Date(redemption.date).toLocaleDateString('ar-EG')}</p>
@@ -388,7 +388,7 @@ const CreateRedemption = () => {
               </CardContent>
               {customerRedemptions.length > 3 && (
                 <CardFooter>
-                  <Button variant="link" onClick={() => customer && navigate(`/customer/${customer.id}`)}>
+                  <Button variant="link" onClick={() => navigate('/redemptions')}>
                     عرض كل عمليات الاستبدال
                   </Button>
                 </CardFooter>

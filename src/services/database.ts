@@ -163,25 +163,33 @@ export const customersService = {
       throw error;
     }
 
-    return dbCustomerToAppCustomer(data);
+    const createdCustomer = dbCustomerToAppCustomer(data);
+    // Initialize credit balance based on opening balance
+    await updateCustomerCreditBalance(createdCustomer.id);
+    // Fetch updated record
+    return await this.getById(createdCustomer.id);
   },
   
   async update(customer: Customer): Promise<Customer> {
     const dbCustomer = appCustomerToDbCustomer(customer);
-    
+
     const { data, error } = await supabase
       .from('customers')
       .update(dbCustomer)
       .eq('id', customer.id)
       .select('*')
       .single();
-      
+
     if (error) {
       console.error(`Error updating customer with id ${customer.id}:`, error);
       throw error;
     }
-    
-    return dbCustomerToAppCustomer(data);
+
+    const updatedCustomer = dbCustomerToAppCustomer(data);
+    // Recalculate credit balance after update
+    await updateCustomerCreditBalance(updatedCustomer.id);
+    // Fetch updated record
+    return await this.getById(updatedCustomer.id);
   },
   
   async delete(id: string): Promise<void> {
@@ -260,6 +268,21 @@ export const paymentsService = {
     return data.map(dbPaymentToAppPayment);
   },
   
+  async getById(id: string): Promise<Payment> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) {
+      console.error(`Error fetching payment with id ${id}:`, error);
+      throw error;
+    }
+    
+    return dbPaymentToAppPayment(data);
+  },
+  
   async create(payment: Omit<Payment, 'id'>): Promise<Payment> {
     const dbPayment = appPaymentToDbPayment(payment);
     
@@ -279,19 +302,33 @@ export const paymentsService = {
     if (error) throw error;
     
     if (payment.invoiceId) {
+      // Payment for an invoice
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
-    }
-    
-    if (payment.customerId) {
       await updateCustomerCreditBalance(payment.customerId);
+    } else if (payment.customerId) {
+      // Payment against opening balance
+      await updateCustomerOpeningBalance(payment.customerId, payment.amount);
     }
     
     return dbPaymentToAppPayment(data);
   },
   
   async update(payment: Payment): Promise<Payment> {
-    const dbPayment = appPaymentToDbPayment(payment);
+    // جلب بيانات الدفعة القديمة لحساب فرق المبلغ للرصيد الافتتاحي
+    const { data: oldData, error: fetchError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', payment.id)
+      .single();
+      
+    if (fetchError) {
+      console.error(`Error fetching existing payment ${payment.id}:`, fetchError);
+      throw fetchError;
+    }
     
+    const oldPayment = dbPaymentToAppPayment(oldData);
+    // تجهيز بيانات التعديل
+    const dbPayment = appPaymentToDbPayment(payment);
     const { data, error } = await supabase
       .from('payments')
       .update(dbPayment)
@@ -305,11 +342,13 @@ export const paymentsService = {
     }
     
     if (payment.invoiceId) {
+      // تعديل دفعة مرتبطة بفاتورة
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
-    }
-    
-    if (payment.customerId) {
       await updateCustomerCreditBalance(payment.customerId);
+    } else {
+      // تعديل دفعة ضد الرصيد الافتتاحي: تطبيق فرق المبلغ
+      const diff = payment.amount - oldPayment.amount;
+      await updateCustomerOpeningBalance(payment.customerId, diff);
     }
     
     return dbPaymentToAppPayment(data);
@@ -340,11 +379,12 @@ export const paymentsService = {
     }
     
     if (payment.invoiceId) {
+      // Deletion of payment for an invoice
       await updateInvoiceStatusAfterPayment(payment.invoiceId, payment.customerId);
-    }
-    
-    if (payment.customerId) {
       await updateCustomerCreditBalance(payment.customerId);
+    } else {
+      // Revert payment against opening balance
+      await updateCustomerOpeningBalance(payment.customerId, -payment.amount);
     }
   }
 };
@@ -477,33 +517,79 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
     
     console.log(`Customer ${customerId} - Total credit balance: ${totalAmountDue}`);
     
-    // جلب الرصيد الافتتاحي من قاعدة البيانات
-    const { data: customerData, error: customerError } = await supabase
-      .from('customers')
-      .select('opening_balance')
-      .eq('id', customerId)
-      .single();
-      
-    if (customerError) {
-      console.error(`Error fetching opening_balance for customer ${customerId}:`, customerError);
-      throw customerError;
-    }
-    
-    const openingBalance = customerData.opening_balance ?? 0;
-    
     const { error: updateError } = await supabase
       .from('customers')
-      .update({ credit_balance: totalAmountDue + openingBalance })
+      .update({ credit_balance: totalAmountDue })
       .eq('id', customerId);
-      
+
     if (updateError) {
       console.error(`Error updating credit balance for customer ${customerId}:`, updateError);
       throw updateError;
     }
-    
-    console.log(`Credit balance for customer ${customerId} updated successfully to ${totalAmountDue + openingBalance}`);
+
+    console.log(`Credit balance for customer ${customerId} updated successfully to ${totalAmountDue}`);
   } catch (error) {
     console.error(`Failed to update credit balance for customer ${customerId}:`, error);
+    throw error;
+  }
+};
+
+// تحديث الرصيد الافتتاحي بعد الدفعات غير المرتبطة بالفواتير
+const updateCustomerOpeningBalance = async (customerId: string, amount: number): Promise<void> => {
+  console.log(`Updating opening balance for customer ${customerId}, amount: ${amount}`);
+  const { data: customerData, error: customerError } = await supabase
+    .from('customers')
+    .select('opening_balance')
+    .eq('id', customerId)
+    .single();
+  if (customerError) {
+    console.error(`Error fetching opening_balance for customer ${customerId}:`, customerError);
+    throw customerError;
+  }
+  const openingBalance = customerData.opening_balance ?? 0;
+  const newOpeningBalance = openingBalance - amount;
+  const { error: updateError } = await supabase
+    .from('customers')
+    .update({ opening_balance: newOpeningBalance })
+    .eq('id', customerId);
+  if (updateError) {
+    console.error(`Error updating opening_balance for customer ${customerId}:`, updateError);
+    throw updateError;
+  }
+  console.log(`Opening balance for customer ${customerId} updated to ${newOpeningBalance}`);
+};
+
+// إضافة دالة لحساب وتحديث رصيد النقاط للعميل
+const updateCustomerPointsBalance = async (customerId: string): Promise<void> => {
+  console.log(`Updating points balance for customer ${customerId}`);
+  try {
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('points_earned')
+      .eq('customer_id', customerId);
+    if (invoiceError) throw invoiceError;
+    const totalEarned = invoiceData?.reduce((sum, inv) => sum + (inv.points_earned ?? 0), 0) ?? 0;
+
+    const { data: redemptionData, error: redemptionError } = await supabase
+      .from('redemptions')
+      .select('total_points_redeemed')
+      .eq('customer_id', customerId);
+    if (redemptionError) throw redemptionError;
+    const totalRedeemed = redemptionData?.reduce((sum, red) => sum + (red.total_points_redeemed ?? 0), 0) ?? 0;
+
+    const { error: updateError } = await supabase
+      .from('customers')
+      .update({
+        points_earned: totalEarned,
+        points_redeemed: totalRedeemed,
+        current_points: totalEarned - totalRedeemed
+      })
+      .eq('id', customerId);
+    if (updateError) throw updateError;
+
+    console.log(`Points balance for customer ${customerId} updated to ${totalEarned - totalRedeemed}`);
+  } catch (error) {
+    console.error(`Failed to update points balance for customer ${customerId}:`, error);
     throw error;
   }
 };
@@ -614,6 +700,7 @@ export const invoicesService = {
     
     // تحديث رصيد العميل بعد إنشاء الفاتورة
     await updateCustomerCreditBalance(invoice.customerId);
+    await updateCustomerPointsBalance(invoice.customerId);
     
     return this.getById(invoiceId);
   },
@@ -635,6 +722,7 @@ export const invoicesService = {
     
     // تحديث رصيد العميل بعد تحديث الفاتورة
     await updateCustomerCreditBalance(invoice.customerId);
+    await updateCustomerPointsBalance(invoice.customerId);
     
     return dbInvoiceToAppInvoice({
       ...data,
@@ -678,6 +766,7 @@ export const invoicesService = {
     
     // تحديث رصيد العميل بعد حذف الفاتورة
     await updateCustomerCreditBalance(deletedInvoice.customer_id);
+    await updateCustomerPointsBalance(deletedInvoice.customer_id);
   }
 };
 

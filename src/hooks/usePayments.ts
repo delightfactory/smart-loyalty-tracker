@@ -28,6 +28,13 @@ export function usePayments() {
     enabled: !!invoiceId
   });
   
+  // استرجاع دفعة واحدة حسب المعرف
+  const getById = (paymentId: string) => useQuery({
+    queryKey: ['payments', paymentId],
+    queryFn: () => paymentsService.getById(paymentId),
+    enabled: !!paymentId
+  });
+  
   const addPayment = useMutation({
     mutationFn: (payment: Omit<Payment, 'id'>) => {
       console.log('Adding payment (original):', payment);
@@ -160,6 +167,7 @@ export function usePayments() {
     getAll,
     getByCustomerId,
     getByInvoiceId,
+    getById,
     addPayment,
     updatePayment,
     deletePayment

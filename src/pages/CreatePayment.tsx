@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -48,6 +48,9 @@ const CreatePayment = () => {
   const { customerId } = useParams<{ customerId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editPaymentId = searchParams.get('edit') || undefined;
+  const isEditing = !!editPaymentId;
   const { toast } = useToast();
   
   // استخدام حالة المكان للاستلام من صفحة المسار
@@ -61,12 +64,13 @@ const CreatePayment = () => {
   // React Query hooks
   const { getAll: getAllCustomers } = useCustomers();
   const { getByCustomerId: getCustomerInvoices, getById: getInvoiceById } = useInvoices();
-  const { addPayment } = usePayments();
+  const { addPayment, updatePayment, getById: getPaymentById } = usePayments();
   
   // استرجاع بيانات العملاء والفواتير
   const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
   const { data: customerInvoices = [], isLoading: isLoadingInvoices } = getCustomerInvoices(selectedCustomerId || '');
   const { data: invoiceData, isLoading: isLoadingInvoice } = getInvoiceById(selectedInvoice?.id || '');
+  const { data: editingPayment, isLoading: isLoadingPayment } = getPaymentById(editPaymentId || '');
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -93,7 +97,20 @@ const CreatePayment = () => {
       form.setValue('invoiceId', preselectedInvoiceId);
       onInvoiceChange(preselectedInvoiceId);
     }
-  }, [customerId, preselectedInvoiceId]);
+    
+    if (isEditing && editingPayment) {
+      form.reset({
+        customerId: editingPayment.customerId,
+        invoiceId: editingPayment.invoiceId || '',
+        amount: editingPayment.amount,
+        paymentDate: new Date(editingPayment.date).toISOString().slice(0,10),
+        method: editingPayment.method || 'نقداً',
+        notes: editingPayment.notes || '',
+      });
+      setSelectedCustomerId(editingPayment.customerId);
+      if (editingPayment.invoiceId) onInvoiceChange(editingPayment.invoiceId);
+    }
+  }, [customerId, preselectedInvoiceId, editingPayment]);
   
   // عند تغيير العميل المختار، تحديث قائمة الفواتير غير المدفوعة
   useEffect(() => {
@@ -154,7 +171,7 @@ const CreatePayment = () => {
   };
   
   const onSubmit = (data: PaymentFormValues) => {
-    const payment: Omit<Payment, 'id'> = {
+    const base = {
       customerId: data.customerId,
       invoiceId: data.invoiceId,
       amount: data.amount,
@@ -164,28 +181,21 @@ const CreatePayment = () => {
       type: PaymentType.PAYMENT
     };
     
-    // استخدام mutation لإضافة الدفعة
-    addPayment.mutate(payment, {
-      onSuccess: (newPayment) => {
-        toast({
-          title: "تم إضافة الدفعة بنجاح",
-          description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}`,
-        });
-        
-        navigate(customerId ? `/customer/${customerId}` : '/invoices');
-      },
-      onError: (error: Error) => {
-        toast({
-          title: "خطأ",
-          description: `حدث خطأ أثناء تسجيل الدفعة: ${error.message}`,
-          variant: "destructive",
-        });
-      }
-    });
+    if (isEditing && editPaymentId) {
+      updatePayment.mutate({ id: editPaymentId, ...base }, {
+        onSuccess: (p) => { toast({ title: 'تم تحديث الدفعة بنجاح', description: `تم تعديل الدفعة ${p.id}` }); navigate('/payments'); },
+        onError: (error) => { toast({ title: 'خطأ', description: `حدث خطأ أثناء تعديل الدفعة: ${error.message}`, variant: 'destructive' }); }
+      });
+    } else {
+      addPayment.mutate(base, {
+        onSuccess: (p) => { toast({ title: 'تم إضافة الدفعة بنجاح', description: `تم تسجيل دفعة بقيمة ${data.amount.toLocaleString('ar-EG')} ج.م للفاتورة ${data.invoiceId}` }); navigate(customerId ? `/customer/${customerId}` : '/invoices'); },
+        onError: (error) => { toast({ title: 'خطأ', description: `حدث خطأ أثناء تسجيل الدفعة: ${error.message}`, variant: 'destructive' }); }
+      });
+    }
   };
   
   // تحقق من حالة التحميل
-  const isLoading = isLoadingCustomers || isLoadingInvoices || addPayment.isPending;
+  const isLoading = isLoadingCustomers || isLoadingInvoices || isLoadingInvoice || addPayment.isPending || (isEditing && updatePayment.isPending) || (isEditing && isLoadingPayment);
   
   const getCustomerById = (id: string) => {
     return customers.find(customer => customer.id === id);
@@ -365,9 +375,14 @@ const CreatePayment = () => {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={!selectedInvoice || unpaidInvoices.length === 0 || addPayment.isPending}
+                  disabled={!selectedInvoice || unpaidInvoices.length === 0 || addPayment.isPending || (isEditing && updatePayment.isPending)}
                 >
-                  {addPayment.isPending ? (
+                  {(isEditing && updatePayment.isPending) ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      جاري التحديث...
+                    </>
+                  ) : (addPayment.isPending ? (
                     <>
                       <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                       جاري التسجيل...
@@ -375,9 +390,9 @@ const CreatePayment = () => {
                   ) : (
                     <>
                       <CreditCard className="ml-2 h-4 w-4" />
-                      تسجيل الدفعة
+                      {isEditing ? 'تحديث الدفعة' : 'تسجيل الدفعة'}
                     </>
-                  )}
+                  ))}
                 </Button>
               </form>
             </Form>

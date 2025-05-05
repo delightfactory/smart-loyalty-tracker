@@ -130,16 +130,6 @@ const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditD
               </Select>
             </div>
             <div>
-              <Label htmlFor="creditBalance">رصيد الآجل (ج.م)</Label>
-              <Input 
-                id="creditBalance"
-                type="number"
-                value={editedCustomer.creditBalance.toString()}
-                onChange={(e) => handleChange('creditBalance', Number(e.target.value))}
-                className="mt-1"
-              />
-            </div>
-            <div>
               <Label htmlFor="credit_period">مدة الائتمان (بالأيام)</Label>
               <Input 
                 id="credit_period"

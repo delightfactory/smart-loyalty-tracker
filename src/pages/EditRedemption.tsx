@@ -145,7 +145,7 @@ const EditRedemption = () => {
           description: `تم تحديث عملية الاستبدال بنجاح.`,
           variant: "default"
         });
-        navigate(`/redemption/${redemption.id}`);
+        navigate(`/redemptions/${redemption.id}`);
       },
       onError: (error) => {
         setSubmitting(false);

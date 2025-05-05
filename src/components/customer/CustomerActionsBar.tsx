@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -66,7 +65,7 @@ const CustomerActionsBar = ({ customer, invoices, onEdit, onDelete }: CustomerAc
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate(`/create-redemption/${customer.id}`)}
+          onClick={() => navigate(`/redemptions/create/${customer.id}`)}
           className="flex items-center"
         >
           <Gift className="ml-2 h-4 w-4" />

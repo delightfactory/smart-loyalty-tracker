@@ -1,4 +1,3 @@
-
 import { Route, Routes as RouterRoutes, Outlet } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import Index from '@/pages/Index';
@@ -50,10 +49,14 @@ export function Routes() {
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/invoices/:id" element={<InvoiceDetails />} />
         <Route path="/create-invoice" element={<CreateInvoice />} />
+        <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />
+        <Route path="/create-invoice/:customerId/edit/:edit" element={<CreateInvoice />} />
         <Route path="/payments" element={<Payments />} />
         <Route path="/create-payment" element={<CreatePayment />} />
+        <Route path="/create-payment/:customerId" element={<CreatePayment />} />
         <Route path="/redemptions" element={<RedemptionsList />} />
         <Route path="/redemptions/create" element={<CreateRedemption />} />
+        <Route path="/redemptions/create/:customerId" element={<CreateRedemption />} />
         <Route path="/redemptions/:id" element={<RedemptionDetails />} />
         <Route path="/redemptions/:id/edit" element={<EditRedemption />} />
         <Route path="/profile" element={<Profile />} />

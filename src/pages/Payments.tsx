@@ -12,10 +12,23 @@ import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import PageContainer from '@/components/layout/PageContainer';
 import AddStandalonePaymentDialog from '@/components/payments/AddStandalonePaymentDialog';
+import EditPaymentDialog from '../components/payments/EditPaymentDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const Payments: React.FC = () => {
   const [showStandaloneDialog, setShowStandaloneDialog] = useState(false);
-  const { getAll } = usePayments();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogId, setEditDialogId] = useState<string>('');
+  const { getAll, deletePayment } = usePayments();
   const { data: payments = [], isLoading } = getAll;
   const { getAll: getAllCustomers } = useCustomers();
   const { data: customers = [] } = getAllCustomers;
@@ -123,13 +136,17 @@ const Payments: React.FC = () => {
   const totalAmount = filteredPayments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalCount = filteredPayments.length;
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   const handleEdit = (paymentId: string) => {
-    navigate(`/create-payment?edit=${paymentId}`);
+    setEditDialogId(paymentId);
+    setEditDialogOpen(true);
   };
   
   const handleDelete = (paymentId: string) => {
-    // TODO: implement confirmation and delete logic
-    alert('Delete payment: ' + paymentId);
+    setPendingDeleteId(paymentId);
+    setDeleteDialogOpen(true);
   };
 
   return (
@@ -158,6 +175,7 @@ const Payments: React.FC = () => {
             إضافة دفعة
           </Button>
           <AddStandalonePaymentDialog open={showStandaloneDialog} onClose={() => setShowStandaloneDialog(false)} />
+          <EditPaymentDialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} paymentId={editDialogId} />
         </div>
       }
     >
@@ -253,6 +271,29 @@ const Payments: React.FC = () => {
           )}
         </div>
       )}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد حذف الدفعة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد أنك تريد حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDeleteId) deletePayment.mutate(pendingDeleteId);
+                setDeleteDialogOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground"
+              disabled={deletePayment.isPending}
+            >
+              {deletePayment.isPending ? 'جاري الحذف...' : 'تأكيد الحذف'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 };

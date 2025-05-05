@@ -111,7 +111,6 @@ const Customers = () => {
     contactPerson: '',
     phone: '',
     businessType: BusinessType.SERVICE_CENTER,
-    creditBalance: 0,
     openingBalance: 0,
     governorate: '',
     city: ''
@@ -175,7 +174,7 @@ const Customers = () => {
       contactPerson: newCustomer.contactPerson!,
       phone: newCustomer.phone!,
       businessType: newCustomer.businessType || BusinessType.SERVICE_CENTER,
-      creditBalance: newCustomer.creditBalance || 0,
+      creditBalance: 0,
       openingBalance: newCustomer.openingBalance || 0,
       currentPoints: 0,
       pointsEarned: 0,
@@ -194,7 +193,6 @@ const Customers = () => {
           contactPerson: '',
           phone: '',
           businessType: BusinessType.SERVICE_CENTER,
-          creditBalance: 0,
           openingBalance: 0,
           governorate: '',
           city: ''
@@ -760,22 +758,6 @@ const Customers = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Label htmlFor="creditBalance">رصيد الآجل</Label>
-              <Input 
-                id="creditBalance" 
-                type="number"
-                value={newCustomer.creditBalance}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9.\-]/g, '');
-                  setNewCustomer({ ...newCustomer, creditBalance: val === '' ? '' : Number(val) });
-                }}
-                className="mt-1 text-left ltr"
-                inputMode="decimal"
-                pattern="[0-9]*"
-                style={{ direction: 'ltr' }}
-              />
             </div>
             <div>
               <Label htmlFor="openingBalance">الرصيد الافتتاحي (ج.م)</Label>
