@@ -559,28 +559,31 @@ export type Database = {
           role_id?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_role"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_roles_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      users: {
+        Row: {
+          email: string | null
+          id: string | null
+        }
+        Insert: {
+          email?: string | null
+          id?: string | null
+        }
+        Update: {
+          email?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      has_permission: {
+        Args: { _perm: string } | { _uid: string; _perm: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _user_id: string

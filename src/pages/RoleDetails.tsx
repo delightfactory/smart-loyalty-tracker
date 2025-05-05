@@ -1,12 +1,18 @@
+
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllRoles, Role } from '@/services/roles-api';
 import RolePermissionsForm from '@/components/RolePermissionsForm';
 import PageContainer from '@/components/layout/PageContainer';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 export default function RoleDetails() {
   const { id } = useParams<{ id: string }>();
+  
+  // استخدام اشتراك الوقت الحقيقي لمراقبة التغييرات في جدول الأدوار والصلاحيات
+  useRealtimeSubscription(['roles', 'role_permissions', 'permissions']);
+
   const { data: roles = [], isLoading, isError } = useQuery<Role[], Error>({
     queryKey: ['roles'],
     queryFn: fetchAllRoles,
