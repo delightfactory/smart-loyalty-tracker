@@ -11,6 +11,10 @@ import UserForm from './UserForm';
 import UserRolesForm from './UserRolesForm';
 import UserPermissionsForm from './UserPermissionsForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EditUserDialogProps {
   userId: string;
@@ -25,6 +29,8 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('profile');
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -36,7 +42,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
       } catch (error: any) {
         toast({
           variant: 'destructive',
-          title: 'Error fetching user',
+          title: 'خطأ في جلب بيانات المستخدم',
           description: error.message,
         });
       } finally {
@@ -50,8 +56,9 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
   }, [userId, isOpen, toast]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (profile: { id: string; fullName: string; phone?: string | null; position?: string | null }) => 
-      await updateUserProfile(profile),
+    mutationFn: async (profile: { id: string; fullName: string; phone?: string | null; position?: string | null }) => {
+      await updateUserProfile(profile);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', userId] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -60,14 +67,16 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     onError: (error: any) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating user profile',
+        title: 'خطأ في تحديث بيانات المستخدم',
         description: error.message,
       });
     },
   });
 
   const updateRolesMutation = useMutation({
-    mutationFn: async (roles: UserRole[]) => await updateUserRoles(userId, roles),
+    mutationFn: async (roles: UserRole[]) => {
+      await updateUserRoles(userId, roles);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', userId] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -76,7 +85,7 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     onError: (error: any) => {
       toast({
         variant: 'destructive',
-        title: 'Error updating user roles',
+        title: 'خطأ في تحديث صلاحيات المستخدم',
         description: error.message,
       });
     },
@@ -98,6 +107,43 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
     queryClient.invalidateQueries({ queryKey: ['permissions'] });
   };
 
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast({
+        variant: 'destructive',
+        title: 'كلمة المرور قصيرة جداً',
+        description: 'يجب أن تكون كلمة المرور 6 أحرف على الأقل',
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      // Update user password using Supabase admin API
+      const { error } = await supabase.auth.admin.updateUserById(
+        userId,
+        { password: newPassword }
+      );
+
+      if (error) throw error;
+
+      toast({
+        title: 'تم تغيير كلمة المرور',
+        description: 'تم تغيير كلمة المرور للمستخدم بنجاح',
+      });
+      
+      setNewPassword('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ في تغيير كلمة المرور',
+        description: error.message || 'حدث خطأ أثناء تغيير كلمة المرور',
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -114,10 +160,11 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
           </div>
         ) : user ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
               <TabsTrigger value="roles">الأدوار</TabsTrigger>
               <TabsTrigger value="permissions">الصلاحيات المباشرة</TabsTrigger>
+              <TabsTrigger value="security">الأمان</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="space-y-4">
@@ -142,6 +189,52 @@ export function EditUserDialog({ userId, isOpen, onClose }: EditUserDialogProps)
                 userId={userId}
                 onSuccess={handlePermissionsUpdated}
               />
+            </TabsContent>
+            
+            <TabsContent value="security" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl">تغيير كلمة المرور</CardTitle>
+                  <CardDescription>
+                    يمكنك تعيين كلمة مرور جديدة للمستخدم
+                  </CardDescription>
+                </CardHeader>
+                
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">كلمة المرور الجديدة</Label>
+                      <Input 
+                        id="new-password"
+                        type="password" 
+                        placeholder="كلمة المرور الجديدة" 
+                        value={newPassword} 
+                        onChange={(e) => setNewPassword(e.target.value)} 
+                        className="max-w-sm"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        يجب أن تكون كلمة المرور 6 أحرف على الأقل
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+                
+                <CardFooter>
+                  <Button 
+                    onClick={handleChangePassword} 
+                    disabled={!newPassword || newPassword.length < 6 || isChangingPassword}
+                  >
+                    {isChangingPassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        جاري تغيير كلمة المرور...
+                      </>
+                    ) : (
+                      'تعيين كلمة المرور'
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
             </TabsContent>
           </Tabs>
         ) : (
