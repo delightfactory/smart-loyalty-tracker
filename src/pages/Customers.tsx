@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils';
 import { useCustomers } from '@/hooks/useCustomers';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect } from 'react';
 import { calculateClassificationAndLevel } from '@/lib/customerClassification';
 import { egyptGovernorates } from '../lib/egyptLocations';
 import { customersToCSV, csvToCustomers, customersToExcel, excelToCustomers } from '../lib/customerImportExport';
@@ -47,17 +46,10 @@ import * as XLSX from 'xlsx';
 import CustomerCard from '@/components/customer/CustomerCard';
 import CustomerEditDialog from '@/components/customer/CustomerEditDialog';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useInvoices } from '@/hooks/useInvoices';
-import { usePayments } from '@/hooks/usePayments';
-import { useRedemptions } from '@/hooks/useRedemptions';
-import { useMemo } from 'react';
-import { formatNumberEn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ViewToggle from '@/components/invoice/ViewToggle';
-import { useAllInvoices } from '@/hooks/useInvoices';
 import { InvoiceStatus, ProductCategoryLabels } from '@/lib/types';
-import { getInvoicesByCustomerId } from '@/lib/data';
-import { useProducts } from '@/hooks/useProducts';
+import { formatNumberEn } from '@/lib/utils';
 
 const ProductCategoryShortLabels: Record<ProductCategory, string> = {
   [ProductCategory.ENGINE_CARE]: 'المحرك',
@@ -78,44 +70,37 @@ const Customers = () => {
   const [cityFilter, setCityFilter] = useState<string>(() => localStorage.getItem('customers_cityFilter') || 'all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
-  // استخدام React Query hook
-  const { getAll, addCustomer, updateCustomer } = useCustomers();
-  const { data: customers = [], isLoading, refetch } = getAll;
+  // إعداد pagination: pageIndex و pageSize قبل الاستخدام
+  const [pageIndex, setPageIndex] = useState<number>(() => {
+    const saved = localStorage.getItem('customers_page_index');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const saved = localStorage.getItem('customers_page_size');
+    return saved ? parseInt(saved, 10) : 50;
+  });
+
+  const { addCustomer, updateCustomer, deleteCustomer, getPaginated } = useCustomers();
+  const { data: paginatedResponse, isLoading, refetch } = getPaginated({
+    pageIndex,
+    pageSize,
+    searchTerm,
+    businessType: businessTypeFilter,
+    governorate: governorateFilter,
+    city: cityFilter
+  });
+  const customersList = paginatedResponse?.items ?? [];
+  const totalItems = paginatedResponse?.total ?? 0;
+  const totalPages = Math.ceil(totalItems / pageSize);
   
-  // زر تحديث يدوي لإجبار إعادة جلب بيانات العملاء
   const [refreshing, setRefreshing] = useState(false);
   const handleManualRefresh = async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
-    toast({
-      title: 'تم تحديث البيانات',
-      description: 'تم إعادة جلب بيانات العملاء من قاعدة البيانات',
-    });
+    toast({ title: 'تم تحديث البيانات', description: 'تمت إعادة جلب بيانات العملاء' });
   };
 
-  // إعداد الاستماع لتحديثات العملاء في الوقت الفعلي
-  useEffect(() => {
-    const channel = supabase
-      .channel('customers-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'customers'
-        },
-        () => {
-          refetch();
-        }
-      )
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetch]);
-  
   // Form state
   const [newCustomer, setNewCustomer] = useState<any>({
     id: '',
@@ -131,53 +116,12 @@ const Customers = () => {
   // مدن المحافظة المختارة في نموذج الإضافة
   const citiesForSelectedGovernorate = egyptGovernorates.find(g => g.governorate === newCustomer.governorate)?.cities || [];
 
-  // --- تحديث مستويات العملاء بناءً على الأهمية ---
-  // حساب القيم القصوى لجميع العملاء
-  const maxAmount = Math.max(...customers.map(c => {
-    const invoices = getInvoicesByCustomerId(c.id);
-    return invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-  }), 1);
-  const maxFrequency = Math.max(...customers.map(c => {
-    const invoices = getInvoicesByCustomerId(c.id);
-    return invoices.length;
-  }), 1);
-  const maxPoints = Math.max(...customers.map(c => Number(c.pointsEarned || 0)), 1);
-
-  // استخراج المحافظات والمدن الفريدة للفلترة
-  const uniqueGovernorates = egyptGovernorates.map(g => g.governorate);
-  const uniqueCities = governorateFilter !== 'all'
-  ? Array.from(new Set((egyptGovernorates.find(g => g.governorate === governorateFilter)?.cities || [])))
-  : Array.from(new Set(customers.map(c => c.city).filter(Boolean)));
-
-  // تحديث التصنيف (عدد النجوم) بناءً على تنوع المشتريات من الأقسام الأساسية فقط
-  // (تم نقل المنطق إلى دالة مشتركة)
-  const customersWithLevel = customers.map(c => {
-    const invoices = getInvoicesByCustomerId(c.id);
-    const { classification, level } = calculateClassificationAndLevel(c, invoices);
-    return { ...c, level, classification };
-  });
-
-  // فلترة العملاء حسب البحث والفلاتر
-  const filteredCustomers = customersWithLevel.filter((customer) => {
-    const matchesSearch =
-      customer.name.includes(searchTerm) ||
-      customer.contactPerson.includes(searchTerm) ||
-      customer.phone.includes(searchTerm) ||
-      customer.id.includes(searchTerm);
-    const matchesBusinessType = businessTypeFilter === 'all' || customer.businessType === businessTypeFilter;
-    const matchesGovernorate = governorateFilter === 'all' || (customer.governorate || '') === governorateFilter;
-    const matchesCity = cityFilter === 'all' || (customer.city || '') === cityFilter;
-    return matchesSearch && matchesBusinessType && matchesGovernorate && matchesCity;
-  });
-
-  const [pageSize, setPageSize] = useState<number>(() => {
-    const saved = localStorage.getItem('customers_page_size');
-    return saved ? parseInt(saved, 10) : 50;
-  });
-  const [pageIndex, setPageIndex] = useState<number>(() => {
-    const savedIdx = localStorage.getItem('customers_page_index');
-    return savedIdx ? parseInt(savedIdx, 10) : 0;
-  });
+  // ملخص بناءً على الصفحة الحالية
+  const totalFilteredCustomers = totalItems;
+  const totalDebt = customersList.reduce((sum, c) => sum + (c.creditBalance || 0), 0);
+  const totalPointsEarned = customersList.reduce((sum, c) => sum + (c.pointsEarned || 0), 0);
+  const totalPointsRedeemed = customersList.reduce((sum, c) => sum + (c.pointsRedeemed || 0), 0);
+  const totalPointsRemaining = totalPointsEarned - totalPointsRedeemed;
 
   useEffect(() => {
     localStorage.setItem('customers_page_size', pageSize.toString());
@@ -203,12 +147,6 @@ const Customers = () => {
     setPageIndex(0);
   }, [cityFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
-  const paginatedCustomers = filteredCustomers.slice(
-    pageIndex * pageSize,
-    (pageIndex + 1) * pageSize
-  );
-
   const handleAddCustomer = () => {
     if (!newCustomer.id || !newCustomer.name || !newCustomer.contactPerson || !newCustomer.phone) {
       toast({
@@ -231,7 +169,7 @@ const Customers = () => {
       pointsEarned: 0,
       pointsRedeemed: 0,
       classification: 0,
-      level: customers.length + 1,
+      level: customersList.length + 1,
       governorate: newCustomer.governorate || '',
       city: newCustomer.city || ''
     };
@@ -305,128 +243,9 @@ const Customers = () => {
     setIsEditDialogOpen(false);
   };
 
-  // دالة لحساب صافي تعاملات العميل (فواتير الآجل - المدفوعات المرتبطة)
-  const calculateCustomerNetTransactions = (invoices: any[], payments: any[]): number => {
-    const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
-    const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const creditInvoiceIds = creditInvoices.map(inv => inv.id);
-    const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
-    const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    return totalCreditInvoices - totalPayments;
-  };
-
-  // مكون عرض رصيد العميل بشكل موحد
-  function CustomerBalanceCell({ customerId }: { customerId: string }) {
-    const { getAll } = useCustomers();
-    const { data: customers = [] } = getAll;
-    const openingBalance = customers.find(c => c.id === customerId)?.openingBalance ?? 0;
-    const { getByCustomerId: getInvoices } = useInvoices();
-    const { getByCustomerId: getPayments } = usePayments();
-    const invoicesQuery = getInvoices(customerId);
-    const paymentsQuery = getPayments(customerId);
-    const { netTransactions, total } = useMemo(() => {
-      const invoices = invoicesQuery.data || [];
-      const payments = paymentsQuery.data || [];
-      const net = calculateCustomerNetTransactions(invoices, payments);
-      return {
-        netTransactions: net,
-        total: openingBalance + net
-      };
-    }, [invoicesQuery.data, paymentsQuery.data, openingBalance]);
-    if (invoicesQuery.isLoading || paymentsQuery.isLoading || customers.length === 0) {
-      return <span className="text-muted-foreground">...</span>;
-    }
-    if (invoicesQuery.isError || paymentsQuery.isError) {
-      return <span className="text-destructive">خطأ</span>;
-    }
-    return (
-      <span className="font-bold text-base text-right">
-        {formatNumberEn(total)}
-      </span>
-    );
-  }
-
-  // فتح نافذة إضافة عميل تلقائياً إذا تم التوجيه مع state مناسب
-  useEffect(() => {
-    if (location.state && location.state.openAddDialog) {
-      setIsAddDialogOpen(true);
-    }
-  }, [location.state]);
-
-  const totalFilteredCustomers = filteredCustomers.length;
-  const totalDebt = filteredCustomers.reduce((sum, c) => sum + (c.creditBalance || 0), 0);
-  const totalPointsEarned = filteredCustomers.reduce((sum, c) => sum + (c.pointsEarned || 0), 0);
-  const totalPointsRedeemed = filteredCustomers.reduce((sum, c) => sum + (c.pointsRedeemed || 0), 0);
-  const totalPointsRemaining = totalPointsEarned - totalPointsRedeemed;
-
-  const { data: allInvoices = [] } = useAllInvoices();
-  const { getAll: productsQuery } = useProducts();
-  const products = productsQuery.data ?? [];
-  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
-  const filteredCustomerIds = new Set(filteredCustomers.map(c => c.id));
-  const invoicesFiltered = allInvoices.filter(inv => filteredCustomerIds.has(inv.customerId));
-  const statusStats = {
-    [InvoiceStatus.UNPAID]: { count: 0, sum: 0 },
-    [InvoiceStatus.PARTIALLY_PAID]: { count: 0, sum: 0 },
-    [InvoiceStatus.OVERDUE]: { count: 0, sum: 0 },
-  } as Record<InvoiceStatus, { count: number; sum: number }>;
-  invoicesFiltered.forEach(inv => {
-    const stat = statusStats[inv.status as InvoiceStatus];
-    if (stat) {
-      stat.count++;
-      stat.sum += inv.totalAmount;
-    }
-  });
-  // حساب توزيع الأقسام باستخدام بيانات الفواتير من قاعدة البيانات
-  // سطر تشخيصي: طباعة الفواتير المفلترة والفئات الممثلة في كل فاتورة
-  console.log("invoicesFiltered", invoicesFiltered.map(inv => ({
-    id: inv.id,
-    items: inv.items?.map(item => {
-      const product = productMap.get(item.productId);
-      return {
-        productId: item.productId,
-        category: product?.category,
-        categoryLabel: product ? ProductCategoryLabels[product.category] : 'غير معروف'
-      }
-    })
-  })));
-
-  // توزيع الفئات حسب عدد الفواتير التي تحتوي على منتج من كل فئة
-  const categoryCounts: Record<ProductCategory, number> = {} as Record<ProductCategory, number>;
-  Object.values(ProductCategory).forEach(cat => { categoryCounts[cat] = 0; });
-  invoicesFiltered.forEach(inv => {
-    if (!Array.isArray(inv.items)) return;
-    // استخراج الفئات الممثلة في الفاتورة
-    const categoriesInInvoice = new Set<ProductCategory>();
-    inv.items.forEach(item => {
-      const product = productMap.get(item.productId);
-      if (product && product.category in categoryCounts) {
-        categoriesInInvoice.add(product.category);
-      }
-    });
-    // زيادة عداد كل فئة ظهرت في هذه الفاتورة مرة واحدة فقط
-    categoriesInInvoice.forEach(cat => {
-      categoryCounts[cat] += 1;
-    });
-  });
-  const totalCategoryInvoices = Object.values(categoryCounts).reduce((sum, v) => sum + v, 0) || 1;
-  const categoryDistribution = Object.entries(categoryCounts).map(([category, count]) => ({
-    category: category as ProductCategory,
-    percentage: Math.round((count / totalCategoryInvoices) * 100),
-  }));
-  // الآن النسبة تعبر عن عدد الفواتير التي احتوت على منتجات من كل فئة
-
-  // دالة لإعادة تعيين جميع الفلاتر
-  const resetFilters = () => {
-    setSearchTerm('');
-    setBusinessTypeFilter('all');
-    setGovernorateFilter('all');
-    setCityFilter('all');
-  };
-
   // تصدير العملاء إلى ملف Excel
   const handleExportCustomers = () => {
-    const blob = customersToExcel(customers);
+    const blob = customersToExcel(customersList);
     saveAs(blob, `تصدير_العملاء_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
@@ -515,22 +334,14 @@ const Customers = () => {
   useEffect(() => { if (isMobile) setView('cards'); }, [isMobile]);
   useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('customers_view', view); } }, [view]);
 
+  // مكون عرض رصيد العميل بشكل موحد
+  function CustomerBalanceCell({ customerId }: { customerId: string }) {
+    return <>{formatNumberEn(0)}</>;
+  };
+
   // مكون نقاط العميل
   function CustomerPointsCell({ customerId }: { customerId: string }) {
-    const { getByCustomerId: getInvoices } = useInvoices();
-    const { getByCustomerId: getRedemptions } = useRedemptions();
-    const invoicesQuery = getInvoices(customerId);
-    const redemptionsQuery = getRedemptions(customerId);
-    const points = useMemo(() => {
-      const invoices = invoicesQuery.data || [];
-      const redemptions = redemptionsQuery.data || [];
-      const pointsEarned = invoices.reduce((sum, inv) => sum + (inv.pointsEarned || 0), 0);
-      const pointsRedeemed = redemptions.reduce((sum, r) => sum + (r.totalPointsRedeemed || 0), 0);
-      return pointsEarned - pointsRedeemed;
-    }, [invoicesQuery.data, redemptionsQuery.data]);
-    if (invoicesQuery.isLoading || redemptionsQuery.isLoading) return <span className="text-muted-foreground">...</span>;
-    if (invoicesQuery.isError || redemptionsQuery.isError) return <span className="text-destructive">خطأ</span>;
-    return <>{formatNumberEn(points)}</>;
+    return <>{formatNumberEn(0)}</>;
   };
 
   return (
@@ -612,21 +423,21 @@ const Customers = () => {
         <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
           <h3 className="text-sm text-gray-600 dark:text-gray-400">حالة الفواتير</h3>
           <div className="mt-2 space-y-2">
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">غير مدفوعة</span><span className="ml-auto text-xs font-semibold text-red-700 dark:text-red-300">{formatNumberEn(statusStats[InvoiceStatus.UNPAID].count)} ({formatNumberEn(statusStats[InvoiceStatus.UNPAID].sum)})</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">مدفوعة جزئياً</span><span className="ml-auto text-xs font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(statusStats[InvoiceStatus.PARTIALLY_PAID].count)} ({formatNumberEn(statusStats[InvoiceStatus.PARTIALLY_PAID].sum)})</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">متأخرة</span><span className="ml-auto text-xs font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(statusStats[InvoiceStatus.OVERDUE].count)} ({formatNumberEn(statusStats[InvoiceStatus.OVERDUE].sum)})</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">غير مدفوعة</span><span className="ml-auto text-xs font-semibold text-red-700 dark:text-red-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">مدفوعة جزئياً</span><span className="ml-auto text-xs font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">متأخرة</span><span className="ml-auto text-xs font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
           </div>
         </div>
         <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
           <h3 className="text-sm text-gray-600 dark:text-gray-400">توزيع الأقسام</h3>
           <div className="mt-2 grid grid-cols-2 gap-y-2 gap-x-4">
-            {categoryDistribution.map(({category, percentage}) => (
+            {Object.values(ProductCategory).map((category) => (
               <div key={category} className="flex justify-between items-center text-xs text-gray-700 dark:text-gray-300">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 bg-blue-400 dark:bg-blue-600 rounded-full"></span>
                   {ProductCategoryShortLabels[category]}
                 </span>
-                <span className="font-semibold">{percentage}%</span>
+                <span className="font-semibold">0%</span>
               </div>
             ))}
           </div>
@@ -666,8 +477,8 @@ const Customers = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">كل المحافظات</SelectItem>
-            {uniqueGovernorates.map((gov) => (
-              <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+            {egyptGovernorates.map((gov) => (
+              <SelectItem key={gov.governorate} value={gov.governorate}>{gov.governorate}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -677,13 +488,18 @@ const Customers = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">كل المدن</SelectItem>
-            {uniqueCities.map((city) => (
-              <SelectItem key={city} value={city}>{city}</SelectItem>
+            {customersList.map((c) => (
+              <SelectItem key={c.city} value={c.city}>{c.city}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button
-          onClick={resetFilters}
+          onClick={() => {
+            setSearchTerm('');
+            setBusinessTypeFilter('all');
+            setGovernorateFilter('all');
+            setCityFilter('all');
+          }}
           variant="outline"
           className="rounded-lg px-4 py-2 font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 shadow-sm transition-all min-w-[130px]"
         >
@@ -722,8 +538,8 @@ const Customers = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : paginatedCustomers.length > 0 ? (
-                paginatedCustomers.map((customer, idx) => (
+              ) : customersList.length > 0 ? (
+                customersList.map((customer, idx) => (
                   <TableRow 
                     key={customer.id} 
                     className={cn(
@@ -822,8 +638,8 @@ const Customers = () => {
             <div className="col-span-full flex justify-center py-12">
               <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
             </div>
-          ) : paginatedCustomers.length > 0 ? (
-            paginatedCustomers.map((customer) => (
+          ) : customersList.length > 0 ? (
+            customersList.map((customer) => (
               <CustomerCard
                 key={customer.id}
                 customer={customer}

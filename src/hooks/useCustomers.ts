@@ -140,12 +140,25 @@ export function useCustomers() {
   });
   
   return {
-    customers,  // Direct access to customers data
-    isLoading,  // Direct access to loading state
-    getAll,     // For advanced usage
+    customers,
+    isLoading,
+    getAll,
     getById,
     addCustomer,
     updateCustomer,
-    deleteCustomer
+    deleteCustomer,
+    // دعم pagination مع فلاتر
+    getPaginated: (params: { pageIndex: number; pageSize: number; searchTerm?: string; businessType?: string; governorate?: string; city?: string }) =>
+      useQuery<{ items: Customer[]; total: number }, Error>({
+        queryKey: ['customers', 'paginated', params.pageIndex, params.pageSize, params.searchTerm, params.businessType, params.governorate, params.city],
+        queryFn: () => customersService.getPaginated(
+          params.pageIndex,
+          params.pageSize,
+          params.searchTerm,
+          params.businessType,
+          params.governorate,
+          params.city
+        )
+      })
   };
 }

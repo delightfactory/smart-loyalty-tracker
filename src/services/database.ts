@@ -1,4 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
 import { 
   Product, 
   Customer, 
@@ -10,7 +9,8 @@ import {
   PaymentType,
   InvoiceStatus,
   PaymentMethod,
-  RedemptionStatus
+  RedemptionStatus,
+  BusinessType
 } from '@/lib/types';
 import { 
   dbProductToAppProduct, 
@@ -28,6 +28,7 @@ import {
   dbRedemptionItemToAppRedemptionItem,
   appRedemptionItemToDbRedemptionItem
 } from '@/lib/adapters';
+import { supabase } from '@/integrations/supabase/client';
 
 export const productsService = {
   async getAll(): Promise<Product[]> {
@@ -258,6 +259,42 @@ export const customersService = {
       throw error;
     }
     return data.map(dbCustomerToAppCustomer);
+  },
+  
+  async getPaginated(
+    pageIndex: number,
+    pageSize: number,
+    searchTerm?: string,
+    businessType?: string,
+    governorate?: string,
+    city?: string
+  ): Promise<{ items: Customer[]; total: number }> {
+    const from = pageIndex * pageSize;
+    const to = from + pageSize - 1;
+    let qb = supabase
+      .from('customers')
+      .select(
+        'id,name,contact_person,phone,business_type,governorate,city,current_points,points_earned,points_redeemed,classification,level,credit_balance,opening_balance,credit_period,credit_limit',
+        { count: 'exact' }
+      );
+    if (searchTerm) {
+      const q = `%${searchTerm.toLowerCase()}%`;
+      qb = qb.ilike('name', q).or(`contact_person.ilike.${q},phone.ilike.${q},id.ilike.${q}`);
+    }
+    if (businessType && businessType !== 'all') qb = qb.eq('business_type', businessType as BusinessType);
+    if (governorate && governorate !== 'all') qb = qb.eq('governorate', governorate);
+    if (city && city !== 'all') qb = qb.eq('city', city);
+    const { data, error, count } = await qb
+      .order('name')
+      .range(from, to);
+    if (error) {
+      console.error('Error fetching paginated customers:', error);
+      throw error;
+    }
+    return {
+      items: data.map(dbCustomerToAppCustomer),
+      total: count || 0
+    };
   }
 };
 
