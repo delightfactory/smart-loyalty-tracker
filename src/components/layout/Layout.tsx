@@ -27,13 +27,11 @@ const LayoutWithSidebar = ({ children }: LayoutProps) => {
     <>
       <SidebarWithContext />
       <div
-        className={`relative flex flex-1 flex-col overflow-hidden transition-all duration-300`
-          + (isSidebarOpen && !isMobile ? ' md:mr-[256px]' : '')
-        }
+        className={`relative flex flex-1 flex-col overflow-hidden transition-all duration-150 ease-out ${!isMobile && isSidebarOpen ? 'md:mr-[16rem]' : 'md:mr-0'}`}
       >
         <HeaderWithContext />
         <main className="flex-1 overflow-auto p-2 sm:p-3 md:p-4 pt-16 md:pt-20">
-          <div className="mx-auto w-full max-w-[1600px]">
+          <div className={`${isSidebarOpen && !isMobile ? 'ml-0 mr-auto' : 'mx-auto'} w-full max-w-[1600px]`}>
             {children}
           </div>
         </main>
@@ -50,8 +48,7 @@ const SidebarWithContext = () => {
     <Sidebar
       side="right"
       variant="sidebar"
-      collapsible="offcanvas"
-      // استخدم Sheet تلقائياً في وضع الهاتف
+      collapsible={isMobile ? "offcanvas" : "icon"}
       // open و onOpenChange يديرها السياق
     >
       <SidebarContent isSidebarOpen={isSidebarOpen} />

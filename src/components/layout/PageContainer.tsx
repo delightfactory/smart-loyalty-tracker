@@ -1,4 +1,3 @@
-
 import { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
@@ -34,10 +33,10 @@ const PageContainer = ({
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
           {searchPlaceholder && onSearchChange && (
             <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-600 dark:text-gray-400" />
               <Input
                 placeholder={searchPlaceholder}
-                className="pl-10"
+                className="pl-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300"
                 onChange={(e) => onSearchChange(e.target.value)}
               />
             </div>

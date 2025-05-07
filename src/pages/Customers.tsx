@@ -50,6 +50,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import ViewToggle from '@/components/invoice/ViewToggle';
 import { InvoiceStatus, ProductCategoryLabels } from '@/lib/types';
 import { formatNumberEn } from '@/lib/utils';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useProducts } from '@/hooks/useProducts';
 
 const ProductCategoryShortLabels: Record<ProductCategory, string> = {
   [ProductCategory.ENGINE_CARE]: 'المحرك',
@@ -58,6 +60,15 @@ const ProductCategoryShortLabels: Record<ProductCategory, string> = {
   [ProductCategory.DASHBOARD_CARE]: 'التابلوه',
   [ProductCategory.INTERIOR_CARE]: 'الفرش',
   [ProductCategory.SUPPLIES]: 'المستلزمات',
+};
+
+const categoryColorClasses: Record<ProductCategory, { bullet: string; text: string }> = {
+  [ProductCategory.ENGINE_CARE]: { bullet: 'bg-red-400 dark:bg-red-600', text: 'text-red-800 dark:text-red-300' },
+  [ProductCategory.EXTERIOR_CARE]: { bullet: 'bg-blue-400 dark:bg-blue-600', text: 'text-blue-800 dark:text-blue-300' },
+  [ProductCategory.TIRE_CARE]: { bullet: 'bg-green-400 dark:bg-green-600', text: 'text-green-800 dark:text-green-300' },
+  [ProductCategory.DASHBOARD_CARE]: { bullet: 'bg-yellow-400 dark:bg-yellow-600', text: 'text-yellow-800 dark:text-yellow-300' },
+  [ProductCategory.INTERIOR_CARE]: { bullet: 'bg-purple-400 dark:bg-purple-600', text: 'text-purple-800 dark:text-purple-300' },
+  [ProductCategory.SUPPLIES]: { bullet: 'bg-teal-400 dark:bg-teal-600', text: 'text-teal-800 dark:text-teal-300' },
 };
 
 const Customers = () => {
@@ -81,7 +92,11 @@ const Customers = () => {
   });
 
   const { addCustomer, updateCustomer, deleteCustomer, getPaginated } = useCustomers();
-  const { data: paginatedResponse, isLoading, refetch } = getPaginated({
+  const { getAll: getAllInvoices } = useInvoices();
+  const { data: allInvoices = [], isLoading: invoicesLoading } = getAllInvoices;
+  const { getAll: getAllProducts } = useProducts();
+  const { data: products = [], isLoading: productsLoading } = getAllProducts;
+  const { data: paginatedResponse, isLoading: customersLoading, refetch } = getPaginated({
     pageIndex,
     pageSize,
     searchTerm,
@@ -117,11 +132,48 @@ const Customers = () => {
   const citiesForSelectedGovernorate = egyptGovernorates.find(g => g.governorate === newCustomer.governorate)?.cities || [];
 
   // ملخص بناءً على الصفحة الحالية
-  const totalFilteredCustomers = totalItems;
   const totalDebt = customersList.reduce((sum, c) => sum + (c.creditBalance || 0), 0);
   const totalPointsEarned = customersList.reduce((sum, c) => sum + (c.pointsEarned || 0), 0);
   const totalPointsRedeemed = customersList.reduce((sum, c) => sum + (c.pointsRedeemed || 0), 0);
   const totalPointsRemaining = totalPointsEarned - totalPointsRedeemed;
+  const indebtedCount = customersList.filter(c => c.creditBalance && c.creditBalance > 0).length;
+
+  // قائمة المدن المتاحة بناءً على الفلتر
+  const availableCities = useMemo(() => {
+    if (governorateFilter !== 'all') {
+      return egyptGovernorates.find(g => g.governorate === governorateFilter)?.cities || [];
+    }
+    const cities = customersList.map(c => c.city).filter(city => Boolean(city));
+    return Array.from(new Set(cities));
+  }, [customersList, governorateFilter]);
+
+  // توزيع نوع النشاط بين العملاء
+  const businessTypeDistribution = useMemo(() => {
+    const dist = Object.values(BusinessType).reduce((acc, type) => { acc[type] = 0; return acc; }, {} as Record<BusinessType, number>);
+    customersList.forEach(c => { if (dist[c.businessType] !== undefined) dist[c.businessType]++; });
+    return Object.entries(dist).map(([type, count]) => ({ type, percentage: totalItems ? Math.round((count / totalItems) * 100) : 0 }));
+  }, [customersList, totalItems]);
+
+  // توزيع الفئات بناءً على قيمة المبيعات للعملاء الحاليين
+  const categoryDistribution = useMemo(() => {
+    if (invoicesLoading || productsLoading) return [];
+    const customerIds = new Set(customersList.map(c => c.id));
+    const catSales: Record<string, number> = {};
+    allInvoices.forEach(inv => {
+      if (customerIds.has(inv.customerId) && inv.items) {
+        inv.items.forEach(item => {
+          const product = products.find(p => p.id === item.productId);
+          const cat = product?.category;
+          if (!cat) return;
+          catSales[cat] = (catSales[cat] || 0) + (item.totalPrice ?? (item.price * item.quantity));
+        });
+      }
+    });
+    const totalSales = Object.values(catSales).reduce((sum, v) => sum + v, 0);
+    return Object.entries(catSales)
+      .map(([name, value]) => ({ name, percentage: totalSales ? Math.round((value / totalSales) * 100) : 0 }))
+      .sort((a, b) => b.percentage - a.percentage);
+  }, [allInvoices, customersList, invoicesLoading, products, productsLoading]);
 
   useEffect(() => {
     localStorage.setItem('customers_page_size', pageSize.toString());
@@ -354,10 +406,10 @@ const Customers = () => {
             variant="ghost"
             className="p-2 h-10 w-10 border border-muted-foreground/20 hover:bg-primary/10 hover:text-primary transition-colors shadow-sm rounded-full relative"
             onClick={handleManualRefresh}
-            disabled={refreshing || isLoading}
+            disabled={refreshing || customersLoading}
             aria-label="تحديث البيانات"
           >
-            {refreshing || isLoading ? (
+            {refreshing || customersLoading ? (
               <span className="absolute inset-0 flex items-center justify-center">
                 <RotateCcw className="animate-spin w-5 h-5 text-primary" />
               </span>
@@ -404,42 +456,58 @@ const Customers = () => {
       
       {/* تحسين مربعات البحث والفلترة وزر إعادة التعيين */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400">عدد العملاء</h3>
-          <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-gray-100">{formatNumberEn(totalFilteredCustomers)}</p>
-        </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400">إجمالي المديونيات (EGP)</h3>
-          <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-gray-100">{formatNumberEn(totalDebt)}</p>
-        </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400">ملخص النقاط</h3>
-          <div className="mt-2 space-y-1">
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-green-400 dark:bg-green-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المكتسبة</span><span className="ml-auto text-xs font-semibold text-green-700 dark:text-green-300">{formatNumberEn(totalPointsEarned)}</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-indigo-400 dark:bg-indigo-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المستبدلة</span><span className="ml-auto text-xs font-semibold text-indigo-700 dark:text-indigo-300">{formatNumberEn(totalPointsRedeemed)}</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المتبقية</span><span className="ml-auto text-xs font-semibold text-gray-700 dark:text-gray-300">{formatNumberEn(totalPointsRemaining)}</span></div>
+        <div className="p-4 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-blue-600 dark:text-blue-300 font-semibold">عدد العملاء</h3>
+          <p className="mt-1 text-xl font-bold text-blue-800 dark:text-blue-100">{formatNumberEn(totalItems)}</p>
+          <div className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+            <div>إجمالي المديونيات: <span className="font-semibold">{formatNumberEn(totalDebt)} EGP</span></div>
+            <div>عدد المدينين: <span className="font-semibold">{formatNumberEn(indebtedCount)}</span></div>
           </div>
         </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400">حالة الفواتير</h3>
-          <div className="mt-2 space-y-2">
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">غير مدفوعة</span><span className="ml-auto text-xs font-semibold text-red-700 dark:text-red-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">مدفوعة جزئياً</span><span className="ml-auto text-xs font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">متأخرة</span><span className="ml-auto text-xs font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(0)} ({formatNumberEn(0)})</span></div>
+        <div className="p-4 bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-green-600 dark:text-green-300 font-semibold">ملخص النقاط</h3>
+          <div className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-green-400 dark:bg-green-600 rounded-full"></span>
+              <span className="ml-1">المكتسبة:</span>
+              <span className="ml-auto font-semibold text-green-800 dark:text-green-200">{formatNumberEn(totalPointsEarned)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-indigo-400 dark:bg-indigo-600 rounded-full"></span>
+              <span className="ml-1">المستبدلة:</span>
+              <span className="ml-auto font-semibold text-indigo-800 dark:text-indigo-200">{formatNumberEn(totalPointsRedeemed)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"></span>
+              <span className="ml-1">المتبقية:</span>
+              <span className="ml-auto font-semibold text-gray-800 dark:text-gray-200">{formatNumberEn(totalPointsRemaining)}</span>
+            </div>
           </div>
         </div>
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <h3 className="text-sm text-gray-600 dark:text-gray-400">توزيع الأقسام</h3>
-          <div className="mt-2 grid grid-cols-2 gap-y-2 gap-x-4">
-            {Object.values(ProductCategory).map((category) => (
-              <div key={category} className="flex justify-between items-center text-xs text-gray-700 dark:text-gray-300">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-blue-400 dark:bg-blue-600 rounded-full"></span>
-                  {ProductCategoryShortLabels[category]}
-                </span>
-                <span className="font-semibold">0%</span>
-              </div>
-            ))}
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-yellow-600 dark:text-yellow-300 font-semibold">حالة الفواتير</h3>
+          <div className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+            {/* اقتراح: إضافة ملخص عدد الفواتير الكلي ومتوسط قيمة الفاتورة */}
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="ml-1">غير مدفوعة:</span><span className="ml-auto font-semibold text-red-700 dark:text-red-300">{formatNumberEn(0)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="ml-1">مدفوعة جزئياً:</span><span className="ml-auto font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(0)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="ml-1">متأخرة:</span><span className="ml-auto font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(0)}</span></div>
+          </div>
+        </div>
+        <div className="p-2 bg-teal-50 dark:bg-teal-900 border border-teal-200 dark:border-teal-700 rounded-lg shadow-sm">
+          <h3 className="text-xs text-teal-600 dark:text-teal-300 font-semibold">توزيع الفئات</h3>
+          <div className="mt-1 grid grid-cols-2 gap-y-1 gap-x-1">
+            {categoryDistribution.map(({ name, percentage }) => {
+              const color = categoryColorClasses[name as ProductCategory] || { bullet: 'bg-blue-400 dark:bg-blue-600', text: 'text-blue-800 dark:text-blue-300' };
+              return (
+                <div key={name} className="flex justify-between items-center min-w-0 py-0.5">
+                  <span className="flex items-center gap-1 min-w-0 overflow-hidden">
+                    <span className={`w-1 h-1 rounded-full ${color.bullet}`}></span>
+                    <span className="truncate text-xs flex-1">{ProductCategoryShortLabels[name as ProductCategory] || name}</span>
+                  </span>
+                  <span className={`${color.text} font-semibold text-base`}>{formatNumberEn(percentage)}%</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -488,8 +556,8 @@ const Customers = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">كل المدن</SelectItem>
-            {customersList.map((c) => (
-              <SelectItem key={c.city} value={c.city}>{c.city}</SelectItem>
+            {availableCities.map(city => (
+              <SelectItem key={city} value={city}>{city}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -529,7 +597,7 @@ const Customers = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {customersLoading ? (
                 <TableRow>
                   <TableCell colSpan={12} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
@@ -634,7 +702,7 @@ const Customers = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {isLoading ? (
+          {customersLoading ? (
             <div className="col-span-full flex justify-center py-12">
               <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
             </div>

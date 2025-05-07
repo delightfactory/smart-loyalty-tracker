@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from "date-fns";
@@ -48,4 +47,11 @@ export function formatDateTime(dateString?: string | Date): string {
     minute: 'numeric',
     hour12: true,
   }).format(date);
+}
+
+// تنسيق التاريخ بصيغة إنجليزية YYYY-MM-DD
+export function formatDateEn(dateString?: string | Date): string {
+  if (!dateString) return '-';
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  return date.toISOString().split('T')[0];
 }

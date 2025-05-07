@@ -141,17 +141,25 @@ export const productsService = {
 
 export const customersService = {
   async getAll(): Promise<Customer[]> {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('name');
-      
-    if (error) {
-      console.error('Error fetching customers:', error);
-      throw error;
+    const allRaw: any[] = [];
+    const batchSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('name')
+        .range(from, from + batchSize - 1);
+      if (error) {
+        console.error('Error fetching customers batch:', error);
+        throw error;
+      }
+      if (!data || data.length === 0) break;
+      allRaw.push(...data);
+      if (data.length < batchSize) break;
+      from += batchSize;
     }
-    
-    return data.map(dbCustomerToAppCustomer);
+    return allRaw.map(dbCustomerToAppCustomer);
   },
   
   async getById(id: string): Promise<Customer> {
