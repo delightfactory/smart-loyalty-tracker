@@ -1,4 +1,3 @@
-
 import { 
   Select,
   SelectContent,
@@ -81,10 +80,10 @@ const CustomerSelector = ({
         </Select>
         
         {!disabled && (
-          <div className={`${isMobile ? 'w-full' : 'w-44'}`}>
-            <SmartSearch 
+          <div className="flex-1 relative">
+            <SmartSearch
               type="customer"
-              placeholder="بحث سريع..."
+              placeholder="بحث بالاسم، الكود، الهاتف أو المسؤول..."
               onSelectCustomer={(customer) => onSelectCustomer(customer.id)}
             />
           </div>

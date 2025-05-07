@@ -38,6 +38,8 @@ const Payments: React.FC = () => {
   const [filter, setFilter] = useState('');
   const [view, setView] = useState<'table' | 'cards'>('table');
   const isMobile = useIsMobile();
+  const [pageSize, setPageSize] = useState<number>(() => parseInt(localStorage.getItem('payments_page_size') || '50', 10));
+  const [pageIndex, setPageIndex] = useState<number>(() => parseInt(localStorage.getItem('payments_page_index') || '0', 10));
 
   // استخدام localStorage لحفظ طريقة العرض المفضلة
   useEffect(() => {
@@ -59,6 +61,9 @@ const Payments: React.FC = () => {
   useEffect(() => {
     if (isMobile) setView('cards');
   }, [isMobile]);
+
+  useEffect(() => { localStorage.setItem('payments_page_size', String(pageSize)); setPageIndex(0); }, [pageSize]);
+  useEffect(() => { localStorage.setItem('payments_page_index', String(pageIndex)); }, [pageIndex]);
 
   // حالة الترتيب: العمود والاتجاه
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -132,13 +137,13 @@ const Payments: React.FC = () => {
     );
   });
 
-  // Summary
   const totalAmount = filteredPayments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalCount = filteredPayments.length;
+  const totalFiltered = filteredPayments.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const paginatedPayments = filteredPayments.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-
+  // Summary
   const handleEdit = (paymentId: string) => {
     setEditDialogId(paymentId);
     setEditDialogOpen(true);
@@ -148,6 +153,9 @@ const Payments: React.FC = () => {
     setPendingDeleteId(paymentId);
     setDeleteDialogOpen(true);
   };
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   return (
     <PageContainer 
@@ -212,12 +220,12 @@ const Payments: React.FC = () => {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {isLoading ? (
                 <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
-              ) : filteredPayments.length === 0 ? (
+              ) : paginatedPayments.length === 0 ? (
                 <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">لم يتم العثور على مدفوعات.</td></tr>
               ) : (
-                filteredPayments.map((payment, idx) => (
+                paginatedPayments.map((payment, idx) => (
                   <tr key={payment.id} className="hover:bg-muted/20 dark:hover:bg-muted/10 transition-colors">
-                    <td className="px-4 py-3 font-mono text-sm">{(idx + 1).toLocaleString('en-US')}</td>
+                    <td className="px-4 py-3 font-mono text-sm">{(pageIndex * pageSize + idx + 1).toLocaleString('en-US')}</td>
                     <td className="px-4 py-3">{getCustomerName(payment.customerId)}</td>
                     <td className="px-4 py-3 text-primary font-mono">{payment.invoiceId ? getInvoiceNumber(payment.invoiceId) : '-'}</td>
                     <td className="px-4 py-3 text-green-600 dark:text-green-400 font-bold font-mono">{Number(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
@@ -255,10 +263,10 @@ const Payments: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {isLoading ? (
             <div className="col-span-full text-center py-8 text-muted-foreground">جاري التحميل...</div>
-          ) : filteredPayments.length === 0 ? (
+          ) : paginatedPayments.length === 0 ? (
             <div className="col-span-full text-center py-8 text-muted-foreground">لم يتم العثور على مدفوعات.</div>
           ) : (
-            filteredPayments.map(payment => (
+            paginatedPayments.map(payment => (
               <PaymentCard
                 key={payment.id}
                 payment={payment}
@@ -271,6 +279,14 @@ const Payments: React.FC = () => {
           )}
         </div>
       )}
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between py-2">
+        <span>صفحة {pageIndex + 1} من {totalPages}</span>
+        <div className="space-x-2">
+          <Button size="sm" variant="outline" onClick={() => setPageIndex(p => Math.max(p - 1, 0))} disabled={pageIndex <= 0}>السابق</Button>
+          <Button size="sm" variant="outline" onClick={() => setPageIndex(p => Math.min(p + 1, totalPages - 1))} disabled={pageIndex + 1 >= totalPages}>التالي</Button>
+        </div>
+      </div>
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

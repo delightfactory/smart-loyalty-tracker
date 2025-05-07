@@ -68,6 +68,12 @@ const InvoiceDetails = () => {
   const { getAll } = useProducts();
   const { data: products = [] } = getAll;
 
+  const { getById: getCustomerById } = useCustomers();
+  const customerQuery = getCustomerById(invoice?.customerId || '');
+  const customer = customerQuery?.data;
+
+  const { deleteInvoice } = useInvoices();
+
   const getProductById = (productId: string) => products.find(p => p.id === productId);
 
   if (isLoading) {
@@ -96,10 +102,6 @@ const InvoiceDetails = () => {
     );
   }
 
-  const { getById: getCustomerById } = useCustomers();
-  const customerQuery = getCustomerById(invoice.customerId);
-  const customer = customerQuery?.data;
-
   const formatCurrency = (value: number) => {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'EGP' });
   };
@@ -123,7 +125,6 @@ const InvoiceDetails = () => {
     }
   };
 
-  const { deleteInvoice } = useInvoices();
   const handleDeleteInvoice = async () => {
     if (!invoice) return;
     try {

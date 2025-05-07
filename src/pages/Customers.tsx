@@ -39,7 +39,6 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
-import { getInvoicesByCustomerId, getProductById } from '@/lib/data';
 import { calculateClassificationAndLevel } from '@/lib/customerClassification';
 import { egyptGovernorates } from '../lib/egyptLocations';
 import { customersToCSV, csvToCustomers, customersToExcel, excelToCustomers } from '../lib/customerImportExport';
@@ -55,15 +54,28 @@ import { useMemo } from 'react';
 import { formatNumberEn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ViewToggle from '@/components/invoice/ViewToggle';
+import { useAllInvoices } from '@/hooks/useInvoices';
+import { InvoiceStatus, ProductCategoryLabels } from '@/lib/types';
+import { getInvoicesByCustomerId } from '@/lib/data';
+import { useProducts } from '@/hooks/useProducts';
+
+const ProductCategoryShortLabels: Record<ProductCategory, string> = {
+  [ProductCategory.ENGINE_CARE]: 'المحرك',
+  [ProductCategory.EXTERIOR_CARE]: 'السطح',
+  [ProductCategory.TIRE_CARE]: 'الإطارات',
+  [ProductCategory.DASHBOARD_CARE]: 'التابلوه',
+  [ProductCategory.INTERIOR_CARE]: 'الفرش',
+  [ProductCategory.SUPPLIES]: 'المستلزمات',
+};
 
 const Customers = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
-  const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
-  const [governorateFilter, setGovernorateFilter] = useState<string>('all');
-  const [cityFilter, setCityFilter] = useState<string>('all');
+  const [businessTypeFilter, setBusinessTypeFilter] = useState<string>(() => localStorage.getItem('customers_businessTypeFilter') || 'all');
+  const [governorateFilter, setGovernorateFilter] = useState<string>(() => localStorage.getItem('customers_governorateFilter') || 'all');
+  const [cityFilter, setCityFilter] = useState<string>(() => localStorage.getItem('customers_cityFilter') || 'all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
   // استخدام React Query hook
@@ -134,8 +146,8 @@ const Customers = () => {
   // استخراج المحافظات والمدن الفريدة للفلترة
   const uniqueGovernorates = egyptGovernorates.map(g => g.governorate);
   const uniqueCities = governorateFilter !== 'all'
-    ? (egyptGovernorates.find(g => g.governorate === governorateFilter)?.cities || [])
-    : Array.from(new Set(customers.map(c => c.city).filter(Boolean)));
+  ? Array.from(new Set((egyptGovernorates.find(g => g.governorate === governorateFilter)?.cities || [])))
+  : Array.from(new Set(customers.map(c => c.city).filter(Boolean)));
 
   // تحديث التصنيف (عدد النجوم) بناءً على تنوع المشتريات من الأقسام الأساسية فقط
   // (تم نقل المنطق إلى دالة مشتركة)
@@ -157,7 +169,46 @@ const Customers = () => {
     const matchesCity = cityFilter === 'all' || (customer.city || '') === cityFilter;
     return matchesSearch && matchesBusinessType && matchesGovernorate && matchesCity;
   });
-  
+
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const saved = localStorage.getItem('customers_page_size');
+    return saved ? parseInt(saved, 10) : 50;
+  });
+  const [pageIndex, setPageIndex] = useState<number>(() => {
+    const savedIdx = localStorage.getItem('customers_page_index');
+    return savedIdx ? parseInt(savedIdx, 10) : 0;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('customers_page_size', pageSize.toString());
+    setPageIndex(0);
+  }, [pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('customers_page_index', pageIndex.toString());
+  }, [pageIndex]);
+
+  useEffect(() => {
+    localStorage.setItem('customers_businessTypeFilter', businessTypeFilter);
+    setPageIndex(0);
+  }, [businessTypeFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('customers_governorateFilter', governorateFilter);
+    setPageIndex(0);
+  }, [governorateFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('customers_cityFilter', cityFilter);
+    setPageIndex(0);
+  }, [cityFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const paginatedCustomers = filteredCustomers.slice(
+    pageIndex * pageSize,
+    (pageIndex + 1) * pageSize
+  );
+
   const handleAddCustomer = () => {
     if (!newCustomer.id || !newCustomer.name || !newCustomer.contactPerson || !newCustomer.phone) {
       toast({
@@ -254,6 +305,117 @@ const Customers = () => {
     setIsEditDialogOpen(false);
   };
 
+  // دالة لحساب صافي تعاملات العميل (فواتير الآجل - المدفوعات المرتبطة)
+  const calculateCustomerNetTransactions = (invoices: any[], payments: any[]): number => {
+    const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
+    const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const creditInvoiceIds = creditInvoices.map(inv => inv.id);
+    const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
+    const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    return totalCreditInvoices - totalPayments;
+  };
+
+  // مكون عرض رصيد العميل بشكل موحد
+  function CustomerBalanceCell({ customerId }: { customerId: string }) {
+    const { getAll } = useCustomers();
+    const { data: customers = [] } = getAll;
+    const openingBalance = customers.find(c => c.id === customerId)?.openingBalance ?? 0;
+    const { getByCustomerId: getInvoices } = useInvoices();
+    const { getByCustomerId: getPayments } = usePayments();
+    const invoicesQuery = getInvoices(customerId);
+    const paymentsQuery = getPayments(customerId);
+    const { netTransactions, total } = useMemo(() => {
+      const invoices = invoicesQuery.data || [];
+      const payments = paymentsQuery.data || [];
+      const net = calculateCustomerNetTransactions(invoices, payments);
+      return {
+        netTransactions: net,
+        total: openingBalance + net
+      };
+    }, [invoicesQuery.data, paymentsQuery.data, openingBalance]);
+    if (invoicesQuery.isLoading || paymentsQuery.isLoading || customers.length === 0) {
+      return <span className="text-muted-foreground">...</span>;
+    }
+    if (invoicesQuery.isError || paymentsQuery.isError) {
+      return <span className="text-destructive">خطأ</span>;
+    }
+    return (
+      <span className="font-bold text-base text-right">
+        {formatNumberEn(total)}
+      </span>
+    );
+  }
+
+  // فتح نافذة إضافة عميل تلقائياً إذا تم التوجيه مع state مناسب
+  useEffect(() => {
+    if (location.state && location.state.openAddDialog) {
+      setIsAddDialogOpen(true);
+    }
+  }, [location.state]);
+
+  const totalFilteredCustomers = filteredCustomers.length;
+  const totalDebt = filteredCustomers.reduce((sum, c) => sum + (c.creditBalance || 0), 0);
+  const totalPointsEarned = filteredCustomers.reduce((sum, c) => sum + (c.pointsEarned || 0), 0);
+  const totalPointsRedeemed = filteredCustomers.reduce((sum, c) => sum + (c.pointsRedeemed || 0), 0);
+  const totalPointsRemaining = totalPointsEarned - totalPointsRedeemed;
+
+  const { data: allInvoices = [] } = useAllInvoices();
+  const { getAll: productsQuery } = useProducts();
+  const products = productsQuery.data ?? [];
+  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+  const filteredCustomerIds = new Set(filteredCustomers.map(c => c.id));
+  const invoicesFiltered = allInvoices.filter(inv => filteredCustomerIds.has(inv.customerId));
+  const statusStats = {
+    [InvoiceStatus.UNPAID]: { count: 0, sum: 0 },
+    [InvoiceStatus.PARTIALLY_PAID]: { count: 0, sum: 0 },
+    [InvoiceStatus.OVERDUE]: { count: 0, sum: 0 },
+  } as Record<InvoiceStatus, { count: number; sum: number }>;
+  invoicesFiltered.forEach(inv => {
+    const stat = statusStats[inv.status as InvoiceStatus];
+    if (stat) {
+      stat.count++;
+      stat.sum += inv.totalAmount;
+    }
+  });
+  // حساب توزيع الأقسام باستخدام بيانات الفواتير من قاعدة البيانات
+  // سطر تشخيصي: طباعة الفواتير المفلترة والفئات الممثلة في كل فاتورة
+  console.log("invoicesFiltered", invoicesFiltered.map(inv => ({
+    id: inv.id,
+    items: inv.items?.map(item => {
+      const product = productMap.get(item.productId);
+      return {
+        productId: item.productId,
+        category: product?.category,
+        categoryLabel: product ? ProductCategoryLabels[product.category] : 'غير معروف'
+      }
+    })
+  })));
+
+  // توزيع الفئات حسب عدد الفواتير التي تحتوي على منتج من كل فئة
+  const categoryCounts: Record<ProductCategory, number> = {} as Record<ProductCategory, number>;
+  Object.values(ProductCategory).forEach(cat => { categoryCounts[cat] = 0; });
+  invoicesFiltered.forEach(inv => {
+    if (!Array.isArray(inv.items)) return;
+    // استخراج الفئات الممثلة في الفاتورة
+    const categoriesInInvoice = new Set<ProductCategory>();
+    inv.items.forEach(item => {
+      const product = productMap.get(item.productId);
+      if (product && product.category in categoryCounts) {
+        categoriesInInvoice.add(product.category);
+      }
+    });
+    // زيادة عداد كل فئة ظهرت في هذه الفاتورة مرة واحدة فقط
+    categoriesInInvoice.forEach(cat => {
+      categoryCounts[cat] += 1;
+    });
+  });
+  const totalCategoryInvoices = Object.values(categoryCounts).reduce((sum, v) => sum + v, 0) || 1;
+  const categoryDistribution = Object.entries(categoryCounts).map(([category, count]) => ({
+    category: category as ProductCategory,
+    percentage: Math.round((count / totalCategoryInvoices) * 100),
+  }));
+  // الآن النسبة تعبر عن عدد الفواتير التي احتوت على منتجات من كل فئة
+
   // دالة لإعادة تعيين جميع الفلاتر
   const resetFilters = () => {
     setSearchTerm('');
@@ -286,10 +448,7 @@ const Customers = () => {
       imported.forEach((customer, idx) => {
         if (!customer.name || !customer.contactPerson || !customer.phone) {
           failCount++;
-          failedRows.push({
-            row: idx + 2, // +2: 1-based index + header row
-            ...customer
-          });
+          failedRows.push({ row: idx + 2, ...customer });
           return;
         }
         addCustomer.mutate(customer);
@@ -353,18 +512,10 @@ const Customers = () => {
 
   // واجهة العرض: جدول أو كروت
   const [view, setView] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
+  useEffect(() => { if (isMobile) setView('cards'); }, [isMobile]);
+  useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('customers_view', view); } }, [view]);
 
-  useEffect(() => {
-    if (isMobile) setView('cards');
-  }, [isMobile]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('customers_view', view);
-    }
-  }, [view]);
-
-  // --- Real-time points cell ---
+  // مكون نقاط العميل
   function CustomerPointsCell({ customerId }: { customerId: string }) {
     const { getByCustomerId: getInvoices } = useInvoices();
     const { getByCustomerId: getRedemptions } = useRedemptions();
@@ -377,63 +528,10 @@ const Customers = () => {
       const pointsRedeemed = redemptions.reduce((sum, r) => sum + (r.totalPointsRedeemed || 0), 0);
       return pointsEarned - pointsRedeemed;
     }, [invoicesQuery.data, redemptionsQuery.data]);
-    if (invoicesQuery.isLoading || redemptionsQuery.isLoading) {
-      return <span className="text-muted-foreground">...</span>;
-    }
-    if (invoicesQuery.isError || redemptionsQuery.isError) {
-      return <span className="text-destructive">خطأ</span>;
-    }
+    if (invoicesQuery.isLoading || redemptionsQuery.isLoading) return <span className="text-muted-foreground">...</span>;
+    if (invoicesQuery.isError || redemptionsQuery.isError) return <span className="text-destructive">خطأ</span>;
     return <>{formatNumberEn(points)}</>;
-  }
-
-  // --- Real-time balance cell ---
-  // دالة لحساب صافي تعاملات العميل (فواتير الآجل - المدفوعات المرتبطة)
-  function calculateCustomerNetTransactions(invoices: any[], payments: any[]): number {
-    const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
-    const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-    const creditInvoiceIds = creditInvoices.map(inv => inv.id);
-    const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
-    const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    return totalCreditInvoices - totalPayments;
-  }
-
-  // مكون عرض رصيد العميل بشكل موحد
-  function CustomerBalanceCell({ customerId }: { customerId: string }) {
-    const { getAll } = useCustomers();
-    const { data: customers = [] } = getAll;
-    const openingBalance = customers.find(c => c.id === customerId)?.openingBalance ?? 0;
-    const { getByCustomerId: getInvoices } = useInvoices();
-    const { getByCustomerId: getPayments } = usePayments();
-    const invoicesQuery = getInvoices(customerId);
-    const paymentsQuery = getPayments(customerId);
-    const { netTransactions, total } = useMemo(() => {
-      const invoices = invoicesQuery.data || [];
-      const payments = paymentsQuery.data || [];
-      const net = calculateCustomerNetTransactions(invoices, payments);
-      return {
-        netTransactions: net,
-        total: openingBalance + net
-      };
-    }, [invoicesQuery.data, paymentsQuery.data, openingBalance]);
-    if (invoicesQuery.isLoading || paymentsQuery.isLoading || customers.length === 0) {
-      return <span className="text-muted-foreground">...</span>;
-    }
-    if (invoicesQuery.isError || paymentsQuery.isError) {
-      return <span className="text-destructive">خطأ</span>;
-    }
-    return (
-      <span className="font-bold text-base text-right">
-        <span className="text-gray-700">رصيد العميل:</span> {formatNumberEn(total)} ج.م
-      </span>
-    );
-  }
-
-  // فتح نافذة إضافة عميل تلقائياً إذا تم التوجيه مع state مناسب
-  useEffect(() => {
-    if (location.state && location.state.openAddDialog) {
-      setIsAddDialogOpen(true);
-    }
-  }, [location.state]);
+  };
 
   return (
     <PageContainer
@@ -493,7 +591,49 @@ const Customers = () => {
         </div>
       </div>
       
-      {/* تحسين مربعات البحث والفلترة وزر إعادة التعيين - دعم كامل للاستجابة */}
+      {/* تحسين مربعات البحث والفلترة وزر إعادة التعيين */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400">عدد العملاء</h3>
+          <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-gray-100">{formatNumberEn(totalFilteredCustomers)}</p>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400">إجمالي المديونيات (EGP)</h3>
+          <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-gray-100">{formatNumberEn(totalDebt)}</p>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400">ملخص النقاط</h3>
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-green-400 dark:bg-green-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المكتسبة</span><span className="ml-auto text-xs font-semibold text-green-700 dark:text-green-300">{formatNumberEn(totalPointsEarned)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-indigo-400 dark:bg-indigo-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المستبدلة</span><span className="ml-auto text-xs font-semibold text-indigo-700 dark:text-indigo-300">{formatNumberEn(totalPointsRedeemed)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">المتبقية</span><span className="ml-auto text-xs font-semibold text-gray-700 dark:text-gray-300">{formatNumberEn(totalPointsRemaining)}</span></div>
+          </div>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400">حالة الفواتير</h3>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">غير مدفوعة</span><span className="ml-auto text-xs font-semibold text-red-700 dark:text-red-300">{formatNumberEn(statusStats[InvoiceStatus.UNPAID].count)} ({formatNumberEn(statusStats[InvoiceStatus.UNPAID].sum)})</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">مدفوعة جزئياً</span><span className="ml-auto text-xs font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(statusStats[InvoiceStatus.PARTIALLY_PAID].count)} ({formatNumberEn(statusStats[InvoiceStatus.PARTIALLY_PAID].sum)})</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="text-xs text-gray-700 dark:text-gray-300">متأخرة</span><span className="ml-auto text-xs font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(statusStats[InvoiceStatus.OVERDUE].count)} ({formatNumberEn(statusStats[InvoiceStatus.OVERDUE].sum)})</span></div>
+          </div>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <h3 className="text-sm text-gray-600 dark:text-gray-400">توزيع الأقسام</h3>
+          <div className="mt-2 grid grid-cols-2 gap-y-2 gap-x-4">
+            {categoryDistribution.map(({category, percentage}) => (
+              <div key={category} className="flex justify-between items-center text-xs text-gray-700 dark:text-gray-300">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-blue-400 dark:bg-blue-600 rounded-full"></span>
+                  {ProductCategoryShortLabels[category]}
+                </span>
+                <span className="font-semibold">{percentage}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* تحسين مربعات البحث والفلترة وزر إعادة التعيين */}
       <div className="flex flex-wrap gap-2 mb-6 items-center bg-gradient-to-tr from-blue-50/40 to-white dark:from-zinc-900/60 dark:to-zinc-800/80 p-4 rounded-xl shadow-sm border border-blue-100 dark:border-zinc-700
         sm:flex-nowrap sm:gap-3 md:gap-4 lg:gap-6
         sm:justify-start justify-center
@@ -582,8 +722,8 @@ const Customers = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredCustomers.length > 0 ? (
-                filteredCustomers.map((customer, idx) => (
+              ) : paginatedCustomers.length > 0 ? (
+                paginatedCustomers.map((customer, idx) => (
                   <TableRow 
                     key={customer.id} 
                     className={cn(
@@ -598,7 +738,7 @@ const Customers = () => {
                     <TableCell className="text-gray-700 dark:text-zinc-200">{customer.contactPerson}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1">
-                        <span className={customer.businessType === BusinessType.SERVICE_CENTER ? 'text-blue-700 dark:text-blue-300' : 'text-green-700 dark:text-green-300'}>●</span>
+                        <span className="inline-block w-2 h-2 bg-blue-400 dark:bg-blue-600 rounded-full"></span>
                         <span className="dark:text-zinc-100">{customer.businessType}</span>
                       </span>
                     </TableCell>
@@ -682,8 +822,8 @@ const Customers = () => {
             <div className="col-span-full flex justify-center py-12">
               <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredCustomers.length > 0 ? (
-            filteredCustomers.map((customer) => (
+          ) : paginatedCustomers.length > 0 ? (
+            paginatedCustomers.map((customer) => (
               <CustomerCard
                 key={customer.id}
                 customer={customer}
@@ -703,6 +843,27 @@ const Customers = () => {
           )}
         </div>
       )}
+      <div className="flex items-center justify-between mt-4 px-4">
+        <div className="flex items-center gap-2">
+          <span>عرض </span>
+          <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+            <SelectTrigger className="w-20">
+              <SelectValue placeholder={`${pageSize}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {[50, 100, 150, 200].map((n) => (
+                <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span> صفوف لكل صفحة</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" disabled={pageIndex === 0} onClick={() => setPageIndex(pageIndex - 1)}>السابق</Button>
+          <span>صفحة {pageIndex + 1} من {totalPages}</span>
+          <Button variant="outline" disabled={pageIndex >= totalPages - 1} onClick={() => setPageIndex(pageIndex + 1)}>التالي</Button>
+        </div>
+      </div>
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogTitle>إضافة عميل جديد</DialogTitle>

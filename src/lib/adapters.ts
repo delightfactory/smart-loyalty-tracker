@@ -8,6 +8,7 @@ import {
   RedemptionItem,
   BusinessType,
   ProductCategory,
+  ProductCategoryLabels,
   InvoiceStatus,
   PaymentMethod,
   PaymentType,
@@ -16,10 +17,19 @@ import {
 
 // تحويل بيانات المنتجات من قاعدة البيانات إلى نموذج التطبيق
 export function dbProductToAppProduct(dbProduct: any): Product {
+  // Normalize category: map enum or Arabic label to enum
+  let category: ProductCategory;
+  if (Object.values(ProductCategory).includes(dbProduct.category)) {
+    category = dbProduct.category as ProductCategory;
+  } else {
+    const found = Object.entries(ProductCategoryLabels).find(([, label]) => label === dbProduct.category);
+    category = (found?.[0] as ProductCategory) ?? ProductCategory.ENGINE_CARE;
+  }
+
   return {
     id: dbProduct.id,
     name: dbProduct.name,
-    category: dbProduct.category as ProductCategory,
+    category,
     price: dbProduct.price,
     unit: dbProduct.unit,
     brand: dbProduct.brand,

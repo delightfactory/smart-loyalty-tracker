@@ -9,7 +9,8 @@ import {
   RedemptionItem,
   PaymentType,
   InvoiceStatus,
-  PaymentMethod
+  PaymentMethod,
+  RedemptionStatus
 } from '@/lib/types';
 import { 
   dbProductToAppProduct, 
@@ -116,6 +117,24 @@ export const productsService = {
       console.error(`Error deleting product with id ${id}:`, error);
       throw error;
     }
+  },
+  
+  async search(query: string, limit: number = 10): Promise<Product[]> {
+    if (!query) return [];
+    const qLower = query.toLowerCase();
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .or(
+        `id.ilike.%${qLower}%,name.ilike.%${qLower}%,brand.ilike.%${qLower}%,category.ilike.%${qLower}%`
+      )
+      .order('name')
+      .limit(limit);
+    if (error) {
+      console.error('Error searching products:', error);
+      throw error;
+    }
+    return data.map(dbProductToAppProduct);
   }
 };
 
@@ -220,22 +239,50 @@ export const customersService = {
     }
     
     return dbCustomerToAppCustomer(data);
+  },
+  
+  async search(query: string, limit: number = 10): Promise<Customer[]> {
+    if (!query) return [];
+    const searchLower = query.toLowerCase();
+    const searchDigits = query.replace(/\D/g, '');
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .or(
+        `id.ilike.%${searchLower}%,name.ilike.%${searchLower}%,contact_person.ilike.%${searchLower}%,phone.ilike.%${searchDigits}%`
+      )
+      .order('name')
+      .limit(limit);
+    if (error) {
+      console.error('Error searching customers:', error);
+      throw error;
+    }
+    return data.map(dbCustomerToAppCustomer);
   }
 };
 
 export const paymentsService = {
   async getAll(): Promise<Payment[]> {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .order('date', { ascending: false });
-      
-    if (error) {
-      console.error('Error fetching payments:', error);
-      throw error;
+    // Fetch all payments in batches to bypass default row limits
+    const allRaw: any[] = [];
+    const batchSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('date', { ascending: false })
+        .range(from, from + batchSize - 1);
+      if (error) {
+        console.error('Error fetching payments batch:', error);
+        throw error;
+      }
+      if (!data || data.length === 0) break;
+      allRaw.push(...data);
+      if (data.length < batchSize) break;
+      from += batchSize;
     }
-    
-    return data.map(dbPaymentToAppPayment);
+    return allRaw.map(dbPaymentToAppPayment);
   },
   
   async getByCustomerId(customerId: string): Promise<Payment[]> {
@@ -563,19 +610,23 @@ const updateCustomerOpeningBalance = async (customerId: string, amount: number):
 const updateCustomerPointsBalance = async (customerId: string): Promise<void> => {
   console.log(`Updating points balance for customer ${customerId}`);
   try {
+    // احتساب النقاط المكتسبة من الفواتير المدفوعة فقط
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
       .select('points_earned')
-      .eq('customer_id', customerId);
+      .eq('customer_id', customerId)
+      .eq('status', InvoiceStatus.PAID);
     if (invoiceError) throw invoiceError;
     const totalEarned = invoiceData?.reduce((sum, inv) => sum + (inv.points_earned ?? 0), 0) ?? 0;
 
+    // احتساب النقاط المستبدلة من العمليات المكتملة فقط
     const { data: redemptionData, error: redemptionError } = await supabase
       .from('redemptions')
       .select('total_points_redeemed')
-      .eq('customer_id', customerId);
+      .eq('customer_id', customerId)
+      .eq('status', RedemptionStatus.COMPLETED);
     if (redemptionError) throw redemptionError;
-    const totalRedeemed = redemptionData?.reduce((sum, red) => sum + (red.total_points_redeemed ?? 0), 0) ?? 0;
+    const totalRedeemed = redemptionData?.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0) ?? 0;
 
     const { error: updateError } = await supabase
       .from('customers')
@@ -596,21 +647,30 @@ const updateCustomerPointsBalance = async (customerId: string): Promise<void> =>
 
 export const invoicesService = {
   async getAll(): Promise<Invoice[]> {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        items:invoice_items(*),
-        payments:payments(*)
-      `)
-      .order('date', { ascending: false });
-      
-    if (error) {
-      console.error('Error fetching invoices:', error);
-      throw error;
+    // Fetch all invoices in batches to bypass server row limits
+    const allRaw: any[] = [];
+    const batchSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          items:invoice_items(*),
+          payments:payments(*)
+        `)
+        .order('date', { ascending: false })
+        .range(from, from + batchSize - 1);
+      if (error) {
+        console.error('Error fetching invoices batch:', error);
+        throw error;
+      }
+      if (!data || data.length === 0) break;
+      allRaw.push(...data);
+      if (data.length < batchSize) break;
+      from += batchSize;
     }
-    
-    return data.map(dbInvoiceToAppInvoice);
+    return allRaw.map(dbInvoiceToAppInvoice);
   },
   
   async getByCustomerId(customerId: string): Promise<Invoice[]> {
@@ -706,36 +766,119 @@ export const invoicesService = {
   },
   
   async update(invoice: Invoice): Promise<Invoice> {
+    // جلب بيانات الفاتورة القديمة
+    const oldInvoice = await this.getById(invoice.id);
+    // قيد: منع رصيد النقاط السالب عند تعديل الفاتورة
+    const customerId = invoice.customerId;
+    const { data: allInvs, error: allInvsError } = await supabase
+      .from('invoices')
+      .select('id, points_earned, status')
+      .eq('customer_id', customerId);
+    if (allInvsError) throw allInvsError;
+    // حساب النقاط المكتسبة المتوقعة بعد التعديل
+    const projectedEarned = (allInvs ?? []).reduce((sum, inv) => {
+      if (inv.id === invoice.id) {
+        return sum + (invoice.status === InvoiceStatus.PAID ? invoice.pointsEarned : 0);
+      }
+      return inv.status === InvoiceStatus.PAID ? sum + (inv.points_earned ?? 0) : sum;
+    }, 0);
+    // مجموع النقاط المستبدلة المكتملة
+    const { data: completedReds, error: redsError } = await supabase
+      .from('redemptions')
+      .select('total_points_redeemed')
+      .eq('customer_id', customerId)
+      .eq('status', RedemptionStatus.COMPLETED);
+    if (redsError) throw redsError;
+    const totalRedeemed = (completedReds ?? []).reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
+    if (projectedEarned < totalRedeemed) {
+      throw new Error('لا يمكن تعديل الفاتورة لأن النقاط المتوقعة أقل من النقاط المستبدلة المكتملة');
+    }
+    // تحديث صف الفاتورة
     const dbInvoice = appInvoiceToDbInvoice(invoice);
-    
-    const { data, error } = await supabase
+    const { error: invError } = await supabase
       .from('invoices')
       .update(dbInvoice)
-      .eq('id', invoice.id)
-      .select('*')
-      .single();
-      
-    if (error) {
-      console.error(`Error updating invoice with id ${invoice.id}:`, error);
-      throw error;
+      .eq('id', invoice.id);
+    if (invError) {
+      console.error(`Error updating invoice ${invoice.id}:`, invError);
+      throw invError;
     }
-    
-    // تحديث رصيد العميل بعد تحديث الفاتورة
+
+    // إعادة بناء عناصر الفاتورة
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoice.id);
+    if (invoice.items.length > 0) {
+      const itemsDb = invoice.items.map(item => ({
+        ...appInvoiceItemToDbInvoiceItem(item),
+        invoice_id: invoice.id
+      }));
+      const { error: itemsError } = await supabase.from('invoice_items').insert(itemsDb);
+      if (itemsError) throw itemsError;
+    }
+
+    // معالجة الدفعات الآلية حسب تغيير الحالة أو طريقة الدفع أو المبلغ
+    const oldStatus = oldInvoice.status;
+    const oldMethod = oldInvoice.paymentMethod;
+    const newStatus = invoice.status;
+    const newMethod = invoice.paymentMethod;
+    // جلب الدفعات الحالية للفاتورة
+    const { data: existingPays = [], error: paysFetchError } = await supabase.from('payments')
+      .select('*')
+      .eq('invoice_id', invoice.id);
+    if (paysFetchError) throw paysFetchError;
+    const autoPays = existingPays.filter(p => p.notes?.includes('تم الدفع عند إنشاء') || p.notes?.includes('تم الدفع عند تعديل'));
+    // إضافة دفعة آلية جديدة أو تحديث الحالية للمدفوعات النقدية
+    if (newStatus === InvoiceStatus.PAID && newMethod === PaymentMethod.CASH) {
+      if (oldStatus !== InvoiceStatus.PAID || oldMethod !== PaymentMethod.CASH) {
+        // إنشاء دفعة آلية
+        const payId = `PAY${Date.now().toString().slice(-6)}`;
+        const payDb = appPaymentToDbPayment({
+          id: payId,
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          amount: invoice.totalAmount,
+          date: invoice.date,
+          method: 'cash',
+          type: PaymentType.PAYMENT,
+          notes: oldStatus !== InvoiceStatus.PAID ? 'تم الدفع عند تعديل الفاتورة' : 'تم الدفع عند إنشاء الفاتورة'
+        });
+        await supabase.from('payments').insert(payDb);
+      } else if (invoice.totalAmount !== oldInvoice.totalAmount) {
+        // تحديث دفعة آلية موجودة عند تغيير المبلغ
+        for (const p of autoPays) {
+          const payDb = appPaymentToDbPayment({
+            id: p.id,
+            customerId: invoice.customerId,
+            invoiceId: invoice.id,
+            amount: invoice.totalAmount,
+            date: invoice.date,
+            method: 'cash',
+            type: PaymentType.PAYMENT,
+            notes: p.notes || ''
+          });
+          await supabase.from('payments').update(payDb).eq('id', p.id);
+        }
+      }
+    }
+    // حذف الدفعات الآلية عند إزالة الدفع أو التحويل لآجل أو تغيير الحالة
+    if ((oldStatus === InvoiceStatus.PAID && newStatus !== InvoiceStatus.PAID) ||
+        (oldMethod === PaymentMethod.CASH && newMethod !== PaymentMethod.CASH)) {
+      for (const p of autoPays) {
+        await supabase.from('payments').delete().eq('id', p.id);
+      }
+    }
+
+    // تحديث أرصدة العميل
     await updateCustomerCreditBalance(invoice.customerId);
     await updateCustomerPointsBalance(invoice.customerId);
-    
-    return dbInvoiceToAppInvoice({
-      ...data,
-      items: invoice.items,
-      payments: invoice.payments
-    });
+
+    return this.getById(invoice.id);
   },
   
   async delete(id: string): Promise<void> {
-    // جلب customer_id قبل حذف الفاتورة
+    // جلب customer_id وpoints_earned قبل حذف الفاتورة
     const { data: deletedInvoice, error: fetchError } = await supabase
       .from('invoices')
-      .select('customer_id')
+      .select('customer_id, points_earned')
       .eq('id', id)
       .single();
       
@@ -744,6 +887,42 @@ export const invoicesService = {
       throw fetchError;
     }
     
+    // تحقق من عدم حدوث رصيد نقاط سالب بعد حذف الفاتورة
+    const customerId = deletedInvoice.customer_id;
+    // مجموع النقاط المكتسبة بعد حذف هذه الفاتورة
+    const { data: invs, error: invsError } = await supabase
+      .from('invoices')
+      .select('points_earned')
+      .eq('customer_id', customerId)
+      .neq('id', id)
+      .eq('status', InvoiceStatus.PAID);
+    if (invsError) throw invsError;
+    const remainingEarned = invs.reduce((sum, inv) => sum + (inv.points_earned ?? 0), 0);
+    // مجموع النقاط المستبدلة
+    const { data: reds, error: redsError } = await supabase
+      .from('redemptions')
+      .select('total_points_redeemed')
+      .eq('customer_id', customerId);
+    if (redsError) throw redsError;
+    const totalRedeemed = reds.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
+    if (remainingEarned - totalRedeemed < 0) {
+      throw new Error('لا يمكن حذف الفاتورة لأن حذف نقاط هذه الفاتورة سيؤدي إلى رصيد نقاط سالب للعميل');
+    }
+    
+    // حذف جميع الدفعات المرتبطة بالفاتورة
+    const { data: paymentsData, error: paymentsFetchError } = await supabase
+      .from('payments')
+      .select('id')
+      .eq('invoice_id', id);
+    if (paymentsFetchError) {
+      console.error(`Error fetching payments for invoice ${id}:`, paymentsFetchError);
+      throw paymentsFetchError;
+    }
+    // تطبيق الحذف العكسي للدفعات
+    for (const p of paymentsData) {
+      await supabase.from('payments').delete().eq('id', p.id);
+    }
+    // حذف عناصر الفاتورة
     const { error: itemsError } = await supabase
       .from('invoice_items')
       .delete()
@@ -764,7 +943,7 @@ export const invoicesService = {
       throw error;
     }
     
-    // تحديث رصيد العميل بعد حذف الفاتورة
+    // تحديث أرصدة العميل بعد حذف الفاتورة
     await updateCustomerCreditBalance(deletedInvoice.customer_id);
     await updateCustomerPointsBalance(deletedInvoice.customer_id);
   }
@@ -778,7 +957,8 @@ export const redemptionsService = {
         *,
         items:redemption_items(*)
       `)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .range(0, 5000);
       
     if (error) {
       console.error('Error fetching redemptions:', error);

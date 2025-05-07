@@ -1,4 +1,3 @@
-
 import { 
   Card, 
   CardHeader, 
@@ -19,9 +18,9 @@ import {
   Percent
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { Customer, Invoice, ProductCategory } from '@/lib/types';
-import { getProductById } from '@/lib/data';
-import { calculateCategoryDistribution } from '@/lib/calculations';
+import { Customer, Invoice, ProductCategory, ProductCategoryLabels } from '@/lib/types';
+import { useProducts } from '@/hooks/useProducts';
+import { useMemo } from 'react';
 
 interface CustomerRecommendationsProps {
   customer: Customer;
@@ -29,7 +28,34 @@ interface CustomerRecommendationsProps {
 }
 
 const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendationsProps) => {
-  const categoryDistribution = calculateCategoryDistribution(customer.id);
+  // جلب قائمة المنتجات الحقيقية
+  const { data: allProducts = [], isLoading: productsLoading } = useProducts().getAll;
+  const productMap = useMemo(() => new Map(allProducts.map(p => [p.id, p])), [allProducts]);
+  if (productsLoading) {
+    return <div>جارٍ تحميل المنتجات...</div>;
+  }
+
+  // حساب توزيع الفئات بناءً على الفواتير الفعلية
+  // تهيئة توزيع الفئات لجميع الفئات لضمان نوع Record المكتمل
+  const rawCategorySum: Record<ProductCategory, number> = Object.values(ProductCategory).reduce(
+    (acc, category) => {
+      acc[category] = 0;
+      return acc;
+    },
+    {} as Record<ProductCategory, number>
+  );
+  let totalCategorySum = 0;
+  invoices.forEach(inv => inv.items.forEach(item => {
+    const product = productMap.get(item.productId);
+    if (product) {
+      rawCategorySum[product.category] = (rawCategorySum[product.category] || 0) + item.totalPrice;
+      totalCategorySum += item.totalPrice;
+    }
+  }));
+  const categoryDistribution: Record<ProductCategory, number> = Object.entries(rawCategorySum).reduce(
+    (acc, [cat, sum]) => ({ ...acc, [cat]: Math.round((sum / totalCategorySum) * 100) }),
+    {} as Record<ProductCategory, number>
+  );
   
   // Get all purchased products
   const allPurchasedProducts = new Set<string>();
@@ -42,18 +68,56 @@ const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendations
   // Find purchase pattern
   const purchasePattern = getPurchasePattern(invoices);
   
-  // Get most frequent category
-  const mostFrequentCategory = getMostFrequentCategory(categoryDistribution);
+  // تحليل توزيع الفئات لتحديد الفئات الأكثر والأقل شراءً
+  const categoryEntries = Object.entries(categoryDistribution) as [ProductCategory, number][];
+  const mostFrequentCategory = categoryEntries.reduce((prev, curr) => curr[1] > prev[1] ? curr : prev)[0];
+  const leastFrequentCategory = (() => {
+    const filtered = categoryEntries.filter(([, v]) => v > 0);
+    return filtered.length
+      ? filtered.reduce((prev, curr) => curr[1] < prev[1] ? curr : prev)[0]
+      : mostFrequentCategory;
+  })();
   
-  // Get least frequent category
-  const leastFrequentCategory = getLeastFrequentCategory(categoryDistribution);
+  // توصيات ديناميكية مبنية على بيانات الفواتير الفعلية
+  const upSellingProducts = allProducts
+    .filter(p => p.category === mostFrequentCategory && !allPurchasedProducts.has(p.id))
+    .sort((a, b) => b.price - a.price)
+    .slice(0, 3);
+  const weakCategories = (Object.entries(categoryDistribution) as [ProductCategory, number][])
+    .filter(([, v]) => v < 20)
+    .map(([c]) => c);
+  const crossSellingProducts = allProducts
+    .filter(p => weakCategories.includes(p.category) && !allPurchasedProducts.has(p.id))
+    .slice(0, 3);
+
+  // تحليل أعمق لتوزيع الأقسام واستراتيجيات التوصية
+  const sortedCategoryEntries = Object.entries(categoryDistribution) as [ProductCategory, number][];
+  sortedCategoryEntries.sort((a, b) => b[1] - a[1]);
+  // فلترة الأقسام بقيمة > 0 فقط
+  const nonZeroCategoryEntries = sortedCategoryEntries.filter(([, val]) => val > 0);
+  const topCategories = nonZeroCategoryEntries.slice(0, 3);
+  const bottomCategories = nonZeroCategoryEntries.slice(-3).reverse();
   
-  // Get up-selling opportunities
-  const upSellingOpportunities = getUpSellingOpportunities(invoices);
-  
-  // Get cross-selling suggestions
-  const crossSellingRecommendations = getCrossSellingRecommendations(customer.id, categoryDistribution);
-  
+  // تحديد الفئات الأكثر والأقل شراءً مع fallback
+  const topEntry = nonZeroCategoryEntries[0] ?? [null, 0];
+  const bottomEntry = nonZeroCategoryEntries[nonZeroCategoryEntries.length - 1] ?? [null, 0];
+  const topCat = topEntry[0] as ProductCategory | string | null;
+  const bottomCat = bottomEntry[0] as ProductCategory | string | null;
+  // استخدام اسم القسم من الـ labels أو المفتاح الأصلي كـ fallback
+  const topLabel = typeof topCat === 'string'
+    ? (ProductCategoryLabels[topCat as ProductCategory] ?? topCat)
+    : 'منتجات عامة';
+  const bottomLabel = typeof bottomCat === 'string'
+    ? (ProductCategoryLabels[bottomCat as ProductCategory] ?? bottomCat)
+    : 'منتجات عامة';
+  const bottomPercent = bottomEntry[1] ?? 0;
+
+  const strategyRecommendations = [
+    { icon: Clock, title: 'توقيت العروض', description: `تقديم عروض على منتجات من ${topLabel} في ${purchasePattern.timingText}` },
+    { icon: AlertCircle, title: 'رفع الوعي', description: `تنبيه العميل بمنتجات ${bottomLabel} لتعزيز نسبة الشراء الحالية (${bottomPercent}%)` },
+    { icon: Award, title: 'باقة موفرة', description: `تجميع منتجات من ${topLabel} و ${bottomLabel} في حزمة خاصة` }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -94,49 +158,47 @@ const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendations
           </CardContent>
         </Card>
         
+        {/* بطاقة فرص زيادة المبيعات ديناميكية */}
         <Card className="border-l-4 border-l-green-500">
           <CardHeader>
             <CardTitle className="flex items-center text-green-700">
               <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
               فرص زيادة المبيعات
             </CardTitle>
-            <CardDescription>توصيات لزيادة قيمة المبيعات</CardDescription>
+            <CardDescription>منتجات مقترحة بناءً على مشتريات العميل</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {upSellingOpportunities.map((opportunity, index) => (
-                <div key={index} className="flex items-start space-x-4 space-x-reverse">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">{opportunity.title}</h4>
-                    <p className="text-sm text-muted-foreground">{opportunity.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {upSellingProducts.length > 0 ? (
+              <ul className="list-disc list-inside space-y-2">
+                {upSellingProducts.map(p => (
+                  <li key={p.id}>{p.name} بسعر {p.price.toFixed(2)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm">لا توجد منتجات للترقية حالياً</p>
+            )}
           </CardContent>
         </Card>
         
+        {/* بطاقة توصيات التنويع ديناميكية */}
         <Card className="border-l-4 border-l-purple-500">
           <CardHeader>
             <CardTitle className="flex items-center text-purple-700">
               <Award className="h-5 w-5 mr-2 text-purple-500" />
-              توصيات المنتجات
+              توصيات تنويع
             </CardTitle>
-            <CardDescription>منتجات مقترحة بناءً على المشتريات السابقة</CardDescription>
+            <CardDescription>منتجات لتعزيز التنويع في مشتريات العميل</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {crossSellingRecommendations.map((recommendation, index) => (
-                <div key={index} className="flex items-start space-x-4 space-x-reverse">
-                  <CheckCircle className="h-5 w-5 text-purple-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">{recommendation.title}</h4>
-                    <p className="text-sm text-muted-foreground">{recommendation.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {crossSellingProducts.length > 0 ? (
+              <ul className="list-disc list-inside space-y-2">
+                {crossSellingProducts.map(p => (
+                  <li key={p.id}>{p.name} بسعر {p.price.toFixed(2)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm">لا توجد توصيات للتنويع حالياً</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -151,152 +213,119 @@ const CustomerRecommendations = ({ customer, invoices }: CustomerRecommendations
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <h4 className="font-medium">القسم الأكثر شراءً</h4>
-                  <span className="text-sm font-medium">{categoryDistribution[mostFrequentCategory]}%</span>
+            {/* توزيع الأقسام ذات النسبة > 0 */}
+            <div className="space-y-4">
+              {nonZeroCategoryEntries.length > 0 ? nonZeroCategoryEntries.map(([cat, val]) => (
+                <div key={cat}>
+                  <div className="flex justify-between mb-2">
+                    <h4 className="font-medium">{ProductCategoryLabels[cat] ?? cat}</h4>
+                    <span className="text-sm font-medium">{val}%</span>
+                  </div>
+                  <Progress value={val} className="h-2" />
                 </div>
-                <div className="space-y-1">
-                  <Progress value={categoryDistribution[mostFrequentCategory]} className="h-2" />
-                  <p className="text-sm text-muted-foreground">{mostFrequentCategory}</p>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  هذا القسم يمثل الاهتمام الرئيسي للعميل، يمكن تقديم عروض خاصة عليه.
-                </p>
-              </div>
-              
-              <div>
-                <div className="flex justify-between mb-2">
-                  <h4 className="font-medium">القسم الأقل شراءً</h4>
-                  <span className="text-sm font-medium">{categoryDistribution[leastFrequentCategory]}%</span>
-                </div>
-                <div className="space-y-1">
-                  <Progress value={categoryDistribution[leastFrequentCategory]} className="h-2" />
-                  <p className="text-sm text-muted-foreground">{leastFrequentCategory}</p>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  هناك فرصة لزيادة مبيعات هذا القسم من خلال التوعية بمنتجاته وفوائدها.
-                </p>
-              </div>
+              )) : <p className="text-sm text-muted-foreground">لا توجد بيانات كافية للأقسام</p>}
             </div>
-            
+            {/* توصيات استراتيجية محسّنة */}
             <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-lg">
               <h3 className="text-lg font-medium mb-4">توصيات استراتيجية</h3>
               <div className="space-y-4">
-                <div className="flex items-start space-x-4 space-x-reverse">
-                  <Clock className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">توقيت العروض</h4>
-                    <p className="text-sm text-muted-foreground">
-                      تقديم عروض في {purchasePattern.bestTimingForOffers} لزيادة احتمالية الشراء.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-4 space-x-reverse">
-                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">تنبيه بشأن المنتجات</h4>
-                    <p className="text-sm text-muted-foreground">
-                      تذكير العميل بالمنتجات الدورية المتوقع احتياجه لها خلال الأسبوعين القادمين.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-4 space-x-reverse">
-                  <Award className="h-5 w-5 text-green-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium">مكافآت الولاء</h4>
-                    <p className="text-sm text-muted-foreground">
-                      تقديم نقاط إضافية على المنتجات من قسم {leastFrequentCategory} لتشجيع تنويع المشتريات.
-                    </p>
-                  </div>
-                </div>
+                {strategyRecommendations.map((rec, idx) => {
+                  const Icon = rec.icon;
+                  return (
+                    <div key={idx} className="flex items-start space-x-4 space-x-reverse">
+                      <Icon className="h-5 w-5 text-blue-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium">{rec.title}</h4>
+                        <p className="text-sm text-muted-foreground">{rec.description}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+      
+      {/* اقتراحات للترقية */}
+      <div className="mt-6">
+        <h4 className="font-medium mb-2">اقتراحات للترقية</h4>
+        <ul className="list-disc list-inside space-y-4 text-sm">
+          {upSellingProducts.length > 0 ? upSellingProducts.map(p => (
+            <li key={p.id}>
+              <div className="flex justify-between">
+                <span className="font-medium">{p.name}</span>
+                <span className="text-sm">{p.price.toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                منتج من قسم {ProductCategoryLabels[p.category]} لتعزيز قيمة الشراء ورفع مستوى الإنفاق.
+              </p>
+            </li>
+          )) : <li>لا توجد توصيات للترقية حالياً</li>}
+        </ul>
+      </div>
+      
+      {/* اقتراحات للتنويع */}
+      <div className="mt-6">
+        <h4 className="font-medium mb-2">اقتراحات للتنويع</h4>
+        <ul className="list-disc list-inside space-y-4 text-sm">
+          {crossSellingProducts.length > 0 ? crossSellingProducts.map(p => (
+            <li key={p.id}>
+              <div className="flex justify-between">
+                <span className="font-medium">{p.name}</span>
+                <span className="text-sm">{p.price.toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                اقتراح ابتكار تجربة جديدة مع منتجات من قسم {ProductCategoryLabels[p.category]} لتنويع مشترياتك.
+              </p>
+            </li>
+          )) : <li>لا توجد توصيات للتنويع حالياً</li>}
+        </ul>
+      </div>
     </div>
   );
 };
 
-// Helper functions to generate recommendations
-
+// دالة لحساب نمط الشراء بناءً على الفواتير الفعلية
 function getPurchasePattern(invoices: Invoice[]) {
-  // In a real app, these would be calculated from actual data
-  return {
-    timingText: "بداية الشهر (1-10)",
-    frequencyText: "مرة كل شهر",
-    priceSensitivityText: "متوسطة - يفضل المنتجات ذات الجودة العالية",
-    bestTimingForOffers: "بداية الشهر"
-  };
-}
-
-function getMostFrequentCategory(categoryDistribution: Record<ProductCategory, number>) {
-  return Object.entries(categoryDistribution)
-    .reduce((max, [category, percentage]) => 
-      (percentage as number) > (max.percentage as number) ? { category, percentage } : max, 
-      { category: ProductCategory.ENGINE_CARE, percentage: 0 }
-    ).category as ProductCategory;
-}
-
-function getLeastFrequentCategory(categoryDistribution: Record<ProductCategory, number>) {
-  return Object.entries(categoryDistribution)
-    .filter(([_, percentage]) => (percentage as number) > 0) // Only consider categories that were purchased
-    .reduce((min, [category, percentage]) => 
-      (percentage as number) < (min.percentage as number) ? { category, percentage } : min, 
-      { category: ProductCategory.ENGINE_CARE, percentage: 100 }
-    ).category as ProductCategory;
-}
-
-function getUpSellingOpportunities(invoices: Invoice[]) {
-  // In a real app, these would be based on customer purchase history
-  return [
-    {
-      title: "ترقية زيوت المحرك",
-      description: "اقتراح الزيوت الاصطناعية الكاملة بدلاً من المخلوطة لأداء أفضل."
-    },
-    {
-      title: "الباقات المتكاملة",
-      description: "تقديم حزم صيانة متكاملة توفر 15% عن شراء المنتجات فردياً."
-    },
-    {
-      title: "برنامج الصيانة الدورية",
-      description: "اشتراك شهري يوفر جميع احتياجات الصيانة الدورية بخصم 20%."
-    }
-  ];
-}
-
-function getCrossSellingRecommendations(customerId: string, categoryDistribution: Record<ProductCategory, number>) {
-  // Get weakest categories to recommend products from them
-  const weakCategories = Object.entries(categoryDistribution)
-    .filter(([_, percentage]) => percentage < 15)
-    .map(([category]) => category as ProductCategory);
-  
-  // Recommendations based on category distribution
-  const recommendations = [
-    {
-      title: "منتجات العناية بالإطارات",
-      description: "ملمع الإطارات يزيد عمر الإطارات ويحسن المظهر الخارجي للسيارة."
-    },
-    {
-      title: "منتجات العناية بالسطح الخارجي",
-      description: "شمع الحماية يوفر طبقة عازلة تحمي طلاء السيارة من العوامل الجوية."
-    },
-    {
-      title: "منتجات العناية بالتابلوه",
-      description: "منظف ومعطر التابلوه يحمي من أشعة الشمس ويعطي رائحة منعشة."
-    }
-  ];
-  
-  // Filter to show only relevant recommendations
-  if (weakCategories.length > 0) {
-    return recommendations.filter((_, index) => index < 3);
+  if (!invoices || invoices.length === 0) {
+    return { timingText: 'لا توجد بيانات', frequencyText: '0', priceSensitivityText: 'غير متاح' };
   }
-  
-  return recommendations;
+  // تحليل توقيت الشراء
+  const segmentCount = { first: 0, middle: 0, end: 0 };
+  invoices.forEach(inv => {
+    const day = new Date(inv.date).getDate();
+    if (day <= 10) segmentCount.first++;
+    else if (day <= 20) segmentCount.middle++;
+    else segmentCount.end++;
+  });
+  const maxSeg = Object.entries(segmentCount).sort((a, b) => b[1] - a[1])[0][0];
+  const timingText =
+    maxSeg === 'first' ? 'أول الشهر (1-10)' :
+    maxSeg === 'middle' ? 'منتصف الشهر (11-20)' :
+    'أواخر الشهر (21-31)';
+  // تحليل معدل التكرار (متوسط الأيام بين الفواتير)
+  const dates = invoices.map(inv => new Date(inv.date)).sort((a, b) => a.getTime() - b.getTime());
+  let totalDiff = 0;
+  for (let i = 1; i < dates.length; i++) {
+    totalDiff += (dates[i].getTime() - dates[i-1].getTime()) / (1000 * 60 * 60 * 24);
+  }
+  const frequencyText = dates.length > 1
+    ? `${(totalDiff / (dates.length - 1)).toFixed(1)} يوم`
+    : 'فاتورة واحدة';
+  // تحليل حساسية السعر (متوسط سعر الوحدة)
+  let totalPrice = 0;
+  let totalItems = 0;
+  invoices.forEach(inv => inv.items.forEach(item => {
+    totalPrice += item.totalPrice;
+    totalItems += item.quantity;
+  }));
+  const avgPrice = totalItems ? totalPrice / totalItems : 0;
+  const priceSensitivityText =
+    avgPrice > 100 ? 'مرتفع - يميل للمنتجات عالية السعر' :
+    avgPrice < 50 ? 'منخفض - يميل للمنتجات منخفضة السعر' :
+    'متوسط - متنوع في الأسعار';
+  return { timingText, frequencyText, priceSensitivityText };
 }
 
 export default CustomerRecommendations;

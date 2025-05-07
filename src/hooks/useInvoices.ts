@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService, customersService, redemptionsService } from '@/services/database';
 import { Invoice, InvoiceItem, InvoiceStatus, Customer, PaymentMethod, PaymentType, RedemptionStatus } from '@/lib/types';
@@ -198,8 +197,9 @@ export const updateCustomerDataBasedOnInvoices = async (customerId: string, quer
     // Update customer with new values
     await customersService.update({
       ...customer,
-      pointsEarned: totalPointsEarned,
-      pointsRedeemed: totalPointsRedeemed,
+      pointsEarned: adjustedPointsEarned,
+      pointsRedeemed: adjustedPointsRedeemed,
+      currentPoints: adjustedPointsEarned - adjustedPointsRedeemed,
       creditBalance: finalCreditBalance, // Only the credit balance without opening balance
       lastActive,
       credit_limit: creditLimit,

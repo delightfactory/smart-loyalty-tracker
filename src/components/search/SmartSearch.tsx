@@ -21,110 +21,107 @@ import { Search, Barcode, User, ShoppingCart, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { Product, Customer, ProductCategory, BusinessType } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { productsService, customersService } from '@/services/database';
 
 interface SmartSearchProps {
   type?: 'product' | 'customer' | 'all';
   onSelectProduct?: (product: Product) => void;
   onSelectCustomer?: (customer: Customer) => void;
-  customers?: Customer[];
-  products?: Product[];
   placeholder?: string;
   className?: string;
   initialSearchTerm?: string;
   onChange?: (val: string) => void;
+  clearSearchOnSelect?: boolean;
 }
 
 const SmartSearch = ({
   type = 'all',
   onSelectProduct,
   onSelectCustomer,
-  customers = [],
-  products = [],
   placeholder = 'بحث...',
   className,
   initialSearchTerm = '',
-  onChange
+  onChange,
+  clearSearchOnSelect = true
 }: SmartSearchProps) => {
   const navigate = useNavigate();
+  const minSearchLength = 2;  // الحد الأدنى لأحرف البحث
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(initialSearchTerm);
+  const [debouncedSearch, setDebouncedSearch] = useState(search.toLowerCase());
+  const searchDigits = search.replace(/\D/g, '');
   const [barcodeMode, setBarcodeMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search.toLowerCase()), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
   useEffect(() => {
     if (barcodeMode && inputRef.current) {
       inputRef.current.focus();
     }
   }, [barcodeMode]);
-  
+
   useEffect(() => {
     if (barcodeMode && search && search.length > 3) {
-      const customer = customers.find(c => c.id === search);
-      if (customer) {
-        handleSelectCustomer(customer);
-        return;
-      }
-
-      toast({
-        title: "لم يتم العثور على نتائج",
-        description: `لم يتم العثور على نتائج للباركود ${search}`,
-        variant: "destructive"
-      });
-
-      setTimeout(() => {
-        setSearch('');
-      }, 1500);
+      (async () => {
+        const results = await customersService.search(search, 1);
+        if (results.length > 0) {
+          handleSelectCustomer(results[0]);
+          return;
+        }
+        toast({
+          title: "لم يتم العثور على نتائج",
+          description: `لم يتم العثور على نتائج للباركود ${search}`,
+          variant: "destructive"
+        });
+        setTimeout(() => { setSearch(''); }, 1500);
+      })();
     }
-  }, [barcodeMode, search, customers]);
-  
+  }, [barcodeMode, search]);
+
   useEffect(() => {
     if (onChange) onChange(search);
   }, [search]);
-  
-  const filteredProducts = products.filter(product => 
-    (type === 'all' || type === 'product') &&
-    (
-      product.id.toLowerCase().includes(search.toLowerCase()) ||
-      product.name.toLowerCase().includes(search.toLowerCase()) ||
-      product.brand.toLowerCase().includes(search.toLowerCase()) ||
-      (typeof product.category === 'string' && product.category.toLowerCase().includes(search.toLowerCase()))
-    )
-  ).slice(0, 8);
-  
-  const filteredCustomers = customers.filter(customer => 
-    (type === 'all' || type === 'customer') &&
-    (
-      customer.id.toLowerCase().includes(search.toLowerCase()) ||
-      customer.name.toLowerCase().includes(search.toLowerCase()) ||
-      customer.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-      customer.phone.replace(/\D/g, '').includes(search.replace(/\D/g, '')) || // تجاهل الرموز في رقم الهاتف
-      customer.businessType.includes(search)
-    )
-  ).slice(0, 8);
-  
+
+  const { data: filteredProducts = [], isFetching: productsLoading } = useQuery<Product[], Error>({
+    queryKey: ['searchProducts', debouncedSearch],
+    queryFn: () => productsService.search(debouncedSearch, 50),
+    enabled: debouncedSearch.length >= minSearchLength && (type === 'all' || type === 'product'),
+  });
+
+  const { data: filteredCustomers = [], isFetching: customersLoading } = useQuery<Customer[], Error>({
+    queryKey: ['searchCustomers', debouncedSearch],
+    queryFn: () => customersService.search(debouncedSearch, 50),
+    enabled: debouncedSearch.length >= minSearchLength && (type === 'all' || type === 'customer'),
+  });
+
   const handleSelectProduct = (product: Product) => {
     if (onSelectProduct) {
       onSelectProduct(product);
     } else {
       navigate(`/product/${product.id}`);
     }
-    setSearch('');
+    if (clearSearchOnSelect) setSearch('');
     setOpen(false);
     setBarcodeMode(false);
   };
-  
+
   const handleSelectCustomer = (customer: Customer) => {
     if (onSelectCustomer) {
       onSelectCustomer(customer);
     } else {
       navigate(`/customer/${customer.id}`);
     }
-    setSearch('');
+    if (clearSearchOnSelect) setSearch('');
     setOpen(false);
     setBarcodeMode(false);
   };
-  
+
   const toggleBarcodeMode = () => {
     setBarcodeMode(!barcodeMode);
     setSearch('');
@@ -132,7 +129,7 @@ const SmartSearch = ({
       setOpen(false);
     }
   };
-  
+
   const getCategoryColor = (category: ProductCategory) => {
     switch (category) {
       case ProductCategory.ENGINE_CARE:
@@ -149,7 +146,7 @@ const SmartSearch = ({
         return "bg-gray-100 text-gray-800";
     }
   };
-  
+
   const getBusinessTypeColor = (businessType: BusinessType) => {
     switch (businessType) {
       case BusinessType.SERVICE_CENTER:
@@ -168,7 +165,7 @@ const SmartSearch = ({
         return "bg-gray-100 text-gray-800";
     }
   };
-  
+
   return (
     <div className={cn("relative", className)}>
       {barcodeMode ? (
@@ -198,18 +195,9 @@ const SmartSearch = ({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  if (e.target.value && !open) {
-                    setOpen(true);
-                  }
-                }}
-                onFocus={() => {
-                  if (search) setOpen(true);
-                }}
-                onClick={() => {
-                  if (search) setOpen(true);
-                }}
+                onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+                onFocus={() => setOpen(true)}
+                onClick={() => setOpen(true)}
                 placeholder={placeholder}
                 className="pl-10 pr-10"
               />
@@ -223,11 +211,15 @@ const SmartSearch = ({
               </Button>
             </div>
           </PopoverTrigger>
-          <PopoverContent className="p-0" align="start" sideOffset={5} style={{ width: '100%' }}>
+          <PopoverContent className="p-0 z-50" align="start" sideOffset={5} style={{ width: '100%' }}>
             <Command>
               <CommandInput placeholder={placeholder} value={search} onValueChange={setSearch} />
               <CommandList>
-                <CommandEmpty>لم يتم العثور على نتائج</CommandEmpty>
+                <CommandEmpty>
+                  {debouncedSearch.length < minSearchLength
+                    ? `اكتب ${minSearchLength} أحرف على الأقل للبحث`
+                    : 'لم يتم العثور على نتائج'}
+                </CommandEmpty>
                 
                 {filteredProducts.length > 0 && (
                   <CommandGroup heading="المنتجات">

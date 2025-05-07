@@ -81,6 +81,10 @@ const CustomerCard: FC<CustomerCardProps> = ({ customer, onView, onEdit, onDelet
               </span>
             )}
           </div>
+          <div className="flex flex-col items-start bg-green-50 dark:bg-green-900 rounded-lg p-2 shadow-sm w-full">
+            <span className="text-xs text-green-800 dark:text-green-200 font-semibold">النقاط الحالية</span>
+            <span className="text-green-700 font-bold text-lg dark:text-green-300">{formatNumberEn(customer.currentPoints)}</span>
+          </div>
         </div>
       {/* الموقع */}
       <div className="flex items-center gap-2 mt-2 text-xs text-blue-900 dark:text-blue-200 font-semibold">

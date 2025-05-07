@@ -34,7 +34,7 @@ export enum BusinessType {
 export interface Product {
   id: string; // المستخدم يدخل هذا الحقل (كود المنتج)
   name: string;
-  category: string; // تغيير النوع من ProductCategory إلى string لدعم القيم العربية
+  category: ProductCategory; // تغيير النوع من ProductCategory إلى string لدعم القيم العربية
   unit: string;
   brand: string;
   price: number;

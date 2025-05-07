@@ -1,4 +1,3 @@
-
 import { 
   Select,
   SelectContent,
@@ -74,9 +73,10 @@ const ProductSelector = ({
         
         <div className="md:col-span-3">
           <Label htmlFor="productSearch">بحث عن منتج</Label>
-          <SmartSearch 
+          <SmartSearch
             type="product"
-            placeholder="بحث سريع..."
+            products={availableProducts}
+            placeholder="بحث بالاسم، الكود أو العلامة التجارية..."
             onSelectProduct={handleSelectProduct}
           />
         </div>

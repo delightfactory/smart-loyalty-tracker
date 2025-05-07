@@ -1,8 +1,7 @@
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CustomerPurchasesTable from './CustomerPurchasesTable';
 import CustomerPaymentHistory from './CustomerPaymentHistory';
-import CustomerAnalytics from './CustomerAnalytics';
+import CustomerDetailAnalytics from './CustomerDetailAnalytics';
 import CustomerRecommendations from './CustomerRecommendations';
 import CustomerRedemptionsTable from './CustomerRedemptionsTable';
 import CustomerPointsHistory from './CustomerPointsHistory';
@@ -65,12 +64,7 @@ const CustomerDetailsTabs = ({ customer, invoices }: CustomerDetailsTabsProps) =
       </TabsContent>
 
       <TabsContent value="analysis">
-        <CustomerAnalytics 
-          customers={[customer]} 
-          invoices={invoices}
-          products={[]} 
-          isLoading={false}
-        />
+        <CustomerDetailAnalytics invoices={invoices} />
       </TabsContent>
 
       <TabsContent value="recommendations">

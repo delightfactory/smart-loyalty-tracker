@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -54,27 +53,34 @@ import SmartSearch from '@/components/search/SmartSearch';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useRealtime } from '@/hooks/use-realtime';
-import { useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import ViewToggle from '@/components/invoices/ViewToggle';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { egyptGovernorates } from '@/lib/egyptLocations';
+import { formatNumberEn } from '@/lib/utils';
+import { useProducts } from '@/hooks/useProducts';
+import { ProductCategory, ProductCategoryLabels } from '@/lib/types';
+import InvoiceSummary from '@/components/invoices/InvoiceSummary';
+import DatePicker from '@/components/ui/DatePicker';
 
 const Invoices = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>(() => localStorage.getItem('invoices_searchTerm') || '');
+  const [statusFilter, setStatusFilter] = useState<string>(() => localStorage.getItem('invoices_statusFilter') || 'all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() => (localStorage.getItem('invoices_viewMode') as 'table'|'cards') || (isMobile ? 'cards' : 'table'));
   
   // استخدام React Query hooks
   const { getAll: getAllInvoices, deleteInvoice } = useInvoices();
   const { getAll: getAllCustomers } = useCustomers();
+  const { getAll: productsQuery } = useProducts();
   
   const { data: invoices = [], isLoading: isLoadingInvoices, refetch: refetchInvoices } = getAllInvoices;
   const { data: customers = [], isLoading: isLoadingCustomers } = getAllCustomers;
+  const products = productsQuery.data ?? [];
   
   // إعداد الاستماع لتحديثات الفواتير والمدفوعات في الوقت الفعلي
   const handleRefetch = useCallback(() => {
@@ -144,22 +150,84 @@ const Invoices = () => {
     if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
-  
-  const filteredInvoices = sortedInvoices.filter(invoice => {
-    // بحث شامل: رقم الفاتورة، اسم العميل، المبلغ، التاريخ
-    const customer = getCustomerById(invoice.customerId);
-    const search = searchTerm.toLowerCase();
-    const matchesInvoiceId = (invoice.id || '').toLowerCase().includes(search);
-    const matchesCustomer = (customer?.name || '').toLowerCase().includes(search);
-    const matchesAmount = (invoice.totalAmount ? invoice.totalAmount.toString() : '').includes(search);
-    const dateStr = formatDate(invoice.date);
-    const matchesDate = dateStr.includes(search);
-    return (
-      (!search || matchesInvoiceId || matchesCustomer || matchesAmount || matchesDate) &&
-      (statusFilter !== 'all' ? invoice.status === statusFilter : true)
-    );
+
+  // Mark invoices as overdue if due date passed and not paid
+  const invoicesProcessed = sortedInvoices.map(inv => {
+    const due = inv.dueDate;
+    const isOverdue = due && safeDate(due) < new Date() && inv.status !== InvoiceStatus.PAID;
+    return { ...inv, status: isOverdue ? InvoiceStatus.OVERDUE : inv.status };
   });
-  
+
+  // فلترة بتاريخ ونطاق، محافظة، مدينة، وترقيم
+  const [dateFrom,setDateFrom] = useState<string>(()=>localStorage.getItem('invoices_dateFrom')||'');
+  const [dateTo,setDateTo]   = useState<string>(()=>localStorage.getItem('invoices_dateTo')||'');
+  const [governorateFilter,setGovernorateFilter] = useState<string>(()=>localStorage.getItem('invoices_governorateFilter')||'all');
+  const [cityFilter,setCityFilter] = useState<string>(()=>localStorage.getItem('invoices_cityFilter')||'all');
+  const [pageSize,setPageSize] = useState<number>(()=>parseInt(localStorage.getItem('invoices_page_size')||'50',10));
+  const [pageIndex,setPageIndex] = useState<number>(()=>parseInt(localStorage.getItem('invoices_page_index')||'0',10));
+
+  useEffect(()=>{localStorage.setItem('invoices_dateFrom',dateFrom); setPageIndex(0);},[dateFrom]);
+  useEffect(()=>{localStorage.setItem('invoices_dateTo',dateTo); setPageIndex(0);},[dateTo]);
+  useEffect(()=>{localStorage.setItem('invoices_governorateFilter',governorateFilter); setPageIndex(0);},[governorateFilter]);
+  useEffect(()=>{localStorage.setItem('invoices_cityFilter',cityFilter); setPageIndex(0);},[cityFilter]);
+  useEffect(()=>{localStorage.setItem('invoices_page_size',String(pageSize)); setPageIndex(0);},[pageSize]);
+  useEffect(()=>{localStorage.setItem('invoices_page_index',String(pageIndex));},[pageIndex]);
+
+  useEffect(() => { localStorage.setItem('invoices_searchTerm', searchTerm); }, [searchTerm]);
+  useEffect(() => { localStorage.setItem('invoices_statusFilter', statusFilter); }, [statusFilter]);
+  useEffect(() => { localStorage.setItem('invoices_viewMode', viewMode); }, [viewMode]);
+
+  const uniqueGovernorates = egyptGovernorates.map(g=>g.governorate);
+  const uniqueCities = governorateFilter!=='all'
+    ? egyptGovernorates.find(g=>g.governorate===governorateFilter)?.cities||[]
+    : Array.from(new Set(customers.map(c=>c.city).filter(Boolean)));
+
+  const customersMap = useMemo(()=>new Map(customers.map(c=>[c.id,c])),[customers]);
+  const productMap = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+
+  const filteredInvoices = useMemo(()=>invoicesProcessed.filter(inv=>{
+    const cust = customersMap.get(inv.customerId);
+    const d = safeDate(inv.date);
+    const okSearch = !searchTerm || inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || (cust?.name||'').toLowerCase().includes(searchTerm.toLowerCase());
+    const okStatus = statusFilter==='all'||inv.status===statusFilter;
+    const okFrom = !dateFrom || d>=new Date(dateFrom);
+    const okTo   = !dateTo   || d<=new Date(dateTo);
+    const okGov  = governorateFilter==='all'||cust?.governorate===governorateFilter;
+    const okCity = cityFilter==='all'||cust?.city===cityFilter;
+    return okSearch&&okStatus&&okFrom&&okTo&&okGov&&okCity;
+  }),[invoicesProcessed,searchTerm,statusFilter,dateFrom,dateTo,governorateFilter,cityFilter,customersMap]);
+
+  const totalFiltered = filteredInvoices.length;
+  const totalAmountSum = filteredInvoices.reduce((s,inv)=>s+(inv.totalAmount||0),0);
+
+  const statusStats = useMemo(()=>{
+    const stats:Record<string,{count:number;sum:number}>={};
+    Object.values(InvoiceStatus).forEach(st=>stats[st]={count:0,sum:0});
+    filteredInvoices.forEach(inv=>{if(stats[inv.status]){stats[inv.status].count++;stats[inv.status].sum+=inv.totalAmount;}});
+    return stats;
+  },[filteredInvoices]);
+
+  const categoryStats = useMemo(() => {
+    const revenueByCategory: Record<ProductCategory, number> = {} as any;
+    Object.values(ProductCategory).forEach(cat => revenueByCategory[cat] = 0);
+    filteredInvoices.forEach(inv => {
+      inv.items?.forEach(item => {
+        const product = productMap.get(item.productId);
+        if (product) {
+          revenueByCategory[product.category] = (revenueByCategory[product.category] || 0) + item.totalPrice;
+        }
+      });
+    });
+    const totalRevenue = Object.values(revenueByCategory).reduce((sum, v) => sum + v, 0) || 1;
+    return Object.entries(revenueByCategory).map(([category, value]) => ({
+      category: category as ProductCategory,
+      percentage: Math.round((value / totalRevenue) * 100),
+    }));
+  }, [filteredInvoices, productMap]);
+
+  const totalPages = Math.max(1,Math.ceil(totalFiltered/pageSize));
+  const paginatedInvoices = filteredInvoices.slice(pageIndex*pageSize,(pageIndex+1)*pageSize);
+
   const formatCurrency = (value: number) => {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'EGP' });
   };
@@ -195,8 +263,8 @@ const Invoices = () => {
         return "bg-gray-100 text-gray-800";
     }
   };
-  
-  const isLoading = isLoadingInvoices || isLoadingCustomers;
+
+  const isLoading = isLoadingInvoices || isLoadingCustomers || productsQuery.isLoading;
 
   useEffect(() => {
     if (isMobile) setViewMode('cards');
@@ -214,48 +282,82 @@ const Invoices = () => {
   }
 
   return (
-    <PageContainer title="إدارة الفواتير" subtitle="عرض وإنشاء وإدارة الفو��تير">
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-        <SmartSearch
-          placeholder="بحث عن فاتورة أو عميل أو رقم أو مبلغ..."
-          className="w-full sm:w-64"
-          customers={customers}
-          onSelectCustomer={(customer) => {
-            setSearchTerm(customer.name);
-          }}
-          onChange={val => setSearchTerm(val)}
+    <PageContainer
+      title="إدارة الفواتير"
+      subtitle="عرض وإدارة الفواتير"
+      extra={
+        <div className="flex gap-2 items-center">
+          <ViewToggle view={viewMode} setView={setViewMode} />
+          <Button onClick={() => navigate('/invoices/new')}><Plus className="mr-1"/> إنشاء فاتورة</Button>
+        </div>
+      }
+    >
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <InvoiceSummary
+          totalFiltered={totalFiltered}
+          totalAmountSum={totalAmountSum}
+          statusStats={statusStats}
+          categoryStats={categoryStats}
         />
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <SelectValue placeholder="جميع الحالات" />
-              </div>
+      )}
+      {/* فلترة إضافية */}
+      {isLoading ? (
+        <div className="flex flex-wrap gap-2 mb-6 items-center">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-full sm:w-40 animate-pulse"></div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2 mb-6 items-center bg-gradient-to-tr from-blue-50/40 to-white dark:from-zinc-900/60 dark:to-zinc-800/80 p-4 rounded-xl shadow-sm border border-blue-100 dark:border-zinc-700">
+          <DatePicker
+            value={dateFrom ? new Date(dateFrom) : null}
+            onChange={d => setDateFrom(d ? d.toLocaleDateString('en-CA') : '')}
+            placeholder="من تاريخ"
+            className="w-full sm:w-40 rounded-lg"
+          />
+          <DatePicker
+            value={dateTo ? new Date(dateTo) : null}
+            onChange={d => setDateTo(d ? d.toLocaleDateString('en-CA') : '')}
+            placeholder="إلى تاريخ"
+            className="w-full sm:w-40 rounded-lg"
+          />
+          <Select value={governorateFilter} onValueChange={setGovernorateFilter}>
+            <SelectTrigger className="w-full sm:w-40 rounded-lg"><SelectValue placeholder="المحافظة"/></SelectTrigger>
+            <SelectContent><SelectItem value="all">الكل</SelectItem>{uniqueGovernorates.map(gov=><SelectItem key={gov} value={gov}>{gov}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={cityFilter} onValueChange={setCityFilter}>
+            <SelectTrigger className="w-full sm:w-40 rounded-lg"><SelectValue placeholder="المدينة"/></SelectTrigger>
+            <SelectContent><SelectItem value="all">الكل</SelectItem>{uniqueCities.map(city=><SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent>
+          </Select>
+          <SmartSearch
+            placeholder="بحث..."
+            initialSearchTerm={searchTerm}
+            onChange={setSearchTerm}
+            className="w-full sm:w-40 rounded-lg"
+          />
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          >
+            <SelectTrigger className="w-full sm:w-40 rounded-lg">
+              <SelectValue placeholder="الحالة" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">جميع الحالات</SelectItem>
-              {Object.values(InvoiceStatus).map((status) => (
-                <SelectItem key={status} value={status}>{status}</SelectItem>
+              <SelectItem value="all">الكل</SelectItem>
+              {Object.values(InvoiceStatus).map(st => (
+                <SelectItem key={st} value={st}>{st}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <ViewToggle view={viewMode} setView={setViewMode} />
-          <Button onClick={() => navigate('/create-payment')} variant="outline" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4 ml-2 text-primary" />
-            تسجيل دفعة
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-lg bg-gradient-to-l from-primary to-purple-500 text-white shadow-md hover:from-purple-600 hover:to-primary dark:from-purple-900 dark:to-purple-700 px-5 py-2 font-bold text-base transition-all min-w-[130px] flex items-center gap-2"
-            onClick={() => navigate('/create-invoice')}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            إنشاء فاتورة
-          </Button>
+          <Button variant="outline" onClick={()=>{setSearchTerm('');setStatusFilter('all');setDateFrom('');setDateTo('');setGovernorateFilter('all');setCityFilter('all');}} className="min-w-[120px]">إعادة التعيين</Button>
         </div>
-      </div>
+      )}
       {/* عرض حسب الوضع المختار */}
       {viewMode === 'table' ? (
         <div className="rounded-lg border bg-card shadow-lg overflow-x-auto">
@@ -327,8 +429,8 @@ const Invoices = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredInvoices.length > 0 ? (
-                filteredInvoices.map((invoice) => {
+              ) : paginatedInvoices.length > 0 ? (
+                paginatedInvoices.map((invoice) => {
                   const customer = getCustomerById(invoice.customerId);
                   return (
                     <TableRow
@@ -341,13 +443,23 @@ const Invoices = () => {
                       <TableCell className="text-center text-gray-800 dark:text-gray-100">{customer?.name || ''}</TableCell>
                       <TableCell className="text-center font-bold text-blue-700 dark:text-blue-300 text-[15px]">{formatCurrency(invoice.totalAmount)}</TableCell>
                       <TableCell className="text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                          <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500 animate-pulse' : 'bg-blue-400'}`}></span>
-                          {invoice.status === InvoiceStatus.PAID ? 'مدفوع' : invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' : 'متأخر'}
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${
+                          invoice.status === InvoiceStatus.PAID ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-500' :
+                          invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-500' :
+                          invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border border-orange-500' :
+                          'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse'
+                        }` }>
+                          <span className={`w-2 h-2 rounded-full ${
+                            invoice.status === InvoiceStatus.PAID ? 'bg-green-500' :
+                            invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' :
+                            invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-500' :
+                            'bg-red-500 animate-pulse'
+                          }` }></span>
+                          {invoice.status === InvoiceStatus.PAID ? 'مدفوع' :
+                           invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' :
+                           invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' :
+                           'متأخر'}
                         </span>
-                        {invoice.status === InvoiceStatus.OVERDUE && (
-                          <div className="text-xs text-red-600 font-bold mt-1">Overdue</div>
-                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 font-bold text-[15px]">
@@ -402,21 +514,31 @@ const Invoices = () => {
             <div className="col-span-full flex justify-center items-center h-40">
               <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
-          ) : filteredInvoices.length > 0 ? (
-            filteredInvoices.map((invoice) => {
+          ) : paginatedInvoices.length > 0 ? (
+            paginatedInvoices.map((invoice) => {
               const customer = getCustomerById(invoice.customerId);
               return (
                 <Card key={invoice.id} className="shadow-md border p-4 flex flex-col gap-2 transition-all hover:scale-[1.015] hover:shadow-xl border-gray-200 dark:border-gray-800 hover:bg-emerald-50/40 dark:hover:bg-emerald-900/40">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-[17px] font-extrabold text-blue-900 dark:text-blue-100">
                       <span>فاتورة #{invoice.id}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                        <span className={`w-2 h-2 rounded-full ${invoice.status === InvoiceStatus.PAID ? 'bg-green-500' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' : invoice.status === InvoiceStatus.OVERDUE ? 'bg-red-500 animate-pulse' : 'bg-blue-400'}`}></span>
-                        {invoice.status === InvoiceStatus.PAID ? 'مدفوع' : invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' : invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' : 'متأخر'}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${
+                        invoice.status === InvoiceStatus.PAID ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-500' :
+                        invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-500' :
+                        invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border border-orange-500' :
+                        'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse'
+                      }` }>
+                        <span className={`w-2 h-2 rounded-full ${
+                          invoice.status === InvoiceStatus.PAID ? 'bg-green-500' :
+                          invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' :
+                          invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-500' :
+                          'bg-red-500 animate-pulse'
+                        }` }></span>
+                        {invoice.status === InvoiceStatus.PAID ? 'مدفوع' :
+                         invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' :
+                         invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' :
+                         'متأخر'}
                       </span>
-                      {invoice.status === InvoiceStatus.OVERDUE && (
-                        <span className="ml-2 text-xs text-red-600 font-bold animate-pulse">Overdue</span>
-                      )}
                     </CardTitle>
                     <CardDescription className="text-gray-800 dark:text-gray-200 text-[15px]">
                       {customer?.name || '---'} | {formatDate(invoice.date)}
@@ -468,6 +590,23 @@ const Invoices = () => {
           )}
         </div>
       )}
+      {/* ترقيم الصفحات */}
+      <div className="flex items-center justify-between mt-4">
+        <Button variant="outline" onClick={()=>setPageIndex(i=>i-1)} disabled={pageIndex===0}>السابق</Button>
+        <span className="text-sm">صفحة {pageIndex+1} من {totalPages}</span>
+        <Button variant="outline" onClick={()=>setPageIndex(i=>i+1)} disabled={pageIndex>=totalPages-1}>التالي</Button>
+        <Select value={String(pageSize)} onValueChange={v => setPageSize(parseInt(v, 10))}>
+          <SelectTrigger className="w-20 text-center">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
