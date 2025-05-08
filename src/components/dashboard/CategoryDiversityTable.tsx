@@ -1,12 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import DataTable, { Column } from '@/components/ui/DataTable';
 import { Customer, Invoice, Product, ProductCategory, ProductCategoryLabels } from "@/lib/types";
 import { formatAmountEn, formatNumberEn } from "@/lib/formatters";
 
@@ -21,7 +14,7 @@ export default function CategoryDiversityTable({
 }) {
   // Create a map of product categories to track their stats
   const categoryStats: Record<string, {
-    category: ProductCategory;
+    category: string;
     productCount: number;
     customerCount: number;
     totalRevenue: number;
@@ -30,7 +23,7 @@ export default function CategoryDiversityTable({
   // Initialize categories
   Object.values(ProductCategory).forEach(category => {
     categoryStats[category] = {
-      category: category as ProductCategory,
+      category: category as string,
       productCount: 0,
       customerCount: 0,
       totalRevenue: 0
@@ -97,58 +90,22 @@ export default function CategoryDiversityTable({
     (a, b) => b.totalRevenue - a.totalRevenue
   );
 
+  // تعريف أعمدة الجدول
+  type Row = typeof categoriesArray[number];
+  const columns: Column<Row>[] = [
+    { header: 'الفئة', accessor: 'category', Cell: (v) => ProductCategoryLabels[v as ProductCategory] || v },
+    { header: 'عدد المنتجات', accessor: 'productCount', Cell: (v) => formatNumberEn(v) },
+    { header: 'عدد العملاء', accessor: 'customerCount', Cell: (v) => formatNumberEn(v) },
+    { header: 'إجمالي الإيرادات', accessor: 'totalRevenue', Cell: (v) => formatAmountEn(v) },
+  ];
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>تنوع الفئات</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>الفئة</TableHead>
-              <TableHead className="text-right">عدد المنتجات</TableHead>
-              <TableHead className="text-right">عدد العملاء</TableHead>
-              <TableHead className="text-right">إجمالي الإيرادات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {categoriesArray.map((stat, idx) => (
-              <TableRow
-                key={stat.category}
-                className={
-                  idx % 2 === 0
-                    ? `bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`
-                    : `bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100`
-                }
-                style={{
-                  borderRight: `6px solid ${
-                    stat.category === 'ENGINE_CARE' ? '#2563eb' :
-                    stat.category === 'EXTERIOR_CARE' ? '#059669' :
-                    stat.category === 'TIRE_CARE' ? '#f59e42' :
-                    stat.category === 'DASHBOARD_CARE' ? '#d97706' :
-                    stat.category === 'INTERIOR_CARE' ? '#a21caf' :
-                    stat.category === 'SUPPLIES' ? '#0ea5e9' :
-                    '#64748b'
-                  }`
-                }}
-              >
-                <TableCell className="font-medium dark:text-gray-100">
-                  {ProductCategoryLabels[stat.category as ProductCategory] || stat.category}
-                </TableCell>
-                <TableCell className="text-right font-bold text-blue-700 dark:text-blue-300">
-                  {formatNumberEn(stat.productCount)}
-                </TableCell>
-                <TableCell className="text-right font-bold text-green-700 dark:text-green-300">
-                  {formatNumberEn(stat.customerCount)}
-                </TableCell>
-                <TableCell className="text-right font-bold text-purple-700 dark:text-purple-300">
-                  {formatAmountEn(stat.totalRevenue)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable data={categoriesArray} columns={columns} defaultPageSize={categoriesArray.length} />
       </CardContent>
     </Card>
   );

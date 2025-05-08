@@ -1,9 +1,11 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { customersService, invoicesService } from '@/services/database';
-import { useEffect, useState } from 'react';
-import { Customer, Invoice } from '@/lib/types';
+import { useCustomers } from '@/hooks/useCustomers';
+import { supabase } from '@/integrations/supabase/client';
+import { Customer, Invoice, InvoiceStatus, PaymentMethod } from '@/lib/types';
 import { formatNumberEn, formatDateEn } from '@/lib/formatters';
+import DataTable, { Column } from '@/components/ui/DataTable';
 
 interface CustomerFrequencyTableProps {
   customers?: Customer[];
@@ -38,27 +40,52 @@ function getCustomerFrequency(customers: Customer[], invoices: Invoice[]) {
 }
 
 const CustomerFrequencyTable = (props: CustomerFrequencyTableProps) => {
-  const [isMounted, setIsMounted] = useState(false);
-  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => await customersService.getAll(),
-    enabled: isMounted && !props.customers,
+  const [pageIndex, setPageIndex] = useState(0);
+  const defaultPageSize = 10;
+  const { getPaginated } = useCustomers();
+  const { data: pagRes, isLoading: loadingCustomers } = getPaginated({ pageIndex, pageSize: defaultPageSize });
+  const customersPage = pagRes?.items || [];
+  const totalItems = pagRes?.total || 0;
+  const { data: invoicesPage = [], isLoading: loadingInvoices } = useQuery<Invoice[], Error>({
+    queryKey: ['invoicesByCustomerIds', pageIndex],
+    queryFn: async () => {
+      if (!customersPage.length) return [];
+      const ids: readonly string[] = customersPage.map(c => c.id);
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .in('customer_id', ids);
+      if (error || !data) return [];
+      return data.map((row) => ({
+        id: row.id,
+        customerId: row.customer_id,
+        date: new Date(row.date),
+        dueDate: row.due_date ? new Date(row.due_date) : undefined,
+        items: [],
+        totalAmount: row.total_amount,
+        pointsEarned: row.points_earned,
+        pointsRedeemed: row.points_redeemed,
+        status: row.status as InvoiceStatus,
+        paymentMethod: row.payment_method as PaymentMethod,
+        categoriesCount: row.categories_count,
+        payments: [],
+      }));
+    },
+    enabled: customersPage.length > 0,
   });
-  const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: async () => await invoicesService.getAll(),
-    enabled: isMounted && !props.invoices,
-  });
-  useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
-
-  const finalCustomers = props.customers || customers;
-  const finalInvoices = props.invoices || invoices;
+  const frequencyData = getCustomerFrequency(customersPage, invoicesPage);
   const loading = props.loading || loadingCustomers || loadingInvoices;
 
-  const customerFrequency = getCustomerFrequency(finalCustomers, finalInvoices);
+  // تعريف أعمدة الجدول
+  type FreqRow = ReturnType<typeof getCustomerFrequency>[0];
+  const columns: Column<FreqRow>[] = [
+    { header: '#', accessor: 'id', Cell: (_v, _r, i) => i + 1 },
+    { header: 'اسم العميل', accessor: 'name' },
+    { header: 'نوع النشاط', accessor: 'businessType' },
+    { header: 'عدد الفواتير', accessor: 'invoicesCount', Cell: (v) => formatNumberEn(v) },
+    { header: 'آخر عملية شراء', accessor: 'lastPurchase', Cell: (v) => v ? formatDateEn(v) : 'لم يشترِ من قبل' },
+    { header: 'متوسط الأيام بين المشتريات', accessor: 'avgDaysBetweenPurchases', Cell: (v) => v != null ? `${formatNumberEn(Math.round(v))} يوم` : 'غير متاح' },
+  ];
 
   return (
     <Card>
@@ -66,36 +93,15 @@ const CustomerFrequencyTable = (props: CustomerFrequencyTableProps) => {
         <CardTitle>تحليل تكرار الشراء للعملاء</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2">#</th>
-                <th className="p-2">اسم العميل</th>
-                <th className="p-2">نوع النشاط</th>
-                <th className="p-2">عدد الفواتير</th>
-                <th className="p-2">آخر عملية شراء</th>
-                <th className="p-2">متوسط الأيام بين المشتريات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} className="text-center">جارٍ التحميل...</td></tr>
-              ) : (
-                customerFrequency.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-yellow-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'}>
-                    <td className="p-2 font-bold text-yellow-700 dark:text-yellow-300">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold dark:text-gray-100">{c.name}</td>
-                    <td className="p-2 dark:text-gray-200">{c.businessType}</td>
-                    <td className="p-2 text-blue-700 font-bold dark:text-blue-300">{formatNumberEn(c.invoicesCount)}</td>
-                    <td className="p-2 dark:text-gray-200" dir="ltr">{c.lastPurchase ? formatDateEn(c.lastPurchase) : 'لم يشترِ من قبل'}</td>
-                    <td className="p-2 text-gray-700 font-bold dark:text-gray-300">{c.avgDaysBetweenPurchases !== null ? formatNumberEn(Math.round(c.avgDaysBetweenPurchases)) + ' يوم' : 'غير متاح'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={frequencyData}
+          columns={columns}
+          defaultPageSize={defaultPageSize}
+          pageIndex={pageIndex}
+          onPageChange={setPageIndex}
+          totalItems={totalItems}
+          loading={loading}
+        />
       </CardContent>
     </Card>
   );

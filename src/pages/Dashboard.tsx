@@ -131,7 +131,7 @@ const Dashboard = () => {
       }
       return { totalManualAdded, totalManualDeducted };
     },
-    enabled: isMounted,
+    enabled: isMounted && activeTab === 'overview',
     refetchOnWindowFocus: true,
   });
 
@@ -146,7 +146,7 @@ const Dashboard = () => {
         return [];
       }
     },
-    enabled: isMounted
+    enabled: isMounted && (activeTab === 'sales' || activeTab === 'products')
   });
 
   const { data: customersData } = useQuery({
@@ -159,7 +159,7 @@ const Dashboard = () => {
         return [];
       }
     },
-    enabled: isMounted
+    enabled: isMounted && activeTab === 'customers'
   });
 
   const { data: invoicesData } = useQuery({
@@ -172,7 +172,7 @@ const Dashboard = () => {
         return [];
       }
     },
-    enabled: isMounted
+    enabled: isMounted && activeTab === 'overview'
   });
 
   const { data: paymentsData } = useQuery({
@@ -185,7 +185,7 @@ const Dashboard = () => {
         return [];
       }
     },
-    enabled: isMounted
+    enabled: isMounted && (activeTab === 'sales' || activeTab === 'customers')
   });
 
   const { data: redemptionsData, isLoading: isRedemptionsLoading } = useQuery({
@@ -198,7 +198,7 @@ const Dashboard = () => {
         return [];
       }
     },
-    enabled: isMounted
+    enabled: isMounted && activeTab === 'overview'
   });
 
   const products = productsData || [];

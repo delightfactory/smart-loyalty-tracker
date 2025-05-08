@@ -1,5 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { formatNumberEn, formatDateEn } from '@/lib/formatters';
+import DataTable, { Column } from '@/components/ui/DataTable';
 
 interface InactiveCustomersTableProps {
   customers: any[];
@@ -42,45 +43,20 @@ function getInactiveCustomers(customers: any[], invoices: any[], inactiveDays = 
 
 export default function InactiveCustomersTable({ customers, invoices, inactiveDays = 60, max = 10 }: InactiveCustomersTableProps) {
   const inactiveCustomers = getInactiveCustomers(customers || [], invoices || [], inactiveDays, max);
+  type Row = typeof inactiveCustomers[number];
+  const columns: Column<Row>[] = [
+    { header: '#', accessor: 'id', Cell: (_v, _r, i) => i + 1 },
+    { header: 'اسم العميل', accessor: 'name' },
+    { header: 'آخر عملية شراء', accessor: 'lastPurchase' },
+    { header: 'أيام الغياب', accessor: 'daysInactive' },
+  ];
   return (
     <Card>
       <CardHeader>
         <CardTitle>العملاء غير النشطين</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2">#</th>
-                <th className="p-2">اسم العميل</th>
-                <th className="p-2">آخر عملية شراء</th>
-                <th className="p-2">أيام الغياب</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inactiveCustomers.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-4">لا يوجد عملاء غير نشطين حالياً</td></tr>
-              ) : (
-                inactiveCustomers.map((c, idx) => (
-                  <tr
-                    key={c.id}
-                    className={
-                      idx % 2 === 0
-                        ? 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'
-                    }
-                  >
-                    <td className="p-2 font-bold text-gray-700 dark:text-gray-300">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold text-gray-900 dark:text-gray-200">{c.name}</td>
-                    <td className="p-2 text-gray-600 dark:text-gray-400">{c.lastPurchase}</td>
-                    <td className="p-2 text-red-600 font-bold dark:text-red-400">{formatNumberEn(c.daysInactive)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable data={inactiveCustomers} columns={columns} defaultPageSize={max} />
       </CardContent>
     </Card>
   );

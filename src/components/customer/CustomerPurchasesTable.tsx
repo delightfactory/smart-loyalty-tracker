@@ -22,6 +22,7 @@ import { Invoice, InvoiceStatus } from '@/lib/types';
 import { getProductById } from '@/lib/data';
 import PurchasesFilterBar from './PurchasesFilterBar';
 import TableWrapper from '@/components/ui/TableWrapper';
+import { Pagination, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination';
 
 interface CustomerPurchasesTableProps {
   invoices: Invoice[];
@@ -51,6 +52,13 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
     return matchSearch && matchDate;
   });
 
+  // إضافة pagination
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageSize = 10;
+  const totalItems = filteredInvoices.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedInvoices = filteredInvoices.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -79,83 +87,98 @@ const CustomerPurchasesTable = ({ invoices, customerId }: CustomerPurchasesTable
           <div>إجمالي المشتريات: <span className="font-bold text-primary">{filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toLocaleString('en-US', { style: 'currency', currency: 'EGP' })}</span></div>
         </div>
         {filteredInvoices.length > 0 ? (
-          <TableWrapper>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      رقم الفاتورة
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      التاريخ
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      القيمة
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      طريقة الدفع
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      الحالة
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      النقاط المكتسبة
-                    </div>
-                  </TableHead>
-                  <TableHead>
-                    <div className="flex items-center gap-1 cursor-move">
-                      <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                      المنتجات
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow 
-                    key={invoice.id} 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/invoices/${invoice.id}`)}
-                  >
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{formatDate(invoice.date)}</TableCell>
-                    <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
-                    <TableCell>{invoice.paymentMethod}</TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        "px-2 py-1 rounded-full text-xs font-medium",
-                        invoice.status === InvoiceStatus.PAID ? "bg-green-100 text-green-800" :
-                        invoice.status === InvoiceStatus.OVERDUE ? "bg-red-100 text-red-800" :
-                        invoice.status === InvoiceStatus.PARTIALLY_PAID ? "bg-blue-100 text-blue-800" :
-                        "bg-amber-100 text-amber-800"
-                      )}>
-                        {invoice.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>{invoice.pointsEarned}</TableCell>
-                    <TableCell>{invoice.items.length}</TableCell>
+          <div className="flex flex-col gap-4">
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        رقم الفاتورة
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        التاريخ
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        القيمة
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        طريقة الدفع
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        الحالة
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        النقاط المكتسبة
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1 cursor-move">
+                        <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        المنتجات
+                      </div>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableWrapper>
+                </TableHeader>
+                <TableBody>
+                  {paginatedInvoices.map((invoice) => (
+                    <TableRow 
+                      key={invoice.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/invoices/${invoice.id}`)}
+                    >
+                      <TableCell className="font-medium">{invoice.id}</TableCell>
+                      <TableCell>{formatDate(invoice.date)}</TableCell>
+                      <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
+                      <TableCell>{invoice.paymentMethod}</TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          invoice.status === InvoiceStatus.PAID ? "bg-green-100 text-green-800" :
+                          invoice.status === InvoiceStatus.OVERDUE ? "bg-red-100 text-red-800" :
+                          invoice.status === InvoiceStatus.PARTIALLY_PAID ? "bg-blue-100 text-blue-800" :
+                          "bg-amber-100 text-amber-800"
+                        )}>
+                          {invoice.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>{invoice.pointsEarned}</TableCell>
+                      <TableCell>{invoice.items.length}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+            {filteredInvoices.length > 0 && totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination>
+                  <PaginationPrevious className={pageIndex === 0 ? 'opacity-50 pointer-events-none' : ''} onClick={() => pageIndex > 0 && setPageIndex(p => p - 1)} />
+                  {[...Array(totalPages)].map((_, idx) => (
+                    <PaginationLink key={idx} isActive={idx === pageIndex} onClick={() => setPageIndex(idx)}>
+                      {idx + 1}
+                    </PaginationLink>
+                  ))}
+                  <PaginationNext className={pageIndex === totalPages - 1 ? 'opacity-50 pointer-events-none' : ''} onClick={() => pageIndex < totalPages - 1 && setPageIndex(p => p + 1)} />
+                </Pagination>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <FileText className="h-12 w-12 mb-4 opacity-50" />

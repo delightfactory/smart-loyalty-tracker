@@ -5,16 +5,10 @@ import {
   CardHeader, 
   CardTitle,
 } from '@/components/ui/card';
-import { 
-  Table, 
-  TableHeader, 
-  TableBody, 
-  TableRow, 
-  TableHead, 
-  TableCell,
-} from '@/components/ui/table';
+import DataTable, { Column } from '@/components/ui/DataTable';
 import { Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatNumberEn } from '@/lib/formatters';
 import { useMemo } from 'react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoices } from '@/hooks/useInvoices';
@@ -23,10 +17,6 @@ import { usePayments } from '@/hooks/usePayments';
 interface CustomersListProps {
   customers: Customer[];
 }
-
-const formatNumberEn = (num: number) => {
-  return num.toLocaleString('en-US');
-};
 
 function calculateCustomerNetTransactions(invoices: any[], payments: any[]): number {
   const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
@@ -73,49 +63,21 @@ const CustomersList = ({ customers }: CustomersListProps) => {
         <CardTitle>قائمة العملاء</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>اسم العميل</TableHead>
-              <TableHead>البريد الإلكتروني</TableHead>
-              <TableHead>نوع النشاط</TableHead>
-              <TableHead>المنطقة</TableHead>
-              <TableHead>مدة الائتمان (يوم)</TableHead>
-              <TableHead>قيمة الائتمان (EGP)</TableHead>
-              <TableHead>رصيد العميل</TableHead>
-              <TableHead>...</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {customers.map((customer, index) => (
-              <TableRow key={customer.id}>
-                <TableCell>{customer.name}</TableCell>
-                <TableCell>{customer.email}</TableCell>
-                <TableCell>{customer.businessType}</TableCell>
-                <TableCell>{customer.region}</TableCell>
-                <TableCell>{formatNumberEn(customer.credit_period ?? 0)}</TableCell>
-                <TableCell>{formatNumberEn(customer.credit_limit ?? 0)}</TableCell>
-                <TableCell><CustomerBalanceCell customerId={customer.id} /></TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "h-8 w-8 rounded-full flex items-center justify-center text-white",
-                      index === 0 ? "bg-yellow-500" : 
-                      index === 1 ? "bg-gray-400" : 
-                      index === 2 ? "bg-amber-700" : "bg-gray-200"
-                    )}>
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium">{customer.currentPoints} نقطة</p>
-                      <p className="text-sm text-muted-foreground">المستوى {customer.level}</p>
-                    </div>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable<Customer>
+          data={customers}
+          columns={[
+            { header: 'اسم العميل', accessor: 'name' },
+            { header: 'البريد الإلكتروني', accessor: 'email' },
+            { header: 'نوع النشاط', accessor: 'businessType' },
+            { header: 'المنطقة', accessor: 'region' },
+            { header: 'مدة الائتمان (يوم)', accessor: 'credit_period', Cell: (v) => formatNumberEn(v as number) },
+            { header: 'قيمة الائتمان (EGP)', accessor: 'credit_limit', Cell: (v) => formatNumberEn(v as number) },
+            { header: 'رصيد العميل', accessor: 'id', Cell: (_v, row) => <CustomerBalanceCell customerId={row.id} /> },
+            { header: 'النقاط', accessor: 'currentPoints', Cell: (v) => formatNumberEn(v as number) },
+            { header: 'المستوى', accessor: 'level', Cell: (v) => formatNumberEn(v as number) },
+          ]}
+          defaultPageSize={10}
+        />
       </CardContent>
     </Card>
   );

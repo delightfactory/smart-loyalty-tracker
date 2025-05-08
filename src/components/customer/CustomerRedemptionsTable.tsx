@@ -7,6 +7,7 @@ import { useRedemptions } from '@/hooks/useRedemptions';
 import { RedemptionStatus } from '@/lib/types';
 import RedemptionsFilterBar from './RedemptionsFilterBar';
 import TableWrapper from '@/components/ui/TableWrapper';
+import { Pagination, PaginationPrevious, PaginationNext, PaginationLink } from '@/components/ui/pagination';
 
 interface CustomerRedemptionsTableProps {
   customerId: string;
@@ -32,6 +33,13 @@ const CustomerRedemptionsTable = ({ customerId }: CustomerRedemptionsTableProps)
     const matchDate = (!fromDate || redemptionDate >= fromDate) && (!toDate || redemptionDate <= toDate);
     return matchSearch && matchDate;
   });
+
+  // إضافة pagination
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageSize = 10;
+  const totalItems = filteredRedemptions.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedRedemptions = filteredRedemptions.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
   return (
     <Card>
@@ -74,7 +82,7 @@ const CustomerRedemptionsTable = ({ customerId }: CustomerRedemptionsTableProps)
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRedemptions.map((r: any) => (
+                    {paginatedRedemptions.map((r: any) => (
                       <TableRow key={r.id}>
                         <TableCell>{r.id}</TableCell>
                         <TableCell>{formatDate(r.date)}</TableCell>
@@ -100,6 +108,19 @@ const CustomerRedemptionsTable = ({ customerId }: CustomerRedemptionsTableProps)
               <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                 <Gift className="h-12 w-12 mb-4 opacity-50" />
                 <p>لا توجد عمليات مطابقة للبحث أو التصفية</p>
+              </div>
+            )}
+            {filteredRedemptions.length > 0 && totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination>
+                  <PaginationPrevious className={pageIndex === 0 ? 'opacity-50 pointer-events-none' : ''} onClick={() => pageIndex > 0 && setPageIndex(p => p - 1)} />
+                  {[...Array(totalPages)].map((_, idx) => (
+                    <PaginationLink key={idx} isActive={idx === pageIndex} onClick={() => setPageIndex(idx)}>
+                      {idx + 1}
+                    </PaginationLink>
+                  ))}
+                  <PaginationNext className={pageIndex === totalPages - 1 ? 'opacity-50 pointer-events-none' : ''} onClick={() => pageIndex < totalPages - 1 && setPageIndex(p => p + 1)} />
+                </Pagination>
               </div>
             )}
           </>

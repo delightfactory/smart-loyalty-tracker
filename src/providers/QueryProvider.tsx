@@ -1,6 +1,6 @@
-
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import NProgress from 'nprogress';
 
 interface QueryProviderProps {
   children: React.ReactNode;
@@ -22,6 +22,20 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
       },
     },
   }));
+
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.query && event.query.state.fetchStatus === 'fetching') {
+        NProgress.start();
+      } else {
+        NProgress.done();
+      }
+    });
+    return () => {
+      unsubscribe();
+      NProgress.done();
+    };
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

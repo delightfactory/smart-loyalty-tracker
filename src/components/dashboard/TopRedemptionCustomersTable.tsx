@@ -4,6 +4,7 @@ import { customersService, redemptionsService } from '@/services/database';
 import { useEffect, useState } from 'react';
 import { Customer, Redemption } from '@/lib/types';
 import { formatNumberEn } from '@/lib/formatters';
+import DataTable, { Column } from '@/components/ui/DataTable';
 
 interface TopRedemptionCustomersTableProps {
   customers?: Customer[];
@@ -58,38 +59,26 @@ const TopRedemptionCustomersTable = (props: TopRedemptionCustomersTableProps) =>
 
   const topRedemptionCustomers = getTopRedemptionCustomers(finalCustomers, finalRedemptions, max);
 
+  // تعريف أعمدة الجدول
+  type Row = typeof topRedemptionCustomers[number];
+  const columns: Column<Row>[] = [
+    { header: '#', accessor: 'id', Cell: (_v, _r, i) => formatNumberEn(i + 1) },
+    { header: 'اسم العميل', accessor: 'name' },
+    { header: 'نوع النشاط', accessor: 'businessType' },
+    { header: 'إجمالي النقاط المستبدلة', accessor: 'totalPoints', Cell: (v) => formatNumberEn(v) },
+  ];
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>أفضل العملاء في استبدال النقاط</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2">#</th>
-                <th className="p-2">اسم العميل</th>
-                <th className="p-2">نوع النشاط</th>
-                <th className="p-2">إجمالي النقاط المستبدلة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="text-center">جارٍ التحميل...</td></tr>
-              ) : (
-                topRedemptionCustomers.map((c, idx) => (
-                  <tr key={c.id} className={idx % 2 === 0 ? 'bg-pink-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100'}>
-                    <td className="p-2 font-bold text-pink-600 dark:text-pink-300">{formatNumberEn(idx + 1)}</td>
-                    <td className="p-2 font-semibold dark:text-gray-100">{c.name}</td>
-                    <td className="p-2 dark:text-gray-200">{c.businessType}</td>
-                    <td className="p-2 text-purple-700 font-bold dark:text-purple-400">{formatNumberEn(c.totalPoints)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {loading ? (
+          <div className="text-center">جارٍ التحميل...</div>
+        ) : (
+          <DataTable data={topRedemptionCustomers} columns={columns} defaultPageSize={max} />
+        )}
       </CardContent>
     </Card>
   );
