@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Gift, Loader2 } from 'lucide-react';
+import { Gift, Loader2, GripVertical } from 'lucide-react';
 import { useRedemptions } from '@/hooks/useRedemptions';
 import { RedemptionStatus } from '@/lib/types';
 import RedemptionsFilterBar from './RedemptionsFilterBar';
+import TableWrapper from '@/components/ui/TableWrapper';
 
 interface CustomerRedemptionsTableProps {
   customerId: string;
@@ -58,38 +59,43 @@ const CustomerRedemptionsTable = ({ customerId }: CustomerRedemptionsTableProps)
               <div>إجمالي النقاط المستبدلة: <span className="font-bold text-primary">{filteredRedemptions.reduce((sum, r) => sum + r.totalPointsRedeemed, 0)}</span></div>
             </div>
             {filteredRedemptions.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>رقم العملية</TableHead>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>النقاط المستبدلة</TableHead>
-                    <TableHead>الحالة</TableHead>
-                    <TableHead>ملاحظات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRedemptions.map((r: any) => (
-                    <TableRow key={r.id}>
-                      <TableCell>{r.id}</TableCell>
-                      <TableCell>{formatDate(r.date)}</TableCell>
-                      <TableCell>{r.totalPointsRedeemed}</TableCell>
-                      <TableCell>
-                        <Badge className={
-                          r.status === RedemptionStatus.COMPLETED ? 'bg-green-100 text-green-800' :
-                          r.status === RedemptionStatus.PENDING ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }>
-                          {r.status === RedemptionStatus.COMPLETED ? 'مكتمل' :
-                           r.status === RedemptionStatus.PENDING ? 'معلق' :
-                           'ملغي'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{r.notes || '-'}</TableCell>
+              <TableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {["رقم العملية","التاريخ","النقاط المستبدلة","الحالة","ملاحظات"].map(label => (
+                        <TableHead key={label}>
+                          <div className="flex items-center gap-1 cursor-move">
+                            <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            {label}
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRedemptions.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.id}</TableCell>
+                        <TableCell>{formatDate(r.date)}</TableCell>
+                        <TableCell>{r.totalPointsRedeemed}</TableCell>
+                        <TableCell>
+                          <Badge className={
+                            r.status === RedemptionStatus.COMPLETED ? 'bg-green-100 text-green-800' :
+                            r.status === RedemptionStatus.PENDING ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }>
+                            {r.status === RedemptionStatus.COMPLETED ? 'مكتمل' :
+                             r.status === RedemptionStatus.PENDING ? 'معلق' :
+                             'ملغي'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{r.notes || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableWrapper>
             ) : (
               <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                 <Gift className="h-12 w-12 mb-4 opacity-50" />

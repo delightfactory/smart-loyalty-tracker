@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAllUsers, deleteUser } from '@/services/users-api';
@@ -19,6 +18,8 @@ import {
 import { EditUserDialog } from './EditUserDialog';
 import { formatDate } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import TableWrapper from '@/components/ui/TableWrapper';
+import { GripVertical } from 'lucide-react';
 
 export function UsersTable() {
   const { toast } = useToast();
@@ -98,15 +99,40 @@ export function UsersTable() {
           حدث خطأ أثناء تحميل البيانات. يرجى المحاولة مرة أخرى.
         </div>
       ) : (
-        <div className="border rounded-md">
+        <TableWrapper>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>الاسم</TableHead>
-                <TableHead>البريد الإلكتروني</TableHead>
-                <TableHead>الصلاحيات</TableHead>
-                <TableHead>تاريخ الإنشاء</TableHead>
-                <TableHead>الإجراءات</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    الاسم
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    البريد الإلكتروني
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    الصلاحيات
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    تاريخ الإنشاء
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    الإجراءات
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -149,7 +175,7 @@ export function UsersTable() {
               )}
             </TableBody>
           </Table>
-        </div>
+        </TableWrapper>
       )}
 
       {/* Edit User Dialog */}

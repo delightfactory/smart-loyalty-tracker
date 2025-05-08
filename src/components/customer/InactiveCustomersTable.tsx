@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, AlertCircle, AlertTriangle, Clock, CalendarClock } from 'lucide-react';
+import { Phone, Mail, AlertCircle, AlertTriangle, Clock, CalendarClock, GripVertical } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import TableWrapper from '@/components/ui/TableWrapper';
 
 interface InactiveCustomersTableProps {
   customers: Customer[];
@@ -110,59 +111,91 @@ const InactiveCustomersTable = ({
         <CardDescription className="text-muted-foreground dark:text-gray-300">{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table className="bg-white dark:bg-gray-900">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-gray-700 dark:text-gray-200">اسم العميل</TableHead>
-              <TableHead className="text-gray-700 dark:text-gray-200">نوع النشاط</TableHead>
-              <TableHead className="text-gray-700 dark:text-gray-200">آخر نشاط</TableHead>
-              <TableHead className="text-gray-700 dark:text-gray-200">مدة عدم النشاط</TableHead>
-              <TableHead className="text-gray-700 dark:text-gray-200">معلومات الاتصال</TableHead>
-              <TableHead className="text-gray-700 dark:text-gray-200">الإجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedCustomers.map(customer => {
-              const inactivityDays = calculateInactivityDays(customer.lastActive);
-              const badgeVariant = getInactivityBadge(inactivityDays);
-              const badgeCustomClass = inactivityDays > 30 && inactivityDays <= 90 ? getWarningLevelClass('warning') : '';
-              
-              return (
-                <TableRow key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
-                  <TableCell className="text-gray-900 dark:text-white font-medium">{customer.name}</TableCell>
-                  <TableCell className="text-gray-700 dark:text-gray-300">{customer.businessType}</TableCell>
-                  <TableCell className="text-gray-700 dark:text-gray-300">
-                    <div className="flex items-center gap-1">
-                      <CalendarClock className="h-4 w-4 text-muted-foreground dark:text-gray-300" />
-                      {customer.lastActive ? formatDate(customer.lastActive) : "لم يسجل نشاط"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-700 dark:text-gray-300">
-                    <Badge variant={badgeVariant} className={`flex items-center gap-1 w-fit ${badgeCustomClass}`}>
-                      {getInactivityIcon(inactivityDays)}
-                      {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-gray-700 dark:text-gray-300">
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" title="الاتصال" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700" onClick={() => window.location.href = `tel:${customer.phone}`}>
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      {customer.email && (
-                        <Button variant="outline" size="icon" title="إرسال بريد إلكتروني" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">
-                          <Mail className="h-4 w-4" />
+        <TableWrapper>
+          <Table className="bg-white dark:bg-gray-900">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    اسم العميل
+                  </div>
+                </TableHead>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    نوع النشاط
+                  </div>
+                </TableHead>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    آخر نشاط
+                  </div>
+                </TableHead>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    مدة عدم النشاط
+                  </div>
+                </TableHead>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    معلومات الاتصال
+                  </div>
+                </TableHead>
+                <TableHead className="text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center gap-1 cursor-move">
+                    <GripVertical className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    الإجراءات
+                  </div>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedCustomers.map(customer => {
+                const inactivityDays = calculateInactivityDays(customer.lastActive);
+                const badgeVariant = getInactivityBadge(inactivityDays);
+                const badgeCustomClass = inactivityDays > 30 && inactivityDays <= 90 ? getWarningLevelClass('warning') : '';
+                
+                return (
+                  <TableRow key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                    <TableCell className="text-gray-900 dark:text-white font-medium">{customer.name}</TableCell>
+                    <TableCell className="text-gray-700 dark:text-gray-300">{customer.businessType}</TableCell>
+                    <TableCell className="text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center gap-1">
+                        <CalendarClock className="h-4 w-4 text-muted-foreground dark:text-gray-300" />
+                        {customer.lastActive ? formatDate(customer.lastActive) : "لم يسجل نشاط"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-700 dark:text-gray-300">
+                      <Badge variant={badgeVariant} className={`flex items-center gap-1 w-fit ${badgeCustomClass}`}>
+                        {getInactivityIcon(inactivityDays)}
+                        {inactivityDays === Infinity ? "غير نشط تماماً" : `${inactivityDays} يوم`}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" title="الاتصال" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700" onClick={() => window.location.href = `tel:${customer.phone}`}>
+                          <Phone className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-700 dark:text-gray-300">
-                    <Button variant="outline" size="sm" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700" onClick={() => navigate(`/customers/${customer.id}`)}>عرض التفاصيل</Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                        {customer.email && (
+                          <Button variant="outline" size="icon" title="إرسال بريد إلكتروني" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-700 dark:text-gray-300">
+                      <Button variant="outline" size="sm" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700" onClick={() => navigate(`/customers/${customer.id}`)}>عرض التفاصيل</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableWrapper>
         {totalPages > 1 && (
           <div className="flex items-center justify-between py-2">
             <span>صفحة {pageIndex + 1} من {totalPages}</span>
