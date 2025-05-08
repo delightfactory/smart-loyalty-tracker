@@ -78,6 +78,23 @@ export default function DataTable<T extends Record<string, any>>({
     });
   };
 
+  // خريطة ألوان لكل عمود (تغيير كلون النص) لتسهيل التمييز
+  const columnColorClasses: Record<number, string> = {
+    0: 'text-blue-600 dark:text-blue-400',
+    1: 'text-green-600 dark:text-green-400',
+    2: 'text-indigo-600 dark:text-indigo-400',
+    3: 'text-emerald-600 dark:text-emerald-400',
+    4: 'text-violet-600 dark:text-violet-400',
+    5: 'text-amber-600 dark:text-amber-400',
+    6: 'text-fuchsia-600 dark:text-fuchsia-400',
+    7: 'text-cyan-600 dark:text-cyan-400',
+    8: 'text-teal-600 dark:text-teal-400',
+    9: 'text-sky-600 dark:text-sky-400',
+    10: 'text-slate-600 dark:text-slate-400',
+    11: 'text-rose-600 dark:text-rose-400',
+    12: 'text-pink-600 dark:text-pink-400',
+  };
+
   // بناء أرقام الصفحات مع حذف الحلقات لعدد محدود من الأزرار
   const maxPageButtons = 5;
   let pageNumbers: (number | '...')[] = [];
@@ -102,10 +119,10 @@ export default function DataTable<T extends Record<string, any>>({
         <Table>
           <TableHeader>
             <TableRow>
-              {columns.map((col) => (
+              {columns.map((col, colIndex) => (
                 <TableHead
                   key={String(col.accessor)}
-                  className="cursor-pointer select-none"
+                  className={`cursor-pointer select-none ${columnColorClasses[colIndex] || ''}`}
                   onClick={() => handleSort(col.accessor)}
                 >
                   <div className="flex items-center gap-1">
@@ -119,8 +136,8 @@ export default function DataTable<T extends Record<string, any>>({
           <TableBody>
             {paginatedData.map((row, rowIndex) => (
               <TableRow key={rowIndex} className="hover:bg-muted/50">
-                {columns.map((col) => (
-                  <TableCell key={String(col.accessor)}>
+                {columns.map((col, colIndex) => (
+                  <TableCell key={String(col.accessor)} className={columnColorClasses[colIndex] || ''}>
                     {col.Cell ? col.Cell(row[col.accessor], row, rowIndex) : String(row[col.accessor] ?? '')}
                   </TableCell>
                 ))}

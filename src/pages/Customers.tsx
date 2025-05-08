@@ -1,13 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
   Dialog,
   DialogContent,
   DialogHeader,
@@ -52,6 +44,7 @@ import { InvoiceStatus, ProductCategoryLabels } from '@/lib/types';
 import { formatNumberEn } from '@/lib/utils';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useProducts } from '@/hooks/useProducts';
+import DataTable, { Column } from '@/components/ui/DataTable';
 
 const ProductCategoryShortLabels: Record<ProductCategory, string> = {
   [ProductCategory.ENGINE_CARE]: 'المحرك',
@@ -386,6 +379,43 @@ const Customers = () => {
   useEffect(() => { if (isMobile) setView('cards'); }, [isMobile]);
   useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('customers_view', view); } }, [view]);
 
+  // تعريف أعمدة جدول العملاء مع تفعيل الفرز
+  const columns: Column<Customer>[] = [
+    { header: 'كود العميل', accessor: 'id', Cell: value => formatNumberEn(value) },
+    { header: 'اسم العميل', accessor: 'name' },
+    { header: 'المسؤول', accessor: 'contactPerson' },
+    { header: 'نوع النشاط', accessor: 'businessType' },
+    { header: 'هاتف', accessor: 'phone' },
+    { header: 'المحافظة', accessor: 'governorate' },
+    { header: 'المدينة', accessor: 'city' },
+    { header: 'النقاط الحالية', accessor: 'id', Cell: (_v, row) => <CustomerPointsCell customerId={row.id} /> },
+    { header: 'رصيد العميل', accessor: 'id', Cell: (_v, row) => <CustomerBalanceCell customerId={row.id} /> },
+    { header: 'مدة الائتمان (يوم)', accessor: 'credit_period', Cell: value => formatNumberEn(value) },
+    { header: 'قيمة الائتمان (EGP)', accessor: 'credit_limit', Cell: value => formatNumberEn(value) },
+    { header: 'التصنيف', accessor: 'classification' },
+    { header: 'المستوى', accessor: 'level' },
+    { header: 'إجراءات', accessor: 'id', Cell: (_v, row) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" title="إجراءات">
+            <Eye className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => handleCustomerClick(row.id)}>
+            <Eye className="w-4 h-4 mr-2" /> تفاصيل
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleEditCustomer(row)}>
+            <Pencil className="w-4 h-4 mr-2" /> تعديل
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleDeleteCustomer(row.id)} className="text-red-600 dark:text-red-400">
+            <Trash className="w-4 h-4 mr-2" /> حذف
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) },
+  ];
+
   // مكون عرض رصيد العميل بشكل موحد
   function CustomerBalanceCell({ customerId }: { customerId: string }) {
     return <>{formatNumberEn(0)}</>;
@@ -575,158 +605,16 @@ const Customers = () => {
         </Button>
       </div>
       
-      {view === 'table' ? (
-        <div className="rounded-lg border bg-card shadow-sm overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">كود العميل</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">اسم العميل</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المسؤول</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">نوع النشاط</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">هاتف</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المحافظة</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المدينة</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">النقاط الحالية</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">رصيد العميل</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100 text-center">مدة الائتمان (يوم)</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">قيمة الائتمان (EGP)</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">التصنيف</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">المستوى</TableHead>
-                <TableHead className="bg-muted/40 text-primary font-bold dark:bg-zinc-900 dark:text-zinc-100">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customersLoading ? (
-                <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Loader2 className="h-10 w-10 animate-spin" />
-                      <p>جاري تحميل البيانات...</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : customersList.length > 0 ? (
-                customersList.map((customer, idx) => (
-                  <TableRow 
-                    key={customer.id} 
-                    className={cn(
-                      "group cursor-pointer hover:bg-blue-50/70 transition-all border-b border-muted/30 dark:hover:bg-zinc-800",
-                      idx % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-muted/10 dark:bg-zinc-800",
-                      customer.level >= 4 ? "ring-2 ring-blue-200 dark:ring-blue-900" : ""
-                    )}
-                    onClick={() => handleCustomerClick(customer.id)}
-                  >
-                    <TableCell className="font-medium text-primary/90 text-sm dark:text-zinc-100">{formatNumberEn(customer.id)}</TableCell>
-                    <TableCell className="font-semibold text-lg dark:text-zinc-100">{customer.name}</TableCell>
-                    <TableCell className="text-gray-700 dark:text-zinc-200">{customer.contactPerson}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1">
-                        <span className="inline-block w-2 h-2 bg-blue-400 dark:bg-blue-600 rounded-full"></span>
-                        <span className="dark:text-zinc-100">{customer.businessType}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell dir="ltr" className="tracking-wider font-mono dark:text-zinc-100">{customer.phone}</TableCell>
-                    <TableCell className="dark:text-zinc-100">{customer.governorate || '-'}</TableCell>
-                    <TableCell className="dark:text-zinc-100">{customer.city || '-'}</TableCell>
-                    <TableCell className="text-center align-middle">
-                      <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-emerald-50 dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-700">
-                        <CustomerPointsCell customerId={customer.id} />
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center align-middle">
-                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-orange-50 dark:bg-zinc-800 text-orange-700 dark:text-orange-300 font-bold border border-orange-200 dark:border-orange-700">
-                        <CustomerBalanceCell customerId={customer.id} />
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center align-middle">
-                      <span className="inline-block min-w-[70px] px-2 py-1 rounded bg-cyan-50 dark:bg-zinc-800 text-cyan-700 dark:text-cyan-300 font-bold border border-cyan-200 dark:border-cyan-700">
-                        {formatNumberEn(customer.credit_period)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center align-middle">
-                      <span className="inline-block min-w-[90px] px-2 py-1 rounded bg-fuchsia-50 dark:bg-zinc-800 text-fuchsia-700 dark:text-fuchsia-300 font-bold border border-fuchsia-200 dark:border-fuchsia-700">
-                        {formatNumberEn(customer.credit_limit)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-amber-500 text-lg dark:text-amber-400">
-                        {getClassificationDisplay(customer.classification)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        "px-2 py-1 rounded-full text-xs font-bold border shadow-sm dark:border-zinc-700",
-                        getLevelBadgeClass(customer.level),
-                        customer.level >= 4 ? "scale-110 border-2" : "",
-                        "dark:text-zinc-100"
-                      )}>
-                        المستوى {formatNumberEn(customer.level)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" title="إجراءات">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleCustomerClick(customer.id)}>
-                            <Eye className="w-4 h-4 mr-2" /> تفاصيل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
-                            <Pencil className="w-4 h-4 mr-2" /> تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteCustomer(customer.id)} className="text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300">
-                            <Trash className="w-4 h-4 mr-2" /> حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground dark:text-zinc-400">
-                      <Users className="h-10 w-10 mb-2" />
-                      <p>لا يوجد عملاء</p>
-                      {searchTerm && <p className="text-sm">جرب البحث بمصطلح آخر</p>}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {customersLoading ? (
-            <div className="col-span-full flex justify-center py-12">
-              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-            </div>
-          ) : customersList.length > 0 ? (
-            customersList.map((customer) => (
-              <CustomerCard
-                key={customer.id}
-                customer={customer}
-                onView={handleCustomerClick}
-                onEdit={handleEditCustomer}
-                onDelete={handleDeleteCustomer}
-                getLevelBadgeClass={getLevelBadgeClass}
-                getClassificationDisplay={getClassificationDisplay}
-              />
-            ))
-          ) : (
-            <div className="col-span-full flex flex-col items-center justify-center text-muted-foreground dark:text-zinc-400 py-12">
-              <Users className="h-10 w-10 mb-2" />
-              <p>لا يوجد عملاء</p>
-              {searchTerm && <p className="text-sm">جرب البحث بمصطلح آخر</p>}
-            </div>
-          )}
-        </div>
-      )}
+      {/* جدول العملاء مع الفرز والصفحات */}
+      <DataTable
+        data={customersList}
+        columns={columns}
+        defaultPageSize={pageSize}
+        pageIndex={pageIndex}
+        onPageChange={setPageIndex}
+        totalItems={totalItems}
+        loading={customersLoading}
+      />
       <div className="flex items-center justify-between mt-4 px-4">
         <div className="flex items-center gap-2">
           <span>عرض </span>
