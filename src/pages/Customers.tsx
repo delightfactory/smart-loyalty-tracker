@@ -39,7 +39,7 @@ import CustomerCard from '@/components/customer/CustomerCard';
 import CustomerEditDialog from '@/components/customer/CustomerEditDialog';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useIsMobile } from '@/hooks/use-mobile';
-import ViewToggle from '@/components/invoice/ViewToggle';
+import ViewToggle from '@/components/invoices/ViewToggle';
 import { InvoiceStatus, ProductCategoryLabels } from '@/lib/types';
 import { formatNumberEn } from '@/lib/utils';
 import { useInvoices } from '@/hooks/useInvoices';
@@ -191,6 +191,10 @@ const Customers = () => {
     localStorage.setItem('customers_cityFilter', cityFilter);
     setPageIndex(0);
   }, [cityFilter]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchTerm]);
 
   const handleAddCustomer = () => {
     if (!newCustomer.id || !newCustomer.name || !newCustomer.contactPerson || !newCustomer.phone) {
@@ -375,7 +379,13 @@ const Customers = () => {
   };
 
   // واجهة العرض: جدول أو كروت
-  const [view, setView] = useState<'table' | 'cards'>(isMobile ? 'cards' : 'table');
+  const [view, setView] = useState<'table' | 'cards'>(() => {
+    const saved = typeof window !== 'undefined'
+      ? (localStorage.getItem('customers_view') as 'table' | 'cards' | null)
+      : null;
+    if (saved === 'table' || saved === 'cards') return saved;
+    return isMobile ? 'cards' : 'table';
+  });
   useEffect(() => { if (isMobile) setView('cards'); }, [isMobile]);
   useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('customers_view', view); } }, [view]);
 
@@ -559,7 +569,7 @@ const Customers = () => {
           </span>
         </div>
         <Select value={businessTypeFilter} onValueChange={setBusinessTypeFilter}>
-          <SelectTrigger className="w-full sm:w-44 md:w-48 lg:w-56 rounded-lg border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200/70 bg-white dark:bg-zinc-900 dark:border-zinc-700 dark:focus:border-blue-700 shadow-sm transition-all min-w-[120px]">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="نوع النشاط" />
           </SelectTrigger>
           <SelectContent>
@@ -570,7 +580,7 @@ const Customers = () => {
           </SelectContent>
         </Select>
         <Select value={governorateFilter} onValueChange={setGovernorateFilter}>
-          <SelectTrigger className="w-full sm:w-44 md:w-48 lg:w-56 rounded-lg border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200/70 bg-white dark:bg-zinc-900 dark:border-zinc-700 dark:focus:border-blue-700 shadow-sm transition-all min-w-[120px]">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="المحافظة" />
           </SelectTrigger>
           <SelectContent>
@@ -581,7 +591,7 @@ const Customers = () => {
           </SelectContent>
         </Select>
         <Select value={cityFilter} onValueChange={setCityFilter}>
-          <SelectTrigger className="w-full sm:w-44 md:w-48 lg:w-56 rounded-lg border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200/70 bg-white dark:bg-zinc-900 dark:border-zinc-700 dark:focus:border-blue-700 shadow-sm transition-all min-w-[120px]">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="المدينة" />
           </SelectTrigger>
           <SelectContent>
@@ -605,37 +615,56 @@ const Customers = () => {
         </Button>
       </div>
       
-      {/* جدول العملاء مع الفرز والصفحات */}
-      <DataTable
-        data={customersList}
-        columns={columns}
-        defaultPageSize={pageSize}
-        pageIndex={pageIndex}
-        onPageChange={setPageIndex}
-        totalItems={totalItems}
-        loading={customersLoading}
-      />
-      <div className="flex items-center justify-between mt-4 px-4">
-        <div className="flex items-center gap-2">
-          <span>عرض </span>
-          <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
-            <SelectTrigger className="w-20">
-              <SelectValue placeholder={`${pageSize}`} />
-            </SelectTrigger>
-            <SelectContent>
-              {[50, 100, 150, 200].map((n) => (
-                <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span> صفوف لكل صفحة</span>
+      {view === 'table' ? (
+        <>
+          {/* جدول العملاء مع الفرز والصفحات */}
+          <DataTable
+            data={customersList}
+            columns={columns}
+            defaultPageSize={pageSize}
+            pageIndex={pageIndex}
+            onPageChange={setPageIndex}
+            totalItems={totalItems}
+            loading={customersLoading}
+            onRowClick={(row) => handleCustomerClick(row.id)}
+          />
+          <div className="flex items-center justify-between mt-4 px-4">
+            <div className="flex items-center gap-2">
+              <span>عرض </span>
+              <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger className="w-20">
+                  <SelectValue placeholder={`${pageSize}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[50, 100, 150, 200].map((n) => (
+                    <SelectItem key={n} value={n.toString()}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span> صفوف لكل صفحة</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" disabled={pageIndex === 0} onClick={() => setPageIndex(pageIndex - 1)}>السابق</Button>
+              <span>صفحة {pageIndex + 1} من {totalPages}</span>
+              <Button variant="outline" disabled={pageIndex >= totalPages - 1} onClick={() => setPageIndex(pageIndex + 1)}>التالي</Button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {customersList.map(customer => (
+            <CustomerCard
+              key={customer.id}
+              customer={customer}
+              onView={handleCustomerClick}
+              onEdit={handleEditCustomer}
+              onDelete={handleDeleteCustomer}
+              getLevelBadgeClass={getLevelBadgeClass}
+              getClassificationDisplay={getClassificationDisplay}
+            />
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" disabled={pageIndex === 0} onClick={() => setPageIndex(pageIndex - 1)}>السابق</Button>
-          <span>صفحة {pageIndex + 1} من {totalPages}</span>
-          <Button variant="outline" disabled={pageIndex >= totalPages - 1} onClick={() => setPageIndex(pageIndex + 1)}>التالي</Button>
-        </div>
-      </div>
+      )}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogTitle>إضافة عميل جديد</DialogTitle>

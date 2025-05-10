@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table';
 import TableWrapper from '@/components/ui/TableWrapper';
 import { Pagination, PaginationPrevious, PaginationNext, PaginationLink, PaginationEllipsis } from './pagination';
@@ -20,6 +20,15 @@ export interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   totalItems?: number;
   loading?: boolean;
+  onRowClick?: (row: T) => void;
+}
+
+function getRowKey<T extends Record<string, any>>(row: T, rowIndex: number) {
+  // Prefer a unique string id, fallback to composite or rowIndex
+  if (typeof row.id !== 'undefined' && row.id !== null) {
+    return String(row.id) + '-' + rowIndex;
+  }
+  return 'row-' + rowIndex;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -30,13 +39,18 @@ export default function DataTable<T extends Record<string, any>>({
   onPageChange,
   totalItems: totalItemsProp,
   loading: loadingProp,
+  onRowClick,
 }: DataTableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{
     accessor: keyof T;
     direction: 'asc' | 'desc';
   } | null>(null);
   const [pageIndexState, setPageIndexState] = useState(pageIndexProp ?? 0);
-  const [pageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  useEffect(() => {
+    setPageSize(defaultPageSize);
+  }, [defaultPageSize]);
 
   const sortedData = useMemo(() => {
     if (!sortConfig) return data;
@@ -57,12 +71,20 @@ export default function DataTable<T extends Record<string, any>>({
   const loading = loadingProp ?? false;
   const totalItems = isControlled ? totalItemsProp! : sortedData.length;
   const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedData = useMemo(() => {
-    if (isControlled) {
-      return sortConfig ? sortedData : data;
-    }
-    return sortedData.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
-  }, [isControlled, data, sortedData, pageIndex, pageSize, sortConfig]);
+  // Check for duplicate ids in data (development only)
+if (process.env.NODE_ENV === 'development' && Array.isArray(data)) {
+  const ids = data.map(row => row.id).filter(id => typeof id !== 'undefined');
+  const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+  if (duplicates.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn('[DataTable] Duplicate row ids found:', duplicates);
+  }
+}
+
+const paginatedData = useMemo(() => {
+    const sourceData = sortConfig ? sortedData : data;
+    return sourceData.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  }, [data, sortedData, pageIndex, pageSize, sortConfig]);
 
   const handleSort = (accessor: keyof T) => {
     if (isControlled) {
@@ -121,7 +143,7 @@ export default function DataTable<T extends Record<string, any>>({
             <TableRow>
               {columns.map((col, colIndex) => (
                 <TableHead
-                  key={String(col.accessor)}
+                  key={colIndex}
                   className={`cursor-pointer select-none ${columnColorClasses[colIndex] || ''}`}
                   onClick={() => handleSort(col.accessor)}
                 >
@@ -135,9 +157,16 @@ export default function DataTable<T extends Record<string, any>>({
           </TableHeader>
           <TableBody>
             {paginatedData.map((row, rowIndex) => (
-              <TableRow key={rowIndex} className="hover:bg-muted/50">
+              <TableRow
+                key={getRowKey(row, rowIndex)}
+                className={`hover:bg-muted/50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+              >
                 {columns.map((col, colIndex) => (
-                  <TableCell key={String(col.accessor)} className={columnColorClasses[colIndex] || ''}>
+                  <TableCell
+                    key={colIndex}
+                    className={columnColorClasses[colIndex] || ''}
+                  >
                     {col.Cell ? col.Cell(row[col.accessor], row, rowIndex) : String(row[col.accessor] ?? '')}
                   </TableCell>
                 ))}

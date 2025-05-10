@@ -207,16 +207,16 @@ const CustomerAnalytics = ({ customers, invoices, products, isLoading }: Custome
     
     // حساب أعداد العملاء لكل فئة شهرياً
     customers.forEach(customer => {
-      const lastActive = customer.lastActive ? new Date(customer.lastActive) : null;
-      
-      if (!lastActive || lastActive < sixMonthsAgo) return;
-      
-      const monthIndex = Math.floor(differenceInDays(now, lastActive) / 30);
-      
-      if (monthIndex >= data.length) return;
-      
-      const daysSinceLastActive = differenceInDays(now, lastActive);
-      
+      // Skip if no lastActive or invalid date
+      if (!customer.lastActive) return;
+      const lastActiveDate = new Date(customer.lastActive);
+      if (isNaN(lastActiveDate.getTime())) return;
+      const daysSinceLastActive = differenceInDays(now, lastActiveDate);
+      if (!Number.isFinite(daysSinceLastActive)) return;
+      // Skip future dates or dates older than six months
+      if (daysSinceLastActive < 0 || daysSinceLastActive > 180) return;
+      const monthIndex = Math.floor(daysSinceLastActive / 30);
+      if (monthIndex < 0 || monthIndex >= data.length) return;
       if (daysSinceLastActive <= 30) {
         data[monthIndex].active += 1;
       } else if (daysSinceLastActive <= 90) {

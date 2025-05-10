@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils';
 interface ViewToggleProps {
   view: 'table' | 'cards';
   setView: (v: 'table' | 'cards') => void;
+  storageKey?: string;
 }
 
-const ViewToggle: React.FC<ViewToggleProps> = ({ view, setView }) => {
+const ViewToggle: React.FC<ViewToggleProps> = ({ view, setView, storageKey }) => {
   return (
     <ToggleGroup type="single" value={view} onValueChange={val => val && setView(val as 'table' | 'cards')} className="rounded-xl bg-gradient-to-r from-emerald-50 via-lime-50 to-teal-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 p-1 shadow-sm border border-lime-100 dark:border-gray-700">
       <ToggleGroupItem value="table" aria-label="Table View" className={cn("px-3 py-2 rounded-lg transition-all", view === 'table' ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 shadow' : 'text-gray-400 dark:text-gray-500 hover:bg-lime-100 dark:hover:bg-gray-700') }>

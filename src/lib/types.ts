@@ -102,6 +102,7 @@ export enum PaymentType {
 export interface Invoice {
   id: string;
   customerId: string;
+  customer?: Customer; // joined customer record
   date: Date;
   dueDate?: Date;
   items: InvoiceItem[];

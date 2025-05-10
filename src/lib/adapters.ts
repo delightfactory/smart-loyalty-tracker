@@ -103,14 +103,15 @@ export function dbInvoiceToAppInvoice(dbInvoice: any): Invoice {
   const invoice: Invoice = {
     id: dbInvoice.id,
     customerId: dbInvoice.customer_id,
+    customer: dbInvoice.customer ? dbCustomerToAppCustomer(dbInvoice.customer) : undefined,
     date: new Date(dbInvoice.date),
     dueDate: dbInvoice.due_date ? new Date(dbInvoice.due_date) : undefined,
-    totalAmount: dbInvoice.total_amount,
+    totalAmount: Number(dbInvoice.total_amount),
     status: dbInvoice.status as InvoiceStatus,
     paymentMethod: dbInvoice.payment_method as PaymentMethod,
-    pointsEarned: dbInvoice.points_earned,
-    pointsRedeemed: dbInvoice.points_redeemed,
-    categoriesCount: dbInvoice.categories_count,
+    pointsEarned: Number(dbInvoice.points_earned),
+    pointsRedeemed: Number(dbInvoice.points_redeemed),
+    categoriesCount: Number(dbInvoice.categories_count),
     items: dbInvoice.items ? dbInvoice.items.map(dbInvoiceItemToAppInvoiceItem) : [],
     payments: dbInvoice.payments ? dbInvoice.payments.map(dbPaymentToAppPayment) : []
   };
@@ -141,8 +142,8 @@ export function dbInvoiceItemToAppInvoiceItem(dbItem: any): InvoiceItem {
     productId: dbItem.product_id,
     quantity: dbItem.quantity,
     price: dbItem.price,
-    totalPrice: dbItem.total_price,
-    pointsEarned: dbItem.points_earned
+    totalPrice: Number(dbItem.total_price),
+    pointsEarned: Number(dbItem.points_earned)
   };
 }
 
@@ -170,7 +171,7 @@ export function dbPaymentToAppPayment(dbPayment: any): Payment {
     customerId: dbPayment.customer_id,
     invoiceId: dbPayment.invoice_id || undefined,
     date: new Date(dbPayment.date),
-    amount: dbPayment.amount,
+    amount: Number(dbPayment.amount),
     method: dbPayment.method,
     type: dbPayment.type as PaymentType,
     notes: dbPayment.notes || ''

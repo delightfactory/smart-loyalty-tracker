@@ -1,15 +1,9 @@
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
-import SmartSearch from '@/components/search/SmartSearch';
+import { Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Product } from '@/lib/types';
 import { useProducts } from '@/hooks/useProducts';
 import { useEffect, useState } from 'react';
@@ -22,65 +16,65 @@ interface ProductSelectorProps {
   onAddItem: () => void;
 }
 
-const ProductSelector = ({ 
-  productId, 
-  quantity, 
-  onProductChange, 
-  onQuantityChange, 
-  onAddItem 
-}: ProductSelectorProps) => {
+const ProductSelector = ({ productId, quantity, onProductChange, onQuantityChange, onAddItem }: ProductSelectorProps) => {
   const { getAll } = useProducts();
   const { data: products = [], isLoading } = getAll;
-  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
-  
-  useEffect(() => {
-    if (products && products.length > 0) {
-      setAvailableProducts(products);
-    }
-  }, [products]);
-  
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+
+  // منطق البحث كما في صفحة المنتجات
+  const suggestions = searchTerm
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.id.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
+
   const formatCurrency = (value: number) => {
     return value.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' });
   };
-  
-  const handleSelectProduct = (product: Product) => {
-    onProductChange(product.id);
-  };
-  
+
   return (
     <div className="border rounded-lg p-4">
       <h3 className="text-sm font-medium mb-4">إضافة منتج</h3>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div className="md:col-span-5">
           <Label htmlFor="product">المنتج</Label>
-          <Select
-            value={productId}
-            onValueChange={onProductChange}
-            disabled={isLoading || availableProducts.length === 0}
-          >
-            <SelectTrigger id="product">
-              <SelectValue placeholder={isLoading ? "جاري التحميل..." : "اختر منتج"} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableProducts.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.name} ({formatCurrency(product.price)})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Input
+              id="product-search"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowDropdown(true);
+                onProductChange('');
+              }}
+              placeholder="بحث بالاسم، الكود أو العلامة التجارية..."
+              className="w-full pr-10"
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            {isLoading && <Skeleton className="h-10 w-full mt-1" />}
+            {!isLoading && showDropdown && suggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                {suggestions.map(prod => (
+                  <div
+                    key={prod.id}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onMouseDown={() => {
+                      onProductChange(prod.id);
+                      setSearchTerm(prod.name);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    {prod.name} ({prod.id})
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        
-        <div className="md:col-span-3">
-          <Label htmlFor="productSearch">بحث عن منتج</Label>
-          <SmartSearch
-            type="product"
-            products={availableProducts}
-            placeholder="بحث بالاسم، الكود أو العلامة التجارية..."
-            onSelectProduct={handleSelectProduct}
-          />
-        </div>
-        
+
         <div className="md:col-span-2">
           <Label htmlFor="quantity">الكمية</Label>
           <Input
@@ -91,7 +85,7 @@ const ProductSelector = ({
             onChange={(e) => onQuantityChange(Number(e.target.value))}
           />
         </div>
-        
+
         <div className="md:col-span-2 flex items-end">
           <Button 
             onClick={onAddItem} 

@@ -1,12 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { 
   Select,
@@ -47,7 +39,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import PageContainer from '@/components/layout/PageContainer';
-import { InvoiceStatus, PaymentMethod } from '@/lib/types';
+import { Invoice, InvoiceStatus, PaymentMethod } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import SmartSearch from '@/components/search/SmartSearch';
 import { useInvoices } from '@/hooks/useInvoices';
@@ -62,6 +54,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { ProductCategory, ProductCategoryLabels } from '@/lib/types';
 import InvoiceSummary from '@/components/invoices/InvoiceSummary';
 import DatePicker from '@/components/ui/DatePicker';
+import DataTable, { Column } from '@/components/ui/DataTable';
 
 const Invoices = () => {
   const navigate = useNavigate();
@@ -270,6 +263,28 @@ const Invoices = () => {
     if (isMobile) setViewMode('cards');
   }, [isMobile]);
 
+  const columns: Column<Invoice>[] = [
+    { header: 'التاريخ', accessor: 'date', Cell: value => formatDate(value) },
+    { header: 'رقم الفاتورة', accessor: 'id' },
+    { header: 'العميل', accessor: 'customerId', Cell: (_v, row) => getCustomerById(row.customerId)?.name || '' },
+    { header: 'الإجمالي', accessor: 'totalAmount', Cell: value => formatCurrency(value) },
+    { header: 'الحالة', accessor: 'status' },
+    { header: 'النقاط المكتسبة', accessor: 'pointsEarned', Cell: value => String(value) },
+    { header: 'إجراءات', accessor: 'id', Cell: (_v, row) => (
+      <div className="flex justify-center gap-2">
+        <button onClick={e => { e.stopPropagation(); navigate(`/invoices/${row.id}`); }} aria-label="View">
+          <Eye className="h-4 w-4 text-blue-700 dark:text-blue-200" />
+        </button>
+        <button onClick={e => { e.stopPropagation(); navigate(`/create-invoice/${row.customerId}/edit/${row.id}`); }} aria-label="Edit">
+          <Pencil className="h-4 w-4 text-green-700 dark:text-green-200" />
+        </button>
+        <button onClick={e => { e.stopPropagation(); handleDeleteInvoice(row.id, row.customerId); }} disabled={row.status === InvoiceStatus.PAID} aria-label="Delete">
+          <Trash className="h-4 w-4 text-red-500" />
+        </button>
+      </div>
+    ) }
+  ];
+
   if (!Array.isArray(invoices) || !Array.isArray(customers)) {
     return (
       <PageContainer title="خطأ في تحميل البيانات" subtitle="تعذر تحميل بيانات الفواتير أو العملاء">
@@ -288,7 +303,7 @@ const Invoices = () => {
       extra={
         <div className="flex gap-2 items-center">
           <ViewToggle view={viewMode} setView={setViewMode} />
-          <Button onClick={() => navigate('/invoices/new')}><Plus className="mr-1"/> إنشاء فاتورة</Button>
+          <Button onClick={() => navigate('/create-invoice')}><Plus className="mr-1"/> إنشاء فاتورة</Button>
         </div>
       }
     >
@@ -360,154 +375,16 @@ const Invoices = () => {
       )}
       {/* عرض حسب الوضع المختار */}
       {viewMode === 'table' ? (
-        <div className="rounded-lg border bg-card shadow-lg overflow-x-auto">
-          <Table className="min-w-[900px] text-[15px]">
-            <TableHeader>
-              <TableRow className="bg-gray-50 dark:bg-gray-900">
-                <TableHead
-                  onClick={() => handleSort('date')}
-                  className={`cursor-pointer select-none text-center w-36 transition-colors duration-150 ${sortBy === 'date' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-b-4 border-blue-500' : ''}`}
-                  aria-sort={sortBy === 'date' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  role="columnheader"
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSort('date'); }}
-                >
-                  <span className="flex items-center justify-center gap-1">
-                    التاريخ
-                    {sortBy === 'date' && (
-                      <span className="inline-block text-xs">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-                    )}
-                  </span>
-                </TableHead>
-                <TableHead className="text-center w-40">رقم الفاتورة</TableHead>
-                <TableHead className="text-center w-64">العميل</TableHead>
-                <TableHead
-                  onClick={() => handleSort('totalAmount')}
-                  className={`cursor-pointer select-none text-center w-36 transition-colors duration-150 ${sortBy === 'totalAmount' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-b-4 border-blue-500' : ''}`}
-                  aria-sort={sortBy === 'totalAmount' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  role="columnheader"
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSort('totalAmount'); }}
-                >
-                  <span className="flex items-center justify-center gap-1">
-                    الإجمالي
-                    {sortBy === 'totalAmount' && (
-                      <span className="inline-block text-xs">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-                    )}
-                  </span>
-                </TableHead>
-                <TableHead
-                  onClick={() => handleSort('status')}
-                  className={`cursor-pointer select-none text-center w-32 transition-colors duration-150 ${sortBy === 'status' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-b-4 border-blue-500' : ''}`}
-                  aria-sort={sortBy === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  role="columnheader"
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSort('status'); }}
-                >
-                  <span className="flex items-center justify-center gap-1">
-                    الحالة
-                    {sortBy === 'status' && (
-                      <span className="inline-block text-xs">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-                    )}
-                  </span>
-                </TableHead>
-                <TableHead
-                  className="text-center w-32"
-                >
-                  النقاط المكتسبة
-                </TableHead>
-                <TableHead className="text-center w-40">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Loader2 className="h-10 w-10 mb-2 animate-spin" />
-                      <p>جاري تحميل البيانات...</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : paginatedInvoices.length > 0 ? (
-                paginatedInvoices.map((invoice) => {
-                  const customer = getCustomerById(invoice.customerId);
-                  return (
-                    <TableRow
-                      key={invoice.id}
-                      className={"group cursor-pointer border-b border-gray-100 dark:border-gray-800 transition hover:bg-emerald-50/30 dark:hover:bg-emerald-900/40"}
-                      onClick={() => navigate(`/invoices/${invoice.id}`)}
-                    >
-                      <TableCell className="text-center font-mono text-[15px]">{formatDate(invoice.date)}</TableCell>
-                      <TableCell className="text-center font-semibold tracking-wide text-[16px] text-emerald-800 dark:text-emerald-200">{invoice.id}</TableCell>
-                      <TableCell className="text-center text-gray-800 dark:text-gray-100">{customer?.name || ''}</TableCell>
-                      <TableCell className="text-center font-bold text-blue-700 dark:text-blue-300 text-[15px]">{formatCurrency(invoice.totalAmount)}</TableCell>
-                      <TableCell className="text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-semibold text-[14px] ${
-                          invoice.status === InvoiceStatus.PAID ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-500' :
-                          invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-500' :
-                          invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border border-orange-500' :
-                          'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-500 animate-pulse'
-                        }` }>
-                          <span className={`w-2 h-2 rounded-full ${
-                            invoice.status === InvoiceStatus.PAID ? 'bg-green-500' :
-                            invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'bg-yellow-400' :
-                            invoice.status === InvoiceStatus.UNPAID ? 'bg-orange-500' :
-                            'bg-red-500 animate-pulse'
-                          }` }></span>
-                          {invoice.status === InvoiceStatus.PAID ? 'مدفوع' :
-                           invoice.status === InvoiceStatus.PARTIALLY_PAID ? 'مدفوع جزئياً' :
-                           invoice.status === InvoiceStatus.UNPAID ? 'غير مدفوع' :
-                           'متأخر'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 font-bold text-[15px]">
-                          ⭐ {invoice.pointsEarned}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={e => { e.stopPropagation(); navigate(`/invoices/${invoice.id}`); }}
-                            className="rounded-full p-2 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            aria-label="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); navigate(`/create-invoice/${invoice.customerId}/edit/${invoice.id}`); }}
-                            className="rounded-full p-2 bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-700 text-green-700 dark:text-green-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-green-400"
-                            aria-label="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDeleteInvoice(invoice.id, invoice.customerId); }}
-                            className="rounded-full p-2 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-700 text-red-700 dark:text-red-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-50"
-                            aria-label="Delete"
-                            disabled={invoice.status === InvoiceStatus.PAID}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <FileText className="h-10 w-10 mb-2" />
-                      <p>لا توجد فواتير</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          data={filteredInvoices}
+          columns={columns}
+          defaultPageSize={pageSize}
+          pageIndex={pageIndex}
+          onPageChange={setPageIndex}
+          totalItems={totalFiltered}
+          loading={isLoading}
+          onRowClick={invoice => navigate(`/invoices/${invoice.id}`)}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
@@ -600,10 +477,11 @@ const Invoices = () => {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="10">10</SelectItem>
             <SelectItem value="25">25</SelectItem>
             <SelectItem value="50">50</SelectItem>
             <SelectItem value="100">100</SelectItem>
+            <SelectItem value="150">150</SelectItem>
+            <SelectItem value="200">200</SelectItem>
           </SelectContent>
         </Select>
       </div>

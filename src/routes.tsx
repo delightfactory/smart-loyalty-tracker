@@ -50,6 +50,7 @@ export function Routes() {
           <Route path="/customers/:id" element={<CustomerDetails />} />
           <Route path="/customer-followup" element={<CustomerFollowup />} />
           <Route path="/invoices" element={<Invoices />} />
+          <Route path="/invoices/new" element={<CreateInvoice />} />
           <Route path="/invoices/:id" element={<InvoiceDetails />} />
           <Route path="/create-invoice" element={<CreateInvoice />} />
           <Route path="/create-invoice/:customerId" element={<CreateInvoice />} />

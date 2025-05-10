@@ -46,12 +46,11 @@ const SmartSearch = ({
   clearSearchOnSelect = true
 }: SmartSearchProps) => {
   const navigate = useNavigate();
-  const minSearchLength = 2;  // الحد الأدنى لأحرف البحث
+  const minSearchLength = 1;  // الحد الأدنى لأحرف البحث
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(initialSearchTerm);
   const [debouncedSearch, setDebouncedSearch] = useState(search.toLowerCase());
-  const searchDigits = search.replace(/\D/g, '');
   const [barcodeMode, setBarcodeMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +86,14 @@ const SmartSearch = ({
   useEffect(() => {
     if (onChange) onChange(search);
   }, [search]);
+
+  useEffect(() => { setSearch(initialSearchTerm); }, [initialSearchTerm]);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => { inputRef.current?.focus(); }, 0);
+    }
+  }, [open]);
 
   const { data: filteredProducts = [], isFetching: productsLoading } = useQuery<Product[], Error>({
     queryKey: ['searchProducts', debouncedSearch],
@@ -194,10 +201,10 @@ const SmartSearch = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
+                ref={inputRef}
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
-                onFocus={() => setOpen(true)}
-                onClick={() => setOpen(true)}
+                onChange={(e) => setSearch(e.target.value)}
+                onMouseDown={() => setOpen(true)}
                 placeholder={placeholder}
                 className="pl-10 pr-10"
               />
@@ -217,7 +224,7 @@ const SmartSearch = ({
               <CommandList>
                 <CommandEmpty>
                   {debouncedSearch.length < minSearchLength
-                    ? `اكتب ${minSearchLength} أحرف على الأقل للبحث`
+                    ? `اكتب ${minSearchLength} حرفاً على الأقل للبحث`
                     : 'لم يتم العثور على نتائج'}
                 </CommandEmpty>
                 

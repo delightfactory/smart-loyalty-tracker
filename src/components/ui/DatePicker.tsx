@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -56,7 +55,7 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
   // Update parent component when dates change
   React.useEffect(() => {
     onChange(date);
-  }, [date, onChange]);
+  }, [date]);
 
   return (
     <div className={cn("grid gap-2", className)}>

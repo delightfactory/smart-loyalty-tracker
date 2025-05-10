@@ -29,12 +29,15 @@ const CustomerFollowup = () => {
   const { getAll: getAllInvoices } = useInvoices();
   const invoices = getAllInvoices.data || [];
   
-  // احتساب lastActive من الفواتير الفعلية
+  // احتساب lastActive من الفواتير الفعلية، مع تجاهل الفواتير المستقبلية
+  const now = new Date();
   const lastInvoiceDateMap: Record<string, string> = {};
   invoices.forEach(inv => {
     const invDate = inv.date instanceof Date ? inv.date : new Date(inv.date);
-    if (!lastInvoiceDateMap[inv.customerId] || new Date(lastInvoiceDateMap[inv.customerId]) < invDate) {
-      lastInvoiceDateMap[inv.customerId] = invDate.toISOString();
+    if (invDate <= now) {
+      if (!lastInvoiceDateMap[inv.customerId] || new Date(lastInvoiceDateMap[inv.customerId]) < invDate) {
+        lastInvoiceDateMap[inv.customerId] = invDate.toISOString();
+      }
     }
   });
   const customersWithLastActive = customers.map(c => ({
@@ -52,7 +55,7 @@ const CustomerFollowup = () => {
   const [selectedGovernorate, setSelectedGovernorate] = useState<string>('');
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [selectedBusinessType, setSelectedBusinessType] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'active'|'inactive'|'warning'|'critical'|'analytics'>('inactive');
+  const [activeTab, setActiveTab] = useState<'active'|'recent'|'inactive'|'warning'|'critical'|'analytics'>('inactive');
 
   // استرجاع إعدادات الفلترة من الجلسة
   useEffect(() => {
@@ -161,6 +164,7 @@ const CustomerFollowup = () => {
   const criticalCustomers = baseCustomers.filter(c => classifyCustomer(c) === 'critical');
   const analyticsInvoices = invoices.filter(inv => baseCustomers.some(c => c.id === inv.customerId));
   const activeCustomers = baseCustomers.filter(c => classifyCustomer(c) === 'active');
+  const recentCustomers = baseCustomers.filter(c => classifyCustomer(c) === 'recent');
 
   const inactivityStats = {
     critical: baseCustomers.filter(c => classifyCustomer(c) === 'critical').length,
@@ -341,6 +345,10 @@ const CustomerFollowup = () => {
                <UserRound className="h-4 w-4 ml-2" />
                العملاء النشطين ({activeCustomers.length})
              </TabsTrigger>
+             <TabsTrigger value="recent">
+               <Clock className="h-4 w-4 ml-2" />
+               العملاء غير النشطين حديثاً ({recentCustomers.length})
+             </TabsTrigger>
              <TabsTrigger value="inactive">
                <Clock className="h-4 w-4 ml-2" />
                العملاء غير النشطين ({inactiveCustomers.length})
@@ -366,6 +374,16 @@ const CustomerFollowup = () => {
               title="العملاء النشطين"
               description="قائمة العملاء الذين تفاعلوا خلال 7 أيام"
               emptyMessage="لا يوجد عملاء نشطين حاليًا"
+            />
+          </TabsContent>
+          
+          <TabsContent value="recent" className="mt-0">
+            <InactiveCustomersTable
+              customers={recentCustomers}
+              loading={isLoading}
+              title="عملاء غير نشطين (حديثاً)"
+              description="قائمة العملاء الذين لم يتفاعلوا بين 7 و30 يومًا"
+              emptyMessage="لا يوجد عملاء غير نشطين حديثاً"
             />
           </TabsContent>
           

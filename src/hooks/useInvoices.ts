@@ -332,13 +332,29 @@ export function useInvoices() {
   const getById = useInvoice;
   const getByCustomerId = useCustomerInvoices;
   const { addInvoice, updateInvoice, deleteInvoice } = useInvoiceMutations();
-  
+
+  /** دعم pagination من الخادم: جلب دفعة من الفواتير مع العدّ الكلي */
+  const getPaginated = (params: { pageIndex: number; pageSize: number; searchTerm?: string; statusFilter?: string; dateFrom?: string; dateTo?: string }) =>
+    useQuery<{ items: Invoice[]; total: number }, Error>({
+      queryKey: ['invoices', 'paginated', params.pageIndex, params.pageSize, params.searchTerm, params.statusFilter, params.dateFrom, params.dateTo],
+      queryFn: () =>
+        invoicesService.getPaginated(
+          params.pageIndex,
+          params.pageSize,
+          params.searchTerm,
+          params.statusFilter,
+          params.dateFrom,
+          params.dateTo
+        ),
+    });
+
   return {
     getAll,
     getById,
     getByCustomerId,
     addInvoice,
     updateInvoice,
-    deleteInvoice
+    deleteInvoice,
+    getPaginated,
   };
 }
