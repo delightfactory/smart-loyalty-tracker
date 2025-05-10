@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,7 +9,7 @@ export const useRealtime = (table: TableName) => {
   
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-changes')
+      .channel(`realtime-${table}`)
       .on(
         'postgres_changes',
         {
@@ -24,41 +23,51 @@ export const useRealtime = (table: TableName) => {
           // Define the type for the payload.new data
           const newData = payload.new as Record<string, any>;
           
-          // Invalidate relevant queries based on the table
+          // Invalidate and refetch main table query
+          queryClient.invalidateQueries({ queryKey: [table] });
+          queryClient.refetchQueries({ queryKey: [table] });
           if (table === 'customers') {
-            queryClient.invalidateQueries({ queryKey: ['customers'] });
             if (newData && newData.id) {
               queryClient.invalidateQueries({ queryKey: ['customers', newData.id] });
+              queryClient.refetchQueries({ queryKey: ['customers', newData.id] });
             }
           } else if (table === 'invoices') {
-            queryClient.invalidateQueries({ queryKey: ['invoices'] });
             if (newData && newData.customer_id) {
               queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['invoices', 'customer', newData.customer_id] });
               queryClient.invalidateQueries({ queryKey: ['customers', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['customers', newData.customer_id] });
             }
           } else if (table === 'payments') {
-            queryClient.invalidateQueries({ queryKey: ['payments'] });
             if (newData && newData.customer_id) {
               queryClient.invalidateQueries({ queryKey: ['payments', 'customer', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['payments', 'customer', newData.customer_id] });
               queryClient.invalidateQueries({ queryKey: ['customers', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['customers', newData.customer_id] });
             }
             if (newData && newData.invoice_id) {
               queryClient.invalidateQueries({ queryKey: ['invoices', newData.invoice_id] });
+              queryClient.refetchQueries({ queryKey: ['invoices', newData.invoice_id] });
             }
           } else if (table === 'products') {
             queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.refetchQueries({ queryKey: ['products'] });
           } else if (table === 'redemptions') {
-            queryClient.invalidateQueries({ queryKey: ['redemptions'] });
             if (newData && newData.customer_id) {
               queryClient.invalidateQueries({ queryKey: ['redemptions', 'customer', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['redemptions', 'customer', newData.customer_id] });
               queryClient.invalidateQueries({ queryKey: ['customers', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['customers', newData.customer_id] });
             }
           } else if (table === 'redemption_items') {
             queryClient.invalidateQueries({ queryKey: ['redemptions'] });
+            queryClient.refetchQueries({ queryKey: ['redemptions'] });
           } else if (table === 'points_history') {
             if (newData && newData.customer_id) {
               queryClient.invalidateQueries({ queryKey: ['points_history', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['points_history', newData.customer_id] });
               queryClient.invalidateQueries({ queryKey: ['customers', newData.customer_id] });
+              queryClient.refetchQueries({ queryKey: ['customers', newData.customer_id] });
             }
           }
         }
