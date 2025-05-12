@@ -831,7 +831,7 @@ export const invoicesService = {
       }
     }
     
-    if (invoice.paymentMethod === 'نقداً' && invoice.status === 'مدفوع') {
+    if (invoice.paymentMethod === PaymentMethod.CASH && invoice.status === InvoiceStatus.PAID) {
       const paymentId = `PAY${Date.now().toString().slice(-6)}`;
       const payment = {
         id: paymentId,
@@ -991,7 +991,8 @@ export const invoicesService = {
     const { data: reds, error: redsError } = await supabase
       .from('redemptions')
       .select('total_points_redeemed')
-      .eq('customer_id', customerId);
+      .eq('customer_id', customerId)
+      .eq('status', RedemptionStatus.COMPLETED);
     if (redsError) throw redsError;
     const totalRedeemed = reds.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
     if (remainingEarned - totalRedeemed < 0) {

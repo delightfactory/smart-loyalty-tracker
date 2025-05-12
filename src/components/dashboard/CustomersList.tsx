@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import DataTable, { Column } from '@/components/ui/DataTable';
-import { Customer } from '@/lib/types';
+import { Customer, InvoiceStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatNumberEn } from '@/lib/formatters';
 import { useMemo } from 'react';
@@ -19,12 +19,13 @@ interface CustomersListProps {
 }
 
 function calculateCustomerNetTransactions(invoices: any[], payments: any[]): number {
-  const creditInvoices = invoices.filter(inv => inv.paymentMethod === 'آجل');
-  const totalCreditInvoices = creditInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
-  const creditInvoiceIds = creditInvoices.map(inv => inv.id);
-  const relatedPayments = payments.filter(p => p.invoiceId && creditInvoiceIds.includes(p.invoiceId));
+  // احسب مجموع الفواتير غير المدفوعة (غير الحالة PAID)
+  const dueInvoices = invoices.filter(inv => inv.status !== InvoiceStatus.PAID);
+  const totalDue = dueInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const invoiceIds = dueInvoices.map(inv => inv.id);
+  const relatedPayments = payments.filter(p => p.invoiceId && invoiceIds.includes(p.invoiceId));
   const totalPayments = relatedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  return totalCreditInvoices - totalPayments;
+  return totalDue - totalPayments;
 }
 
 const CustomerBalanceCell = ({ customerId }: { customerId: string }) => {
