@@ -21,6 +21,9 @@ export interface DataTableProps<T> {
   totalItems?: number;
   loading?: boolean;
   onRowClick?: (row: T) => void;
+  sortBy?: keyof T;
+  sortDir?: 'asc' | 'desc';
+  onSortChange?: (accessor: keyof T, direction: 'asc' | 'desc') => void;
 }
 
 function getRowKey<T extends Record<string, any>>(row: T, rowIndex: number) {
@@ -40,6 +43,9 @@ export default function DataTable<T extends Record<string, any>>({
   totalItems: totalItemsProp,
   loading: loadingProp,
   onRowClick,
+  sortBy: sortByProp,
+  sortDir: sortDirProp,
+  onSortChange,
 }: DataTableProps<T>) {
   const [sortConfig, setSortConfig] = useState<{
     accessor: keyof T;
@@ -52,7 +58,10 @@ export default function DataTable<T extends Record<string, any>>({
     setPageSize(defaultPageSize);
   }, [defaultPageSize]);
 
+  const isSortControlled = typeof onSortChange === 'function' && sortByProp !== undefined && sortDirProp !== undefined;
+
   const sortedData = useMemo(() => {
+    if (isSortControlled) return data;
     if (!sortConfig) return data;
     return [...data].sort((a, b) => {
       const aVal = a[sortConfig.accessor];
@@ -72,21 +81,27 @@ export default function DataTable<T extends Record<string, any>>({
   const totalItems = isControlled ? totalItemsProp! : sortedData.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   // Check for duplicate ids in data (development only)
-if (process.env.NODE_ENV === 'development' && Array.isArray(data)) {
-  const ids = data.map(row => row.id).filter(id => typeof id !== 'undefined');
-  const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
-  if (duplicates.length > 0) {
-    // eslint-disable-next-line no-console
-    console.warn('[DataTable] Duplicate row ids found:', duplicates);
+  if (process.env.NODE_ENV === 'development' && Array.isArray(data)) {
+    const ids = data.map(row => row.id).filter(id => typeof id !== 'undefined');
+    const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+    if (duplicates.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn('[DataTable] Duplicate row ids found:', duplicates);
+    }
   }
-}
 
-const paginatedData = useMemo(() => {
+  const paginatedData = useMemo(() => {
     const sourceData = sortConfig ? sortedData : data;
     return sourceData.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
   }, [data, sortedData, pageIndex, pageSize, sortConfig]);
 
   const handleSort = (accessor: keyof T) => {
+    if (isSortControlled) {
+      const nextDir = sortByProp === accessor && sortDirProp === 'asc' ? 'desc' : 'asc';
+      onPageChange && onPageChange(0);
+      onSortChange!(accessor, nextDir);
+      return;
+    }
     if (isControlled) {
       onPageChange!(0);
     } else {

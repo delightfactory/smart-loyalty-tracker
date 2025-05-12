@@ -147,6 +147,17 @@ const Customers = () => {
     return Object.entries(dist).map(([type, count]) => ({ type, percentage: totalItems ? Math.round((count / totalItems) * 100) : 0 }));
   }, [customersList, totalItems]);
 
+  // توزيع حالات الفواتير بناءً على العملاء الحاليين
+  const invoiceStatusDistribution = useMemo(() => {
+    if (invoicesLoading) return { unpaid: 0, partiallyPaid: 0, overdue: 0 };
+    const customerIds = new Set(customersList.map(c => c.id));
+    const filteredInvoices = allInvoices.filter(inv => customerIds.has(inv.customerId));
+    const unpaid = filteredInvoices.filter(inv => inv.status === InvoiceStatus.UNPAID).length;
+    const partiallyPaid = filteredInvoices.filter(inv => inv.status === InvoiceStatus.PARTIALLY_PAID).length;
+    const overdue = filteredInvoices.filter(inv => inv.status === InvoiceStatus.OVERDUE).length;
+    return { unpaid, partiallyPaid, overdue };
+  }, [allInvoices, customersList, invoicesLoading]);
+
   // توزيع الفئات بناءً على قيمة المبيعات للعملاء الحاليين
   const categoryDistribution = useMemo(() => {
     if (invoicesLoading || productsLoading) return [];
@@ -391,15 +402,15 @@ const Customers = () => {
 
   // تعريف أعمدة جدول العملاء مع تفعيل الفرز
   const columns: Column<Customer>[] = [
-    { header: 'كود العميل', accessor: 'id', Cell: value => formatNumberEn(value) },
     { header: 'اسم العميل', accessor: 'name' },
+    { header: 'كود العميل', accessor: 'id', Cell: value => formatNumberEn(value) },
     { header: 'المسؤول', accessor: 'contactPerson' },
     { header: 'نوع النشاط', accessor: 'businessType' },
     { header: 'هاتف', accessor: 'phone' },
     { header: 'المحافظة', accessor: 'governorate' },
     { header: 'المدينة', accessor: 'city' },
-    { header: 'النقاط الحالية', accessor: 'id', Cell: (_v, row) => <CustomerPointsCell customerId={row.id} /> },
-    { header: 'رصيد العميل', accessor: 'id', Cell: (_v, row) => <CustomerBalanceCell customerId={row.id} /> },
+    { header: 'النقاط الحالية', accessor: 'currentPoints', Cell: value => formatNumberEn(value) },
+    { header: 'رصيد العميل', accessor: 'creditBalance', Cell: value => formatNumberEn(value) },
     { header: 'مدة الائتمان (يوم)', accessor: 'credit_period', Cell: value => formatNumberEn(value) },
     { header: 'قيمة الائتمان (EGP)', accessor: 'credit_limit', Cell: value => formatNumberEn(value) },
     { header: 'التصنيف', accessor: 'classification' },
@@ -425,16 +436,6 @@ const Customers = () => {
       </DropdownMenu>
     ) },
   ];
-
-  // مكون عرض رصيد العميل بشكل موحد
-  function CustomerBalanceCell({ customerId }: { customerId: string }) {
-    return <>{formatNumberEn(0)}</>;
-  };
-
-  // مكون نقاط العميل
-  function CustomerPointsCell({ customerId }: { customerId: string }) {
-    return <>{formatNumberEn(0)}</>;
-  };
 
   return (
     <PageContainer
@@ -527,10 +528,9 @@ const Customers = () => {
         <div className="p-4 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg shadow-sm">
           <h3 className="text-sm text-yellow-600 dark:text-yellow-300 font-semibold">حالة الفواتير</h3>
           <div className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
-            {/* اقتراح: إضافة ملخص عدد الفواتير الكلي ومتوسط قيمة الفاتورة */}
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="ml-1">غير مدفوعة:</span><span className="ml-auto font-semibold text-red-700 dark:text-red-300">{formatNumberEn(0)}</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="ml-1">مدفوعة جزئياً:</span><span className="ml-auto font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(0)}</span></div>
-            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="ml-1">متأخرة:</span><span className="ml-auto font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(0)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-red-400 dark:bg-red-600 rounded-full"></span><span className="ml-1">غير مدفوعة:</span><span className="ml-auto font-semibold text-red-700 dark:text-red-300">{formatNumberEn(invoiceStatusDistribution.unpaid)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-orange-400 dark:bg-orange-600 rounded-full"></span><span className="ml-1">مدفوعة جزئياً:</span><span className="ml-auto font-semibold text-orange-700 dark:text-orange-300">{formatNumberEn(invoiceStatusDistribution.partiallyPaid)}</span></div>
+            <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 bg-yellow-400 dark:bg-yellow-600 rounded-full"></span><span className="ml-1">متأخرة:</span><span className="ml-auto font-semibold text-yellow-700 dark:text-yellow-300">{formatNumberEn(invoiceStatusDistribution.overdue)}</span></div>
           </div>
         </div>
         <div className="p-2 bg-teal-50 dark:bg-teal-900 border border-teal-200 dark:border-teal-700 rounded-lg shadow-sm">
@@ -559,7 +559,7 @@ const Customers = () => {
         max-w-full overflow-x-auto">
         <div className="relative flex items-center">
           <Input
-            placeholder="بحث بالاسم أو الهاتف أو الكود..."
+            placeholder="بحث بالاسم، الكود، الهاتف أو اسم المسؤول..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full sm:w-52 md:w-60 lg:w-72 rounded-lg border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200/70 bg-white dark:bg-zinc-900 dark:border-zinc-700 dark:focus:border-blue-700 shadow-sm transition-all min-w-[180px]"

@@ -41,6 +41,7 @@ import { useToast } from '@/components/ui/use-toast';
 import PageContainer from '@/components/layout/PageContainer';
 import { Invoice, InvoiceStatus, PaymentMethod } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import SmartSearch from '@/components/search/SmartSearch';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -89,7 +90,7 @@ const Invoices = () => {
   };
   
   // ترتيب الفواتير الأحدث أولاً مع دعم الفرز الديناميكي
-  const [sortBy, setSortBy] = useState<'date' | 'totalAmount' | 'status'>('date');
+  const [sortBy, setSortBy] = useState<keyof Invoice>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // حماية عند التعامل مع تواريخ أو بيانات ناقصة
@@ -106,25 +107,13 @@ const Invoices = () => {
     }
   };
 
-  const handleSort = (column: 'date' | 'totalAmount' | 'status') => {
+  const handleSort = (column: keyof Invoice) => {
     if (sortBy === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(column);
       setSortDirection('desc');
     }
-  };
-
-  // Helper function to format date in English (YYYY-MM-DD)
-  const formatDate = (date: string | Date) => {
-    if (!date) return '';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) {
-      console.error('Invalid date for formatting:', date);
-      return '';
-    }
-    // Always English format
-    return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
   };
 
   const sortedInvoices = [...invoices].sort((a, b) => {
@@ -138,6 +127,9 @@ const Invoices = () => {
     } else if (sortBy === 'status') {
       valA = a.status || '';
       valB = b.status || '';
+    } else {
+      valA = a[sortBy] || '';
+      valB = b[sortBy] || '';
     }
     if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
     if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
@@ -181,7 +173,7 @@ const Invoices = () => {
   const filteredInvoices = useMemo(()=>invoicesProcessed.filter(inv=>{
     const cust = customersMap.get(inv.customerId);
     const d = safeDate(inv.date);
-    const okSearch = !searchTerm || inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || (cust?.name||'').toLowerCase().includes(searchTerm.toLowerCase());
+    const okSearch = !searchTerm || inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customerId.toLowerCase().includes(searchTerm.toLowerCase()) || (cust?.name||'').toLowerCase().includes(searchTerm.toLowerCase());
     const okStatus = statusFilter==='all'||inv.status===statusFilter;
     const okFrom = !dateFrom || d>=new Date(dateFrom);
     const okTo   = !dateTo   || d<=new Date(dateTo);
@@ -332,13 +324,13 @@ const Invoices = () => {
         <div className="flex flex-wrap gap-2 mb-6 items-center bg-gradient-to-tr from-blue-50/40 to-white dark:from-zinc-900/60 dark:to-zinc-800/80 p-4 rounded-xl shadow-sm border border-blue-100 dark:border-zinc-700">
           <DatePicker
             value={dateFrom ? new Date(dateFrom) : null}
-            onChange={d => setDateFrom(d ? d.toLocaleDateString('en-CA') : '')}
+            onChange={d => setDateFrom(d ? formatDate(d) : '')}
             placeholder="من تاريخ"
             className="w-full sm:w-40 rounded-lg"
           />
           <DatePicker
             value={dateTo ? new Date(dateTo) : null}
-            onChange={d => setDateTo(d ? d.toLocaleDateString('en-CA') : '')}
+            onChange={d => setDateTo(d ? formatDate(d) : '')}
             placeholder="إلى تاريخ"
             className="w-full sm:w-40 rounded-lg"
           />
@@ -374,18 +366,24 @@ const Invoices = () => {
         </div>
       )}
       {/* عرض حسب الوضع المختار */}
-      {viewMode === 'table' ? (
+      {viewMode === 'table' && (
         <DataTable
+          columns={[
+            ...columns,
+            { header: 'كود العميل', accessor: 'customerId' as const }
+          ]}
           data={filteredInvoices}
-          columns={columns}
-          defaultPageSize={pageSize}
+          loading={isLoadingInvoices}
           pageIndex={pageIndex}
-          onPageChange={setPageIndex}
+          defaultPageSize={pageSize}
           totalItems={totalFiltered}
-          loading={isLoading}
-          onRowClick={invoice => navigate(`/invoices/${invoice.id}`)}
+          onPageChange={setPageIndex}
+          sortBy={sortBy}
+          sortDir={sortDirection}
+          onSortChange={(col, dir) => { setSortBy(col); setSortDirection(dir); }}
         />
-      ) : (
+      )}
+      {viewMode !== 'table' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
             <div className="col-span-full flex justify-center items-center h-40">
@@ -467,24 +465,28 @@ const Invoices = () => {
           )}
         </div>
       )}
-      {/* ترقيم الصفحات */}
-      <div className="flex items-center justify-between mt-4">
-        <Button variant="outline" onClick={()=>setPageIndex(i=>i-1)} disabled={pageIndex===0}>السابق</Button>
-        <span className="text-sm">صفحة {pageIndex+1} من {totalPages}</span>
-        <Button variant="outline" onClick={()=>setPageIndex(i=>i+1)} disabled={pageIndex>=totalPages-1}>التالي</Button>
-        <Select value={String(pageSize)} onValueChange={v => setPageSize(parseInt(v, 10))}>
-          <SelectTrigger className="w-20 text-center">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="25">25</SelectItem>
-            <SelectItem value="50">50</SelectItem>
-            <SelectItem value="100">100</SelectItem>
-            <SelectItem value="150">150</SelectItem>
-            <SelectItem value="200">200</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {viewMode !== 'table' && (
+        <>
+          {/* ترقيم الصفحات */}
+          <div className="flex items-center justify-between mt-4">
+            <Button variant="outline" onClick={()=>setPageIndex(i=>i-1)} disabled={pageIndex===0}>السابق</Button>
+            <span className="text-sm">صفحة {pageIndex+1} من {totalPages}</span>
+            <Button variant="outline" onClick={()=>setPageIndex(i=>i+1)} disabled={pageIndex>=totalPages-1}>التالي</Button>
+            <Select value={String(pageSize)} onValueChange={v => setPageSize(parseInt(v, 10))}>
+              <SelectTrigger className="w-20 text-center">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="150">150</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

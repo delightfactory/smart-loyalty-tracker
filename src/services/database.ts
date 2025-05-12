@@ -291,7 +291,9 @@ export const customersService = {
     searchTerm?: string,
     businessType?: string,
     governorate?: string,
-    city?: string
+    city?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<{ items: Customer[]; total: number }> {
     const from = pageIndex * pageSize;
     const to = from + pageSize - 1;
@@ -302,53 +304,17 @@ export const customersService = {
         { count: 'exact' }
       );
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const searchDigits = searchTerm.replace(/\D/g, '');
-      const isNumericSearch = /^\d+$/.test(searchTerm);
-      if (isNumericSearch) {
-        // بحث بالكود (id) أولاً
-        const selectCols = 'id,name,contact_person,phone,business_type,governorate,city,current_points,points_earned,points_redeemed,classification,level,credit_balance,opening_balance,credit_period,credit_limit';
-        // جلب عن طريق id
-        let idQb = supabase
-          .from('customers')
-          .select(selectCols, { count: 'exact' })
-          .eq('id', searchTerm);
-        if (businessType && businessType !== 'all') idQb = idQb.eq('business_type', businessType as BusinessType);
-        if (governorate && governorate !== 'all') idQb = idQb.eq('governorate', governorate);
-        if (city && city !== 'all') idQb = idQb.eq('city', city);
-        const { data: idData, error: idError } = await idQb;
-        if (idError) throw idError;
-        const itemsById = idData.map(dbCustomerToAppCustomer);
-        // جلب عن طريق الهاتف
-        let phoneQb = supabase
-          .from('customers')
-          .select(selectCols, { count: 'exact' })
-          .ilike('phone', `%${searchDigits}%`);
-        if (businessType && businessType !== 'all') phoneQb = phoneQb.eq('business_type', businessType as BusinessType);
-        if (governorate && governorate !== 'all') phoneQb = phoneQb.eq('governorate', governorate);
-        if (city && city !== 'all') phoneQb = phoneQb.eq('city', city);
-        const { data: phoneData, error: phoneError, count: phoneCount } = await phoneQb
-          .order('name')
-          .range(from, to);
-        if (phoneError) throw phoneError;
-        const itemsPhone = phoneData.map(dbCustomerToAppCustomer);
-        return {
-          items: [...itemsById, ...itemsPhone],
-          total: itemsById.length + (phoneCount || 0)
-        };
-      } else {
-        const q = `%${searchLower}%`;
-        qb = qb.or(
-          `name.ilike.${q},contact_person.ilike.${q},governorate.ilike.${q},city.ilike.${q},phone.ilike.%${searchDigits}%`
-        );
-      }
+      const q = `%${searchTerm}%`;
+      qb = qb.or(`id.ilike.${q},name.ilike.${q},contact_person.ilike.${q},phone.ilike.${q}`);
     }
     if (businessType && businessType !== 'all')
       qb = qb.eq('business_type', businessType as BusinessType);
     if (governorate && governorate !== 'all') qb = qb.eq('governorate', governorate);
     if (city && city !== 'all') qb = qb.eq('city', city);
+    const orderField = sortBy || 'name';
+    const ascending = sortDir === 'asc';
     const { data, error, count } = await qb
-      .order('name')
+      .order(orderField, { ascending })
       .range(from, to);
     if (error) {
       console.error('Error fetching paginated customers:', error);
@@ -1044,7 +1010,9 @@ export const invoicesService = {
     searchTerm?: string,
     statusFilter?: string,
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<{ items: Invoice[]; total: number }> {
     const from = pageIndex * pageSize;
     const to = from + pageSize - 1;
@@ -1065,13 +1033,24 @@ export const invoicesService = {
         let idQb = supabase
           .from('invoices')
           .select(selectCols, { count: 'exact' })
-          .eq('id', searchTerm);
+          .ilike('id', `%${searchTerm}%`);
         if (statusFilter && statusFilter !== 'all') idQb = idQb.eq('status', statusFilter as InvoiceStatus);
         if (dateFrom) idQb = idQb.gte('date', dateFrom);
         if (dateTo) idQb = idQb.lte('date', dateTo);
-        const { data: idData, error: idError } = await idQb;
+        const { data: idData = [], error: idError } = await idQb;
         if (idError) throw idError;
         const itemsById = idData.map(dbInvoiceToAppInvoice);
+        // بحث بالكود (customer_id)
+        let custQb = supabase
+          .from('invoices')
+          .select(selectCols, { count: 'exact' })
+          .ilike('customer_id', `%${searchTerm}%`); // Use ilike for customer_id
+        if (statusFilter && statusFilter !== 'all') custQb = custQb.eq('status', statusFilter as InvoiceStatus);
+        if (dateFrom) custQb = custQb.gte('date', dateFrom);
+        if (dateTo) custQb = custQb.lte('date', dateTo);
+        const { data: custData = [], error: custError } = await custQb.order('date', { ascending: false }).range(from, to);
+        if (custError) throw custError;
+        const itemsByCust = custData.map(dbInvoiceToAppInvoice);
         // جلب عن طريق الهاتف
         let phoneQb = supabase
           .from('invoices')
@@ -1080,26 +1059,28 @@ export const invoicesService = {
         if (statusFilter && statusFilter !== 'all') phoneQb = phoneQb.eq('status', statusFilter as InvoiceStatus);
         if (dateFrom) phoneQb = phoneQb.gte('date', dateFrom);
         if (dateTo) phoneQb = phoneQb.lte('date', dateTo);
-        const { data: phoneData, error: phoneError, count: phoneCount } = await phoneQb
-          .order('date', { ascending: false })
-          .range(from, to);
+        const { data: phoneData = [], error: phoneError } = await phoneQb.order('date', { ascending: false }).range(from, to);
         if (phoneError) throw phoneError;
         const itemsPhone = phoneData.map(dbInvoiceToAppInvoice);
-        return {
-          items: [...itemsById, ...itemsPhone],
-          total: itemsById.length + (phoneCount || 0)
-        };
+        // دمج النتائج وإزالة التكرار
+        const combined = [...itemsById, ...itemsByCust, ...itemsPhone];
+        const unique = Array.from(new Map(combined.map(inv => [inv.id, inv])).values());
+        return { items: unique, total: unique.length };
       } else {
         const q = `%${searchLower}%`;
-        qb = qb.ilike('id', q);
+        qb = qb.or(
+          `id.ilike.${q},customer_id.ilike.${q},customer.name.ilike.${q},customer.contact_person.ilike.${q},customer.phone.ilike.${q}`
+        );
       }
     }
     if (statusFilter && statusFilter !== 'all')
       qb = qb.eq('status', statusFilter as InvoiceStatus);
     if (dateFrom) qb = qb.gte('date', dateFrom);
     if (dateTo) qb = qb.lte('date', dateTo);
+    const orderField = sortBy || 'date';
+    const ascending = sortDir === 'asc';
     const { data, error, count } = await qb
-      .order('date', { ascending: false })
+      .order(orderField, { ascending })
       .range(from, to);
     if (error) {
       console.error('Error fetching paginated invoices:', error);

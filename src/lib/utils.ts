@@ -7,17 +7,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Format date to a readable string using date-fns
+// تنسيق التاريخ لواجهة المستخدم (DD/MM/YYYY)
 export function formatDate(dateString?: string | Date): string {
-  if (!dateString) return 'غير محدد';
-  
+  if (!dateString) return '-';
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  
-  // Use Intl to format dates in a locale-appropriate way
-  return new Intl.DateTimeFormat('ar-EG', {
+  // Format date as DD/MM/YYYY with English locale
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
-    month: 'short',
-    day: 'numeric',
   }).format(date);
 }
 
