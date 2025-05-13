@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
@@ -6,8 +5,13 @@ import { toast } from '@/components/ui/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { customersService } from '@/services/database';
 import { updateCustomerDataBasedOnInvoices } from '@/hooks/useInvoices';
+import { useAuth } from '@/hooks/useAuth';
+import { UserRole } from '@/lib/auth-types';
 
 const UpdateCustomersButton = () => {
+  const { hasRole } = useAuth();
+  // إخفاء الزر لغير الإدمن
+  if (!hasRole(UserRole.ADMIN)) return null;
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
 
