@@ -23,11 +23,10 @@ const CustomerSelector = ({
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
-  const { getPaginated } = useCustomers();
+  const { getPaginated, getById } = useCustomers();
   const { data: paginatedResponse = { items: [], total: 0 }, isLoading: loading, error: fetchError } =
     getPaginated({ pageIndex: 0, pageSize: 10, searchTerm });
   const suggestions = paginatedResponse.items;
-  // ترتيب الاقتراحات عند البحث بالأرقام: أولاً الكود ثم الهاتف
   const isNumericSearch = /^\d+$/.test(searchTerm);
   const orderedSuggestions = isNumericSearch
     ? [
@@ -36,6 +35,17 @@ const CustomerSelector = ({
       ]
     : suggestions;
   const isMobile = useIsMobile();
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  // استدعِ hook getById دائمًا بنفس الترتيب
+  const customerQuery = getById(selectedCustomerId || '');
+  const customerData = customerQuery?.data;
+
+  useEffect(() => {
+    if (customerData && searchTerm !== customerData.name) {
+      setSearchTerm(customerData.name);
+    }
+  }, [customerData]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -61,7 +71,7 @@ const CustomerSelector = ({
     <div className="space-y-2">
       <Label htmlFor="customer">العميل</Label>
       {disabled ? (
-        <Input id="customer" value={searchTerm} disabled />
+        <Input id="customer" value={searchTerm} disabled className="bg-background text-foreground border border-input" />
       ) : (
         <div className="relative">
           <Input
@@ -72,16 +82,16 @@ const CustomerSelector = ({
               setShowDropdown(true);
             }}
             placeholder="بحث بالاسم، الكود، الهاتف أو المسؤول..."
-            className="w-full pr-10"
+            className="w-full pr-10 bg-background text-foreground border border-input placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
           />
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          {loading && <Skeleton className="h-10 w-full mt-1" />}
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          {loading && <Skeleton className="h-10 w-full mt-1 bg-muted" />}
           {!loading && orderedSuggestions.length > 0 && showDropdown && (
-            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+            <div className="absolute z-10 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
               {orderedSuggestions.map(customer => (
                 <div
                   key={customer.id}
-                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  className="px-4 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
                   onMouseDown={() => {
                     onSelectCustomer(customer.id);
                     setSearchTerm(customer.name);

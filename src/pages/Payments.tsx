@@ -149,13 +149,13 @@ const Payments: React.FC = () => {
     setEditDialogOpen(true);
   };
   
-  const handleDelete = (paymentId: string) => {
-    setPendingDeleteId(paymentId);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteContext, setPendingDeleteContext] = useState<{ id: string; customerId: string; invoiceId?: string } | null>(null);
+
+  const handleDelete = (payment: { id: string; customerId: string; invoiceId?: string }) => {
+    setPendingDeleteContext(payment);
     setDeleteDialogOpen(true);
   };
-
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   return (
     <PageContainer 
@@ -240,14 +240,16 @@ const Payments: React.FC = () => {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
+                          disabled={payment.notes?.includes('تم الدفع عند إنشاء') || payment.notes?.includes('تم الدفع عند تعديل')}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
-                          onClick={() => handleDelete(payment.id)}
+                          onClick={() => handleDelete({ id: payment.id, customerId: payment.customerId, invoiceId: payment.invoiceId })}
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                          disabled={payment.notes?.includes('تم الدفع عند إنشاء') || payment.notes?.includes('تم الدفع عند تعديل')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -273,7 +275,7 @@ const Payments: React.FC = () => {
                 customerName={getCustomerName(payment.customerId)}
                 invoiceNumber={payment.invoiceId ? getInvoiceNumber(payment.invoiceId) : '-'}
                 onEdit={() => handleEdit(payment.id)}
-                onDelete={() => handleDelete(payment.id)}
+                onDelete={() => handleDelete({ id: payment.id, customerId: payment.customerId, invoiceId: payment.invoiceId })}
               />
             ))
           )}
@@ -299,7 +301,10 @@ const Payments: React.FC = () => {
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (pendingDeleteId) deletePayment.mutate(pendingDeleteId);
+                if (pendingDeleteContext) {
+                  deletePayment.mutate(pendingDeleteContext);
+                  setPendingDeleteContext(null);
+                }
                 setDeleteDialogOpen(false);
               }}
               className="bg-destructive text-destructive-foreground"

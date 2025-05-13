@@ -36,7 +36,7 @@ const ProductSelector = ({ productId, quantity, onProductChange, onQuantityChang
   };
 
   return (
-    <div className="border rounded-lg p-4">
+    <div className="border rounded-lg p-4 bg-background text-foreground border-input">
       <h3 className="text-sm font-medium mb-4">إضافة منتج</h3>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         <div className="md:col-span-5">
@@ -51,16 +51,16 @@ const ProductSelector = ({ productId, quantity, onProductChange, onQuantityChang
                 onProductChange('');
               }}
               placeholder="بحث بالاسم، الكود أو العلامة التجارية..."
-              className="w-full pr-10"
+              className="w-full pr-10 bg-background text-foreground border border-input placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            {isLoading && <Skeleton className="h-10 w-full mt-1" />}
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            {isLoading && <Skeleton className="h-10 w-full mt-1 bg-muted" />}
             {!isLoading && showDropdown && suggestions.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+              <div className="absolute z-10 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
                 {suggestions.map(prod => (
                   <div
                     key={prod.id}
-                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    className="px-4 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
                     onMouseDown={() => {
                       onProductChange(prod.id);
                       setSearchTerm(prod.name);
@@ -88,7 +88,10 @@ const ProductSelector = ({ productId, quantity, onProductChange, onQuantityChang
 
         <div className="md:col-span-2 flex items-end">
           <Button 
-            onClick={onAddItem} 
+            onClick={() => {
+              onAddItem();
+              setSearchTerm(''); // تفريغ الحقل تلقائياً بعد الإضافة
+            }}
             className="w-full"
             disabled={!productId || quantity <= 0}
           >

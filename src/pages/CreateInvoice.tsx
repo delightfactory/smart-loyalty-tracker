@@ -74,7 +74,7 @@ const CreateInvoice = () => {
   const [quantity, setQuantity] = useState(1);
   const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -117,6 +117,8 @@ const CreateInvoice = () => {
       } else {
         setDueDate(undefined);
       }
+    } else if (!paymentMethod || paymentMethod === PaymentMethod.CASH) {
+      setDueDate(undefined);
     }
   }, [paymentMethod, selectedCustomerId, invoiceDate, customers]);
 
@@ -213,6 +215,15 @@ const CreateInvoice = () => {
       toast({
         title: "تنبيه",
         description: "يرجى إضافة منتج واحد على الأقل",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!paymentMethod) {
+      toast({
+        title: "تنبيه",
+        description: "يرجى اختيار طريقة الدفع",
         variant: "destructive"
       });
       return;

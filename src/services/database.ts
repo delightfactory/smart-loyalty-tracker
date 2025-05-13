@@ -767,7 +767,27 @@ export const invoicesService = {
   },
   
   async create(invoice: Omit<Invoice, 'id'>, items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]): Promise<Invoice> {
-    const invoiceId = `INV${Date.now().toString().slice(-6)}`;
+    // توليد رقم فاتورة تسلسلي
+    // جلب آخر رقم فاتورة حالي (id)
+    const { data: lastInvoiceData, error: lastInvoiceError } = await supabase
+      .from('invoices')
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1);
+    if (lastInvoiceError) {
+      console.error('خطأ في جلب آخر رقم فاتورة:', lastInvoiceError);
+      throw lastInvoiceError;
+    }
+    let nextNumber = 1;
+    if (lastInvoiceData && lastInvoiceData.length > 0) {
+      const lastId = lastInvoiceData[0].id;
+      // استخراج الرقم من الشكل INV00001
+      const match = /INV(\d+)/.exec(lastId);
+      if (match && match[1]) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+    const invoiceId = `INV${nextNumber.toString().padStart(5, '0')}`;
     const dbInvoice = appInvoiceToDbInvoice({ ...invoice, id: invoiceId });
     
     const { data: createdInvoice, error: invoiceError } = await supabase

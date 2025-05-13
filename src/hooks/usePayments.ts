@@ -137,20 +137,35 @@ export function usePayments() {
   });
   
   const deletePayment = useMutation({
-    mutationFn: (id: string & { customerId?: string }) => paymentsService.delete(id),
-    onSuccess: async (_, variables) => {
+    mutationFn: (variables: { id: string; customerId: string; invoiceId?: string }) => {
+      console.log('Deleting payment with context:', variables);
+      return paymentsService.delete(variables.id);
+    },
+    onSuccess: async (_data, variables: { id: string; customerId: string; invoiceId?: string }) => {
+      console.log('deletePayment onSuccess for context:', variables);
+      const { customerId, invoiceId } = variables;
+      // تحديث مدفوعات العميل
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      // تحديث جميع البيانات المتعلقة بالعملاء والفواتير
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      // تحديث رصيد العميل بشكل لحظي بعد حذف الدفعة
-      // يجب تمرير customerId بشكل صريح عند الحذف إذا كان متاحًا
-      if ((variables as any)?.customerId) {
-        await updateCustomerDataBasedOnInvoices((variables as any).customerId, queryClient);
+      queryClient.invalidateQueries({ queryKey: ['payments', 'customer', customerId] });
+      // تحديث المدفوعات المرتبطة بالفاتورة إن وجدت
+      if (invoiceId) {
+        queryClient.invalidateQueries({ queryKey: ['payments', 'invoice', invoiceId] });
       }
+      // تحديث الفاتورة المرتبطة
+      if (invoiceId) {
+        queryClient.invalidateQueries({ queryKey: ['invoices', invoiceId] });
+        queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', customerId] });
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      }
+      // تحديث بيانات العملاء
+      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      // إعادة حساب رصيد العميل وحالة الفواتير
+      await updateCustomerDataBasedOnInvoices(customerId, queryClient);
+   
       toast({
         title: 'تم حذف الدفعة بنجاح',
-        description: 'تم حذف الدفعة بنجاح من النظام',
+        description: 'تم حذف الدفعة بنجاح وعكس تأثيرها على الفواتير ورصيد العميل',
       });
     },
     onError: (error: Error) => {
