@@ -166,6 +166,16 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
 
   const cardData = view === 'sales' ? salesCards : cardDataDefault;
 
+  // حدود ملونة لكل بطاقة لدعم الوضع النهاري والليلي
+  const borderColors = [
+    'border-blue-200 dark:border-blue-700',
+    'border-green-200 dark:border-green-700',
+    'border-amber-200 dark:border-amber-700',
+    'border-purple-200 dark:border-purple-700',
+    'border-red-200 dark:border-red-700',
+    'border-yellow-200 dark:border-yellow-700',
+  ];
+
   if (!isMounted) {
     return null;
   }
@@ -173,7 +183,7 @@ const DashboardCards = ({ summary, view, formatCurrency }: DashboardSummaryProps
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {cardData.map((card, index) => (
-        <Card key={index} className="transition-all hover:shadow-md">
+        <Card key={index} className={`transition-all hover:shadow-md border-2 ${borderColors[index]}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {card.title}
