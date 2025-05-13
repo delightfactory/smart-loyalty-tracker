@@ -1,35 +1,20 @@
 import { useEffect, useState } from 'react';
-
-interface WaitingServiceWorker {
-  waiting: ServiceWorker | null;
-  message: { type: string } | null;
-}
+import { registerSW } from 'virtual:pwa-register';
 
 export function useServiceWorkerUpdate() {
-  const [registration, setRegistration] = useState<WaitingServiceWorker | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const updateSW = registerSW({
+    onNeedRefresh() {
+      setUpdateAvailable(true);
+    },
+    onOfflineReady() {
+      console.log('App ready for offline use');
+    },
+  });
 
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_UPDATED') {
-          setRegistration({ waiting: registration as any, message: event.data });
-        }
-      });
-
-      navigator.serviceWorker.getRegistration().then((reg) => {
-        if (reg && reg.waiting) {
-          setRegistration({ waiting: reg.waiting, message: null });
-        }
-      });
-    }
-  }, []);
-
-  const updateApp = () => {
-    if (registration?.waiting) {
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
-    }
+  const updateServiceWorker = () => {
+    if (updateSW) updateSW(true);
   };
 
-  return { registration, updateApp };
+  return { updateAvailable, updateServiceWorker };
 }
