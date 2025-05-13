@@ -12,33 +12,35 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    mode === 'development' && componentTagger(),
     VitePWA({
-      // تعطيل التسجيل التلقائي للسيرفس ووركر الافتراضي لاستخدام التسجيل اليدوي
-      injectRegister: null,
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'placeholder.svg'],
+      injectRegister: false, // manual register in main.tsx
+      manifestFilename: 'manifest.webmanifest',
+      includeAssets: ['favicon.ico', 'robots.txt', 'pwa-192x192.png', 'pwa-512x512.png'],
+      devOptions: { enabled: true }, // enable SW in dev for testing
       manifest: {
         name: 'Smart Loyalty Tracker',
         short_name: 'Loyalty',
-        start_url: './',
+        description: 'تطبيق تتبع الولاء الذكي',
+        start_url: '/',
+        scope: '/',
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#000000',
         orientation: 'portrait',
         icons: [
-          { src: 'placeholder.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' }
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*supabase\.co\/.*$/,
-            handler: 'NetworkOnly',
-          },
-        ],
-      },
+          { urlPattern: /^https:\/\/.*supabase\.co\/.*/, handler: 'NetworkOnly' }
+        ]
+      }
     }),
   ].filter(Boolean),
   resolve: {
