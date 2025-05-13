@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Customer, BusinessType } from '@/lib/types';
 import { egyptGovernorates } from '@/lib/egyptLocations';
 
@@ -29,7 +30,7 @@ interface CustomerEditDialogProps {
 const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditDialogProps) => {
   const [editedCustomer, setEditedCustomer] = useState<Customer>({...customer});
   
-  const handleChange = (field: keyof Customer, value: string | number) => {
+  const handleChange = (field: keyof Customer, value: string | number | boolean) => {
     setEditedCustomer(prev => ({
       ...prev,
       [field]: value
@@ -151,6 +152,14 @@ const CustomerEditDialog = ({ customer, isOpen, onClose, onSave }: CustomerEditD
                 onChange={(e) => handleChange('credit_limit', Number(e.target.value))}
                 className="mt-1"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="earnPointsEnabled"
+                checked={editedCustomer.earnPointsEnabled}
+                onCheckedChange={(checked) => handleChange('earnPointsEnabled', checked as boolean)}
+              />
+              <Label htmlFor="earnPointsEnabled">استحقاق النقاط</Label>
             </div>
           </div>
           <DialogFooter>

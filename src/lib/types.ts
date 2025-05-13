@@ -66,6 +66,7 @@ export interface Customer {
   credit_period?: number; // مدة الائتمان بالأيام
   credit_limit?: number;  // قيمة الائتمان
   region?: string; // منطقة العميل (حل مشكلة عدم وجود الحقل في Customer)
+  earnPointsEnabled: boolean; // إضافة خيار استحقاق النقاط
 }
 
 // Invoice Item Interface

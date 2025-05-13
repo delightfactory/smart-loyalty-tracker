@@ -16,6 +16,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -118,7 +119,8 @@ const Customers = () => {
     businessType: BusinessType.SERVICE_CENTER,
     openingBalance: 0,
     governorate: '',
-    city: ''
+    city: '',
+    earnPointsEnabled: true
   });
 
   // مدن المحافظة المختارة في نموذج الإضافة
@@ -231,7 +233,8 @@ const Customers = () => {
       classification: 0,
       level: customersList.length + 1,
       governorate: newCustomer.governorate || '',
-      city: newCustomer.city || ''
+      city: newCustomer.city || '',
+      earnPointsEnabled: newCustomer.earnPointsEnabled
     };
 
     addCustomer.mutate(customerData, {
@@ -244,7 +247,8 @@ const Customers = () => {
           businessType: BusinessType.SERVICE_CENTER,
           openingBalance: 0,
           governorate: '',
-          city: ''
+          city: '',
+          earnPointsEnabled: true
         });
         setIsAddDialogOpen(false);
       }
@@ -771,6 +775,14 @@ const Customers = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="earnPointsEnabled"
+                checked={newCustomer.earnPointsEnabled}
+                onCheckedChange={(checked) => setNewCustomer({ ...newCustomer, earnPointsEnabled: checked as boolean })}
+              />
+              <Label htmlFor="earnPointsEnabled">استحقاق النقاط</Label>
             </div>
           </div>
           <div className="flex justify-end mt-4">

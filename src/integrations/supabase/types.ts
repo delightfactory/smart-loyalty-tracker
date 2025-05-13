@@ -20,6 +20,7 @@ export type Database = {
           credit_limit: number | null
           credit_period: number | null
           current_points: number
+          earn_points_enabled: boolean
           governorate: string | null
           id: string
           lastactive: string | null
@@ -41,6 +42,7 @@ export type Database = {
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number
+          earn_points_enabled?: boolean
           governorate?: string | null
           id: string
           lastactive?: string | null
@@ -62,6 +64,7 @@ export type Database = {
           credit_limit?: number | null
           credit_period?: number | null
           current_points?: number
+          earn_points_enabled?: boolean
           governorate?: string | null
           id?: string
           lastactive?: string | null

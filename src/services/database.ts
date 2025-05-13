@@ -300,7 +300,7 @@ export const customersService = {
     let qb = supabase
       .from('customers')
       .select(
-        'id,name,contact_person,phone,business_type,governorate,city,current_points,points_earned,points_redeemed,classification,level,credit_balance,opening_balance,credit_period,credit_limit',
+        'id,name,contact_person,phone,business_type,governorate,city,earn_points_enabled,current_points,points_earned,points_redeemed,classification,level,credit_balance,opening_balance,credit_period,credit_limit',
         { count: 'exact' }
       );
     if (searchTerm) {
@@ -665,6 +665,25 @@ const updateCustomerOpeningBalance = async (customerId: string, amount: number):
 const updateCustomerPointsBalance = async (customerId: string): Promise<void> => {
   console.log(`Updating points balance for customer ${customerId}`);
   try {
+    // Load points eligibility flag
+    const { data: customerData, error: customerError } = await supabase
+      .from('customers')
+      .select('earn_points_enabled')
+      .eq('id', customerId)
+      .single();
+    if (customerError) {
+      console.error(`Error fetching points eligibility for customer ${customerId}:`, customerError);
+      throw customerError;
+    }
+    if (!customerData?.earn_points_enabled) {
+      // Customer not eligible for points, reset balances
+      const { error: resetError } = await supabase
+        .from('customers')
+        .update({ current_points: 0, points_earned: 0, points_redeemed: 0 })
+        .eq('id', customerId);
+      if (resetError) throw resetError;
+      return;
+    }
     // احتساب النقاط المكتسبة من الفواتير المدفوعة فقط
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
@@ -788,7 +807,23 @@ export const invoicesService = {
       }
     }
     const invoiceId = `INV${nextNumber.toString().padStart(5, '0')}`;
-    const dbInvoice = appInvoiceToDbInvoice({ ...invoice, id: invoiceId });
+    // تحقق من استحقاق النقاط قبل إنشاء الفاتورة
+    const { data: custFlag, error: custFlagError } = await supabase
+      .from('customers')
+      .select('earn_points_enabled')
+      .eq('id', invoice.customerId)
+      .single();
+    if (custFlagError) {
+      console.error(`Error fetching points eligibility for customer ${invoice.customerId}:`, custFlagError);
+      throw custFlagError;
+    }
+    const effectiveInvoice = {
+      ...invoice,
+      id: invoiceId,
+      pointsEarned: custFlag?.earn_points_enabled ? invoice.pointsEarned : 0,
+      pointsRedeemed: 0
+    };
+    const dbInvoice = appInvoiceToDbInvoice(effectiveInvoice);
     
     const { data: createdInvoice, error: invoiceError } = await supabase
       .from('invoices')
@@ -845,6 +880,21 @@ export const invoicesService = {
     const oldInvoice = await this.getById(invoice.id);
     // قيد: منع رصيد النقاط السالب عند تعديل الفاتورة
     const customerId = invoice.customerId;
+    // تحقق من استحقاق النقاط قبل تعديل الفاتورة
+    const { data: custFlagUpd, error: custFlagUpdError } = await supabase
+      .from('customers')
+      .select('earn_points_enabled')
+      .eq('id', customerId)
+      .single();
+    if (custFlagUpdError) {
+      console.error(`Error fetching points eligibility for customer ${customerId}:`, custFlagUpdError);
+      throw custFlagUpdError;
+    }
+    if (!custFlagUpd?.earn_points_enabled) {
+      // إذا لم يكن العميل مؤهلاً، ضبط النقاط المكتسبة على 0
+      invoice.pointsEarned = 0;
+    }
+    // حساب النقاط المكتسبة المتوقعة بعد التعديل
     const { data: allInvs, error: allInvsError } = await supabase
       .from('invoices')
       .select('id, points_earned, status')
@@ -858,15 +908,15 @@ export const invoicesService = {
       return inv.status === InvoiceStatus.PAID ? sum + (inv.points_earned ?? 0) : sum;
     }, 0);
     // مجموع النقاط المستبدلة المكتملة
-    const { data: completedReds, error: redsError } = await supabase
+    const { data: reds, error: redsError } = await supabase
       .from('redemptions')
       .select('total_points_redeemed')
       .eq('customer_id', customerId)
       .eq('status', RedemptionStatus.COMPLETED);
     if (redsError) throw redsError;
-    const totalRedeemed = (completedReds ?? []).reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
+    const totalRedeemed = reds.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
     if (projectedEarned < totalRedeemed) {
-      throw new Error('لا يمكن تعديل الفاتورة لأن النقاط المتوقعة أقل من النقاط المستبدلة المكتملة');
+      throw new Error('لا يمكن تعديل الفاتورة لأن حذف نقاط هذه الفاتورة سيؤدي إلى رصيد نقاط سالب للعميل');
     }
     // تحديث صف الفاتورة
     const dbInvoice = appInvoiceToDbInvoice(invoice);
@@ -962,27 +1012,38 @@ export const invoicesService = {
       throw fetchError;
     }
     
-    // تحقق من عدم حدوث رصيد نقاط سالب بعد حذف هذه الفاتورة
     const customerId = deletedInvoice.customer_id;
-    // مجموع النقاط المكتسبة بعد حذف هذه الفاتورة
-    const { data: invs, error: invsError } = await supabase
-      .from('invoices')
-      .select('points_earned')
-      .eq('customer_id', customerId)
-      .neq('id', id)
-      .eq('status', InvoiceStatus.PAID);
-    if (invsError) throw invsError;
-    const remainingEarned = invs.reduce((sum, inv) => sum + (inv.points_earned ?? 0), 0);
-    // مجموع النقاط المستبدلة
-    const { data: reds, error: redsError } = await supabase
-      .from('redemptions')
-      .select('total_points_redeemed')
-      .eq('customer_id', customerId)
-      .eq('status', RedemptionStatus.COMPLETED);
-    if (redsError) throw redsError;
-    const totalRedeemed = reds.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
-    if (remainingEarned - totalRedeemed < 0) {
-      throw new Error('لا يمكن حذف الفاتورة لأن حذف نقاط هذه الفاتورة سيؤدي إلى رصيد نقاط سالب للعميل');
+    // تحقق من استحقاق النقاط قبل حذف الفاتورة
+    const { data: custFlagDel, error: custFlagDelError } = await supabase
+      .from('customers')
+      .select('earn_points_enabled')
+      .eq('id', customerId)
+      .single();
+    if (custFlagDelError) {
+      console.error(`Error fetching points eligibility for customer ${customerId}:`, custFlagDelError);
+      throw custFlagDelError;
+    }
+    if (custFlagDel?.earn_points_enabled) {
+      // مجموع النقاط المكتسبة بعد حذف هذه الفاتورة
+      const { data: invs, error: invsError } = await supabase
+        .from('invoices')
+        .select('points_earned')
+        .eq('customer_id', customerId)
+        .neq('id', id)
+        .eq('status', InvoiceStatus.PAID);
+      if (invsError) throw invsError;
+      const remainingEarned = invs.reduce((sum, inv) => sum + (inv.points_earned ?? 0), 0);
+      // مجموع النقاط المستبدلة
+      const { data: reds, error: redsError } = await supabase
+        .from('redemptions')
+        .select('total_points_redeemed')
+        .eq('customer_id', customerId)
+        .eq('status', RedemptionStatus.COMPLETED);
+      if (redsError) throw redsError;
+      const totalRedeemed = reds.reduce((sum, r) => sum + (r.total_points_redeemed ?? 0), 0);
+      if (remainingEarned - totalRedeemed < 0) {
+        throw new Error('لا يمكن حذف الفاتورة لأن حذف نقاط هذه الفاتورة سيؤدي إلى رصيد نقاط سالب للعميل');
+      }
     }
     
     // حذف جميع الدفعات المرتبطة بالفاتورة
@@ -1110,7 +1171,7 @@ export const invoicesService = {
       items: (data || []).map(dbInvoiceToAppInvoice),
       total: count || 0
     };
-  },
+  }
 };
 
 export const redemptionsService = {
