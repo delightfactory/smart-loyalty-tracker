@@ -15,8 +15,10 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
     VitePWA({
+      // تعطيل التسجيل التلقائي للسيرفس ووركر الافتراضي لاستخدام التسجيل اليدوي
+      injectRegister: null,
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['favicon.ico', 'robots.txt', 'placeholder.svg'],
       manifest: {
         name: 'Smart Loyalty Tracker',
         short_name: 'Loyalty',
@@ -26,8 +28,7 @@ export default defineConfig(({ mode }) => ({
         theme_color: '#000000',
         orientation: 'portrait',
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'placeholder.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
       },
       workbox: {
