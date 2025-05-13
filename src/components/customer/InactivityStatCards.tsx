@@ -10,7 +10,7 @@ interface InactivityStatCardsProps {
   recentCount: number;
   totalCustomers: number;
   inactivePercentage: number;
-  onSelect?: (tab: 'active' | 'inactive' | 'warning' | 'critical' | 'analytics') => void;
+  onSelect?: (tab: 'active' | 'recent' | 'inactive' | 'warning' | 'critical' | 'analytics') => void;
 }
 
 const InactivityStatCards = ({
@@ -141,7 +141,7 @@ const InactivityStatCards = ({
           </div>
         </CardContent>
       </Card>
-      <Card onClick={() => onSelect?.('inactive')} className="cursor-pointer bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
+      <Card onClick={() => onSelect?.('recent')} className="cursor-pointer bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
         <CardContent className="p-4 text-center flex flex-col items-center space-y-3 h-48 bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900 dark:to-blue-800 hover:shadow-lg">
           <div className="flex items-center justify-center gap-2 mb-2 w-full">
             <div>
