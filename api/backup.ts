@@ -25,13 +25,14 @@ export default async function handler(req: any, res: any) {
   }
   try {
     // جلب إعدادات النسخ التلقائي
-    const { data: settings, error: settingsError } = await supabaseAdmin
+    const { data: settingsData, error: settingsError } = await supabaseAdmin
       .from('settings')
-      .select('enableAutoBackup, backupFrequency, backupRetention')
+      .select('settings_json')
       .single();
     if (settingsError) throw settingsError;
 
-    if (!settings.enableAutoBackup) {
+    const backupSettings = settingsData?.settings_json?.backup;
+    if (!backupSettings?.enableAutoBackup) {
       return res.status(200).json({ message: 'Auto backup disabled' });
     }
 
@@ -41,8 +42,8 @@ export default async function handler(req: any, res: any) {
 
     // تحقق من التردد
     if (
-      (settings.backupFrequency === 'weekly' && dayOfWeek !== 0) ||
-      (settings.backupFrequency === 'monthly' && dayOfMonth !== 1)
+      (backupSettings.backupFrequency === 'weekly' && dayOfWeek !== 0) ||
+      (backupSettings.backupFrequency === 'monthly' && dayOfMonth !== 1)
     ) {
       return res.status(200).json({ message: 'Not scheduled per current backupFrequency' });
     }
@@ -71,14 +72,14 @@ export default async function handler(req: any, res: any) {
     if (uploadError) throw uploadError;
 
     // تنظيف النسخ القديمة
-    if (settings.backupRetention > 0) {
+    if (backupSettings.backupRetention > 0) {
       const { data: files, error: listError } = await supabaseAdmin.storage
         .from(bucket)
         .list('', { limit: 1000 });
       if (listError) throw listError;
       for (const file of files) {
         const fileDate = parseISO(file.name.split('/')[0]);
-        if (differenceInDays(now, fileDate) > settings.backupRetention) {
+        if (differenceInDays(now, fileDate) > backupSettings.backupRetention) {
           await supabaseAdmin.storage.from(bucket).remove([file.name]);
         }
       }
