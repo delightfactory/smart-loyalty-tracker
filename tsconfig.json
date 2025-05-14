@@ -9,12 +9,27 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    // لا تلمس بقية الخيارات إن كانت تتوافق مع تكوين UI
     "noImplicitAny": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,
     "allowJs": true,
     "noUnusedLocals": false,
-    "strictNullChecks": false
+    "strictNullChecks": false,
+    // إضافات موصى بها (اختياريّة إن احتجت استيراد JSON):
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
-  "include": ["api"]
+  // تضمين مجلّد الـ API إلى مشروع TS root:
+  "include": [
+    "api",     // <-- حتى تُضمّ دوال الـ Serverless
+    "src"      // <-- يحافظ على إعدادات الـ UI
+  ],
+  // استبعاد مجلّدات البناء و node_modules و .vercel:
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".vercel",
+    "dev-dist"
+  ]
 }
