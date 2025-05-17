@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +16,9 @@ type TableName =
   | 'user_roles'
   | 'permissions'
   | 'role_permissions'
-  | 'user_permissions';
+  | 'user_permissions'
+  | 'returns'
+  | 'return_items';
 
 /**
  * Hook to subscribe to Supabase real-time updates for a specific table

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { saveAs } from 'file-saver';
@@ -14,6 +13,8 @@ const TABLE_ORDER = [
   'payments',
   'redemptions',
   'redemption_items',
+  'returns',
+  'return_items',
   'points_history'
 ] as const;
 
@@ -21,7 +22,7 @@ const TABLE_ORDER = [
 export type TableName = typeof TABLE_ORDER[number];
 
 // Tables with UUID primary keys
-const UUID_TABLES = ['redemption_items', 'invoice_items', 'points_history'] as const;
+const UUID_TABLES = ['redemption_items', 'invoice_items', 'points_history', 'returns', 'return_items'] as const;
 type UuidTableName = typeof UUID_TABLES[number];
 
 /**
@@ -126,9 +127,21 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
           let summary: string[] = [];
           for (const tableName of TABLE_ORDER) {
             if (backupData[tableName] && backupData[tableName].length > 0) {
+              // إزالة الأعمدة المحسوبة (generated) قبل الإدراج
+              let records = backupData[tableName];
+              if (tableName === 'return_items') {
+                records = (records as any[]).map(({ total_price, ...rest }) => rest);
+              }
+              // حساب total_price لسجلات invoice_items
+              if (tableName === 'invoice_items') {
+                records = (records as any[]).map(record => ({
+                  ...record,
+                  total_price: record.quantity * record.price
+                }));
+              }
               const { error } = await supabase
                 .from(tableName)
-                .insert(backupData[tableName]);
+                .upsert(records, { onConflict: 'id' });
 
               if (error) {
                 console.error(`Error restoring ${tableName}:`, error);
@@ -183,19 +196,25 @@ export async function restoreFromBackup(backupFile: File): Promise<boolean> {
  * Helper function to delete all records from a table with appropriate method for the primary key type
  */
 export async function deleteAllFromTable(tableName: TableName) {
-  if (isUuidTable(tableName)) {
-    // For UUID tables, use delete() without conditions to delete all records
+  // جدول settings يستخدم مفتاح رقمي
+  if (tableName === 'settings') {
     return await supabase
       .from(tableName)
       .delete()
-      .gt('id', '00000000-0000-0000-0000-000000000000'); // Match all UUIDs
-  } else {
-    // For non-UUID tables, use delete() with a more generic condition
-    return await supabase
-      .from(tableName)
-      .delete()
-      .gte('id', 0); // This will match all numeric IDs
+      .gte('id', 0);
   }
+  // الجداول ذات المفاتيح من نوع UUID
+  if (isUuidTable(tableName)) {
+    return await supabase
+      .from(tableName)
+      .delete()
+      .gt('id', '00000000-0000-0000-0000-000000000000');
+  }
+  // الجداول ذات المفاتيح الرقمية الأخرى
+  return await supabase
+    .from(tableName)
+    .delete()
+    .gte('id', 0);
 }
 
 /**

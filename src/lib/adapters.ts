@@ -12,7 +12,10 @@ import {
   InvoiceStatus,
   PaymentMethod,
   PaymentType,
-  RedemptionStatus
+  RedemptionStatus,
+  Return,
+  ReturnItem,
+  ReturnStatus
 } from './types';
 
 // تحويل بيانات المنتجات من قاعدة البيانات إلى نموذج التطبيق
@@ -242,4 +245,56 @@ export function appRedemptionItemToDbRedemptionItem(item: RedemptionItem | Omit<
   }
   
   return dbItem;
+}
+
+// تحويل بيانات بنود المرتجعات من قاعدة البيانات إلى نموذج التطبيق
+export function dbReturnItemToAppReturnItem(dbItem: any): ReturnItem {
+  return {
+    id: dbItem.id,
+    productId: dbItem.product_id,
+    quantity: dbItem.quantity,
+    unitPrice: Number(dbItem.unit_price),
+    totalPrice: Number(dbItem.total_price)
+  };
+}
+
+// تحويل بيانات بنود المرتجعات من نموذج التطبيق إلى قاعدة البيانات
+export function appReturnItemToDbReturnItem(item: ReturnItem | Omit<ReturnItem, 'id'>): any {
+  const dbItem: any = {
+    product_id: item.productId,
+    quantity: item.quantity,
+    unit_price: item.unitPrice
+  };
+  if ('id' in item && item.id) {
+    dbItem.id = item.id;
+  }
+  return dbItem;
+}
+
+// تحويل بيانات المرتجعات من قاعدة البيانات إلى نموذج التطبيق
+export function dbReturnToAppReturn(dbReturn: any): Return {
+  return {
+    id: dbReturn.id,
+    invoiceId: dbReturn.invoice_id,
+    customerId: dbReturn.customer_id,
+    date: new Date(dbReturn.return_date),
+    totalAmount: Number(dbReturn.total_amount),
+    status: dbReturn.status as ReturnStatus,
+    items: dbReturn.items ? dbReturn.items.map(dbReturnItemToAppReturnItem) : []
+  };
+}
+
+// تحويل بيانات المرتجعات من نموذج التطبيق إلى قاعدة البيانات
+export function appReturnToDbReturn(ret: Return | Omit<Return, 'id'>): any {
+  const base: any = {
+    invoice_id: ret.invoiceId,
+    customer_id: ret.customerId,
+    return_date: ret.date instanceof Date ? ret.date.toISOString() : ret.date,
+    total_amount: ret.totalAmount,
+    status: ret.status
+  };
+  if ('id' in ret && ret.id) {
+    base.id = ret.id;
+  }
+  return base;
 }

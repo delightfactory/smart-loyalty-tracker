@@ -27,6 +27,10 @@ const Roles = lazy(() => import('@/pages/Roles'));
 const RoleDetails = lazy(() => import('@/pages/RoleDetails'));
 const CustomerFollowup = lazy(() => import('@/pages/CustomerFollowup'));
 const EditRedemption = lazy(() => import('@/pages/EditRedemption'));
+const ReturnsList = lazy(() => import('@/pages/ReturnsList'));
+const CreateReturn = lazy(() => import('@/pages/CreateReturn'));
+const ReturnDetails = lazy(() => import('@/pages/ReturnDetails'));
+const EditReturn = lazy(() => import('@/pages/EditReturn'));
 
 export function Routes() {
   return (
@@ -69,6 +73,10 @@ export function Routes() {
           <Route path="/users" element={<Users />} />
           <Route path="/roles" element={<Roles />} />
           <Route path="/roles/:id" element={<RoleDetails />} />
+          <Route path="/returns" element={<ReturnsList />} />
+          <Route path="/returns/create" element={<CreateReturn />} />
+          <Route path="/returns/:id" element={<ReturnDetails />} />
+          <Route path="/returns/:id/edit" element={<EditReturn />} />
         </Route>
         
         <Route path="*" element={<NotFound />} />

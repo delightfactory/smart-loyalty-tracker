@@ -37,6 +37,8 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        // Only ignore node_modules to ensure precache has files and avoid warnings
+        globIgnores: ['**/node_modules/**/*'],
         runtimeCaching: [
           { urlPattern: /^https:\/\/.*supabase\.co\/.*/, handler: 'NetworkOnly' }
         ]

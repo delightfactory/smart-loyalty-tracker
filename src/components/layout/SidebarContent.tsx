@@ -11,6 +11,7 @@ import {
   BarChart,
   CreditCard,
   Gift,
+  ArrowUpLeft,
   UserPlus,
   ShieldCheck,
   Settings
@@ -35,6 +36,7 @@ const SidebarContent = ({ isSidebarOpen }: SidebarContentProps) => {
       <SidebarLink href="/analytics" icon={<BarChart className="w-6 h-6 text-pink-600 dark:text-pink-400" />} label="التحليلات" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/payments" icon={<CreditCard className="w-6 h-6 text-teal-600 dark:text-teal-400" />} label="المدفوعات" isSidebarOpen={isSidebarOpen} />
       <SidebarLink href="/redemptions" icon={<Gift className="w-6 h-6 text-orange-600 dark:text-orange-400" />} label="الاستبدالات" isSidebarOpen={isSidebarOpen} />
+      <SidebarLink href="/returns" icon={<ArrowUpLeft className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />} label="المرتجعات" isSidebarOpen={isSidebarOpen} />
       {isAdmin && <SidebarLink href="/users" icon={<UserPlus className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />} label="إدارة المستخدمين" isSidebarOpen={isSidebarOpen} />}
       {isAdmin && <SidebarLink href="/roles" icon={<ShieldCheck className="w-6 h-6 text-lime-600 dark:text-lime-400" />} label="الأدوار" isSidebarOpen={isSidebarOpen} />}
       <SidebarLink href="/settings" icon={<Settings className="w-6 h-6 text-gray-700 dark:text-gray-300" />} label="الإعدادات" isSidebarOpen={isSidebarOpen} />

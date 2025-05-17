@@ -3,7 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidationKeyMap } from './subscriptionHandlers';
 
-export type TableName = 'customers' | 'invoices' | 'payments' | 'products' | 'redemptions' | 'redemption_items' | 'points_history';
+export type TableName =
+  | 'customers'
+  | 'invoices'
+  | 'payments'
+  | 'products'
+  | 'redemptions'
+  | 'redemption_items'
+  | 'points_history'
+  | 'profiles'
+  | 'roles'
+  | 'user_roles'
+  | 'permissions'
+  | 'role_permissions'
+  | 'user_permissions'
+  | 'returns'
+  | 'return_items';
 
 export const useRealtime = (table: TableName) => {
   const queryClient = useQueryClient();

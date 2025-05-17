@@ -23,12 +23,24 @@ export const invalidationKeyMap: Record<TableName, KeyGenerator> = {
     return keys;
   },
   products: () => [],
+  profiles: () => [],
   redemptions: (data) => data?.customer_id ? [
     ['redemptions'],
     ['redemptions', 'customer', data.customer_id],
     ['customers', data.customer_id]
   ] : [],
   redemption_items: () => [],
+  return_items: () => [],
+  returns: (data) => data?.customer_id ? [
+    ['returns'],
+    ['returns', 'customer', data.customer_id],
+    ['customers', data.customer_id]
+  ] : [],
+  roles: () => [],
+  user_roles: () => [],
+  permissions: () => [],
+  role_permissions: () => [],
+  user_permissions: () => [],
   points_history: (data) => data?.customer_id ? [
     ['points_history', data.customer_id],
     ['customers', data.customer_id]

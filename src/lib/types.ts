@@ -154,6 +154,31 @@ export interface Redemption {
   status: RedemptionStatus;
 }
 
+// Return Types
+export enum ReturnStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected"
+}
+
+export interface ReturnItem {
+  id?: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface Return {
+  id: string;
+  invoiceId: string;
+  customerId: string;
+  date: Date;
+  items: ReturnItem[];
+  totalAmount: number;
+  status: ReturnStatus;
+}
+
 // Customer Analysis
 export interface CustomerAnalysis {
   customer: Customer;

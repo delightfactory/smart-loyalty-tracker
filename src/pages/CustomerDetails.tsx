@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
@@ -11,6 +10,8 @@ import CustomerDetailsTabs from '@/components/customer/CustomerDetailsTabs';
 import CustomerActionsBar from '@/components/customer/CustomerActionsBar';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useInvoices } from '@/hooks/useInvoices';
+import { Button } from '@/components/ui/button';
+import { RotateCcw } from 'lucide-react';
 
 const CustomerDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -109,6 +110,17 @@ const CustomerDetails = () => {
         onEdit={() => setIsEditDialogOpen(true)}
         onDelete={handleCustomerDelete}
       />
+      <div className="flex flex-wrap gap-2 w-full md:w-auto mb-6">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => navigate('/returns/create', { state: { customerId: id } })}
+          className="flex items-center bg-orange-500 text-white hover:bg-orange-600"
+        >
+          <RotateCcw className="ml-2 h-4 w-4" />
+          إنشاء مرتجع
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <CustomerBasicInfo customer={customer} />

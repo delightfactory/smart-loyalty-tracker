@@ -444,6 +444,95 @@ export type Database = {
           },
         ]
       }
+      return_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          return_id: string
+          total_price: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          return_id: string
+          total_price: number
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          return_id?: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      returns: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          invoice_id: string
+          return_date: string
+          status: Database["public"]["Enums"]["return_status"]
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          invoice_id: string
+          return_date: string
+          status: Database["public"]["Enums"]["return_status"]
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          invoice_id?: string
+          return_date?: string
+          status?: Database["public"]["Enums"]["return_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "returns_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "returns_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           permission_id: string
@@ -615,6 +704,7 @@ export type Database = {
         | "العناية بالفرش الداخلي"
         | "المستلزمات"
       redemption_status: "completed" | "cancelled" | "pending"
+      return_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -751,6 +841,7 @@ export const Constants = {
         "المستلزمات",
       ],
       redemption_status: ["completed", "cancelled", "pending"],
+      return_status: ["pending", "approved", "rejected"],
     },
   },
 } as const

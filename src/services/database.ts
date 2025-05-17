@@ -6,10 +6,13 @@ import {
   InvoiceItem, 
   Redemption, 
   RedemptionItem,
+  Return,
+  ReturnItem,
   PaymentType,
   InvoiceStatus,
   PaymentMethod,
   RedemptionStatus,
+  ReturnStatus,
   BusinessType
 } from '@/lib/types';
 import { 
@@ -26,7 +29,11 @@ import {
   dbRedemptionToAppRedemption,
   appRedemptionToDbRedemption,
   dbRedemptionItemToAppRedemptionItem,
-  appRedemptionItemToDbRedemptionItem
+  appRedemptionItemToDbRedemptionItem,
+  dbReturnToAppReturn,
+  appReturnToDbReturn,
+  dbReturnItemToAppReturnItem,
+  appReturnItemToDbReturnItem
 } from '@/lib/adapters';
 import { supabase } from '@/integrations/supabase/client';
 import { Constants } from '@/integrations/supabase/types';
@@ -573,7 +580,7 @@ const updateInvoiceStatusAfterPayment = async (invoiceId: string, customerId: st
   }
 };
 
-const updateCustomerCreditBalance = async (customerId: string): Promise<void> => {
+export const updateCustomerCreditBalance = async (customerId: string): Promise<void> => {
   console.log(`Updating credit balance for customer ${customerId}`);
   
   try {
@@ -618,7 +625,21 @@ const updateCustomerCreditBalance = async (customerId: string): Promise<void> =>
     }
     
     console.log(`Customer ${customerId} - Total credit balance: ${totalAmountDue}`);
-    
+
+    // طرح مبالغ المرتجعات المعتمدة
+    const { data: returnsData, error: returnsError } = await supabase
+      .from('returns')
+      .select('total_amount')
+      .eq('customer_id', customerId)
+      .eq('status', ReturnStatus.APPROVED);
+    if (returnsError) {
+      console.error(`Error fetching returns for customer ${customerId}:`, returnsError);
+      throw returnsError;
+    }
+    const totalReturns = returnsData.reduce((sum, r) => sum + Number(r.total_amount), 0);
+    totalAmountDue -= totalReturns;
+    console.log(`Customer ${customerId} - Total approved returns: ${totalReturns}`);
+
     const { error: updateError } = await supabase
       .from('customers')
       .update({ credit_balance: totalAmountDue })
@@ -1337,6 +1358,158 @@ export const redemptionsService = {
       
     if (error) {
       console.error(`Error deleting redemption with id ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+export const returnsService = {
+  async getAll(): Promise<Return[]> {
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`
+        *,
+        items:return_items(*)
+      `)
+      .order('return_date', { ascending: false })
+      .range(0, 5000);
+    if (error) {
+      console.error('Error fetching returns:', error);
+      throw error;
+    }
+    return data.map(dbReturnToAppReturn);
+  },
+
+  async getByCustomerId(customerId: string): Promise<Return[]> {
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`
+        *,
+        items:return_items(*)
+      `)
+      .eq('customer_id', customerId)
+      .order('return_date', { ascending: false });
+    if (error) {
+      console.error(`Error fetching returns for customer ${customerId}:`, error);
+      throw error;
+    }
+    return data.map(dbReturnToAppReturn);
+  },
+
+  async getById(id: string): Promise<Return> {
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`
+        *,
+        items:return_items(*)
+      `)
+      .eq('id', id)
+      .maybeSingle();
+    if (error) {
+      console.error(`Error fetching return with id ${id}:`, error);
+      throw error;
+    }
+    if (!data) {
+      throw new Error(`Return with id ${id} not found`);
+    }
+    return dbReturnToAppReturn(data);
+  },
+
+  async getByInvoiceId(invoiceId: string): Promise<Return[]> {
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`
+        *,
+        items:return_items(*)
+      `)
+      .eq('invoice_id', invoiceId);
+    if (error) {
+      console.error(`Error fetching returns for invoice ${invoiceId}:`, error);
+      throw error;
+    }
+    return data.map(dbReturnToAppReturn);
+  },
+
+  async create(ret: Omit<Return, 'id'>, items: Omit<ReturnItem, 'id'>[]): Promise<Return> {
+    const { data, error } = await supabase
+      .from('returns')
+      .insert(appReturnToDbReturn(ret))
+      .select('*')
+      .single();
+    if (error) {
+      console.error('Error creating return:', error);
+      throw error;
+    }
+    const returnId = data.id;
+    if (items.length > 0) {
+      const dbItems = items.map(item => {
+        const dbItem = appReturnItemToDbReturnItem(item);
+        const { id: _ignore, ...fields } = dbItem;
+        return { ...fields, return_id: returnId };
+      });
+      const { error: itemsError } = await supabase
+        .from('return_items')
+        .insert(dbItems);
+      if (itemsError) {
+        console.error('Error inserting return items:', itemsError);
+        throw itemsError;
+      }
+    }
+    return this.getById(data.id);
+  },
+
+  async update(ret: Return): Promise<Return> {
+    const { data, error } = await supabase
+      .from('returns')
+      .update(appReturnToDbReturn(ret))
+      .eq('id', ret.id)
+      .select('*')
+      .single();
+    if (error) {
+      console.error(`Error updating return with id ${ret.id}:`, error);
+      throw error;
+    }
+    const returnId = ret.id;
+    const { error: deleteError } = await supabase
+      .from('return_items')
+      .delete()
+      .eq('return_id', returnId);
+    if (deleteError) {
+      console.error(`Error deleting old return items for ${returnId}:`, deleteError);
+      throw deleteError;
+    }
+    if (ret.items && ret.items.length > 0) {
+      const dbItems = ret.items.map(item => {
+        const dbItem = appReturnItemToDbReturnItem(item);
+        const { id: _ignore, ...fields } = dbItem;
+        return { ...fields, return_id: returnId };
+      });
+      const { error: itemsError } = await supabase
+        .from('return_items')
+        .insert(dbItems);
+      if (itemsError) {
+        console.error(`Error inserting new return items for ${returnId}:`, itemsError);
+        throw itemsError;
+      }
+    }
+    return this.getById(returnId);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error: itemsError } = await supabase
+      .from('return_items')
+      .delete()
+      .eq('return_id', id);
+    if (itemsError) {
+      console.error(`Error deleting return items for return ${id}:`, itemsError);
+      throw itemsError;
+    }
+    const { error } = await supabase
+      .from('returns')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      console.error(`Error deleting return with id ${id}:`, error);
       throw error;
     }
   }

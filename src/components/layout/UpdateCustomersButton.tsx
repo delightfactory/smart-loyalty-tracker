@@ -9,11 +9,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { UserRole } from '@/lib/auth-types';
 
 const UpdateCustomersButton = () => {
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const { hasRole } = useAuth();
   // إخفاء الزر لغير الإدمن
   if (!hasRole(UserRole.ADMIN)) return null;
-  const [loading, setLoading] = useState(false);
-  const queryClient = useQueryClient();
 
   const handleUpdate = async () => {
     setLoading(true);
