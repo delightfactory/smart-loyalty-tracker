@@ -133,6 +133,43 @@ export function useRedemptions() {
     queryFn: () => redemptionsService.getAll()
   });
   
+  /**
+   * جلب الاستبدالات بتصفح محكوم بالخادم
+   */
+  const getPaginated = (params: {
+    pageIndex: number;
+    pageSize: number;
+    searchTerm?: string;
+    statusFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }) => useQuery<{ items: Redemption[]; total: number }, Error>({
+    queryKey: [
+      'redemptions',
+      'paginated',
+      params.pageIndex,
+      params.pageSize,
+      params.searchTerm,
+      params.statusFilter,
+      params.dateFrom,
+      params.dateTo,
+      params.sortBy,
+      params.sortDir
+    ],
+    queryFn: () => redemptionsService.getPaginated(
+      params.pageIndex,
+      params.pageSize,
+      params.searchTerm,
+      params.statusFilter,
+      params.dateFrom,
+      params.dateTo,
+      params.sortBy,
+      params.sortDir
+    )
+  });
+  
   // إسترجاع عمليات الاستبدال لعميل محدد
   const getByCustomerId = (customerId: string) => useQuery({
     queryKey: ['redemptions', 'customer', customerId],
@@ -262,6 +299,7 @@ export function useRedemptions() {
   
   return {
     getAll,
+    getPaginated,
     getByCustomerId,
     getById,
     addRedemption,

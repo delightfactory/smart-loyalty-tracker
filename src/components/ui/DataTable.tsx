@@ -91,9 +91,11 @@ export default function DataTable<T extends Record<string, any>>({
   }
 
   const paginatedData = useMemo(() => {
+    // في وضع التحكم من الخادم، نفترض أن البيانات القادمة هي البيانات الخاصة بالصفحة الحالية بالفعل
+    if (isControlled) return data;
     const sourceData = sortConfig ? sortedData : data;
     return sourceData.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
-  }, [data, sortedData, pageIndex, pageSize, sortConfig]);
+  }, [data, sortedData, pageIndex, pageSize, sortConfig, isControlled]);
 
   const handleSort = (accessor: keyof T) => {
     if (isSortControlled) {

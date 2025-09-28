@@ -134,11 +134,12 @@ export const productsService = {
     // البحث في الحقول id, name, brand، والفئات إن وجدت
     const matchingCategories = Constants.public.Enums.product_category.filter(label => label.toLowerCase().includes(qLower));
     const clauses = [
-      `name.ilike.%${qLower}%`,
-      `brand.ilike.%${qLower}%`,
+      `name.ilike.*%${qLower}%*`,
+      `brand.ilike.*%${qLower}%*`,
     ];
     if (matchingCategories.length) {
-      const inList = matchingCategories.map(label => `'${label}'`).join(',');
+      // لا تضع علامات اقتباس أحادية حول قيم ENUM، Supabase سيقوم بترميزها
+      const inList = matchingCategories.join(',');
       clauses.push(`category.in.(${inList})`);
     }
     const orFilter = clauses.join(',');
@@ -331,6 +332,25 @@ export const customersService = {
       items: data.map(dbCustomerToAppCustomer),
       total: count || 0
     };
+  },
+  
+  /** جلب أسماء العملاء لمجموعة من المعرفات لتقليل حجم البيانات */
+  async getNamesByIds(ids: string[]): Promise<Record<string, string>> {
+    if (!ids || ids.length === 0) return {};
+    const unique = Array.from(new Set(ids));
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id, name')
+      .in('id', unique);
+    if (error) {
+      console.error('Error fetching customer names by IDs:', error);
+      throw error;
+    }
+    const map: Record<string, string> = {};
+    for (const row of data || []) {
+      if (row && row.id) map[row.id] = row.name || '';
+    }
+    return map;
   }
 };
 
@@ -596,31 +616,30 @@ export const updateCustomerCreditBalance = async (customerId: string): Promise<v
     }
     
     let totalAmountDue = 0;
-    
-    for (const invoiceData of invoicesData) {
-      const invoice = dbInvoiceToAppInvoice(invoiceData);
-      
-      const { data: paymentsData, error: paymentsError } = await supabase
+
+    // تجميع المدفوعات لكل فواتير العميل في استعلام واحد لتجنب N+1
+    const invoiceIds = (invoicesData || []).map((inv: any) => inv.id);
+    let paymentsByInvoice: Record<string, number> = {};
+    if (invoiceIds.length > 0) {
+      const { data: allPays, error: paysError } = await supabase
         .from('payments')
-        .select('*')
-        .eq('invoice_id', invoice.id);
-        
-      if (paymentsError) {
-        console.error(`Error fetching payments for invoice ${invoice.id}:`, paymentsError);
-        throw paymentsError;
+        .select('invoice_id, amount, type')
+        .in('invoice_id', invoiceIds);
+      if (paysError) {
+        console.error(`Error fetching batched payments for customer ${customerId}:`, paysError);
+        throw paysError;
       }
-      
-      const payments = paymentsData.map(dbPaymentToAppPayment);
-      
-      const totalPaidForInvoice = payments.reduce((sum, payment) => {
-        if (payment.type === PaymentType.PAYMENT) {
-          return sum + payment.amount;
-        } else if (payment.type === PaymentType.REFUND) {
-          return sum - payment.amount;
-        }
-        return sum;
-      }, 0);
-      
+      for (const p of allPays || []) {
+        const key = p.invoice_id as string;
+        const amt = Number(p.amount) || 0;
+        const sign = p.type === PaymentType.PAYMENT ? 1 : p.type === PaymentType.REFUND ? -1 : 0;
+        paymentsByInvoice[key] = (paymentsByInvoice[key] || 0) + sign * amt;
+      }
+    }
+
+    for (const inv of invoicesData || []) {
+      const invoice = dbInvoiceToAppInvoice(inv);
+      const totalPaidForInvoice = paymentsByInvoice[invoice.id] || 0;
       totalAmountDue += (invoice.totalAmount - totalPaidForInvoice);
     }
     
@@ -1114,72 +1133,81 @@ export const invoicesService = {
     dateFrom?: string,
     dateTo?: string,
     sortBy?: string,
-    sortDir?: 'asc' | 'desc'
+    sortDir?: 'asc' | 'desc',
+    governorateFilter?: string,
+    cityFilter?: string
   ): Promise<{ items: Invoice[]; total: number }> {
     const from = pageIndex * pageSize;
     const to = from + pageSize - 1;
+    // تحديد الأعمدة الضرورية فقط لقائمة الفواتير
+    const selectCols = `
+      id,
+      customer_id,
+      date,
+      due_date,
+      total_amount,
+      points_earned,
+      points_redeemed,
+      status,
+      payment_method,
+      categories_count,
+      customer:customers!inner(name, governorate, city, contact_person, phone)
+    `;
     let qb = supabase
       .from('invoices')
-      .select(
-        `*, customer:customers(*), items:invoice_items(*), payments:payments(*)`,
-        { count: 'exact' }
-      );
+      .select(selectCols, { count: 'exact' });
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const searchDigits = searchTerm.replace(/\D/g, '');
-      const isNumericSearch = /^\d+$/.test(searchTerm);
-      if (isNumericSearch) {
-        // بحث بالكود (id) أولاً
-        const selectCols = '*, customer:customers(*)';
-        // جلب عن طريق id
-        let idQb = supabase
-          .from('invoices')
-          .select(selectCols, { count: 'exact' })
-          .ilike('id', `%${searchTerm}%`);
-        if (statusFilter && statusFilter !== 'all') idQb = idQb.eq('status', statusFilter as InvoiceStatus);
-        if (dateFrom) idQb = idQb.gte('date', dateFrom);
-        if (dateTo) idQb = idQb.lte('date', dateTo);
-        const { data: idData = [], error: idError } = await idQb;
-        if (idError) throw idError;
-        const itemsById = idData.map(dbInvoiceToAppInvoice);
-        // بحث بالكود (customer_id)
+      const q = `%${searchTerm}%`;
+      const orParts: string[] = [
+        `id.ilike.${q}`,
+        `customer_id.ilike.${q}`
+      ];
+      // ابحث عن العملاء المطابقين لجملة البحث لإضافة customer_id.in إلى OR
+      try {
         let custQb = supabase
-          .from('invoices')
-          .select(selectCols, { count: 'exact' })
-          .ilike('customer_id', `%${searchTerm}%`); // Use ilike for customer_id
-        if (statusFilter && statusFilter !== 'all') custQb = custQb.eq('status', statusFilter as InvoiceStatus);
-        if (dateFrom) custQb = custQb.gte('date', dateFrom);
-        if (dateTo) custQb = custQb.lte('date', dateTo);
-        const { data: custData = [], error: custError } = await custQb.order('date', { ascending: false }).range(from, to);
-        if (custError) throw custError;
-        const itemsByCust = custData.map(dbInvoiceToAppInvoice);
-        // جلب عن طريق الهاتف
-        let phoneQb = supabase
-          .from('invoices')
-          .select(selectCols, { count: 'exact' })
-          .ilike('customer.phone', `%${searchDigits}%`);
-        if (statusFilter && statusFilter !== 'all') phoneQb = phoneQb.eq('status', statusFilter as InvoiceStatus);
-        if (dateFrom) phoneQb = phoneQb.gte('date', dateFrom);
-        if (dateTo) phoneQb = phoneQb.lte('date', dateTo);
-        const { data: phoneData = [], error: phoneError } = await phoneQb.order('date', { ascending: false }).range(from, to);
-        if (phoneError) throw phoneError;
-        const itemsPhone = phoneData.map(dbInvoiceToAppInvoice);
-        // دمج النتائج وإزالة التكرار
-        const combined = [...itemsById, ...itemsByCust, ...itemsPhone];
-        const unique = Array.from(new Map(combined.map(inv => [inv.id, inv])).values());
-        return { items: unique, total: unique.length };
-      } else {
-        const q = `%${searchLower}%`;
-        qb = qb.or(
-          `id.ilike.${q},customer_id.ilike.${q},customer.name.ilike.${q},customer.contact_person.ilike.${q},customer.phone.ilike.${q}`
-        );
+          .from('customers')
+          .select('id')
+          .or(`name.ilike.${q},contact_person.ilike.${q},phone.ilike.${q}`)
+          .limit(500);
+        if (governorateFilter && governorateFilter !== 'all') {
+          custQb = custQb.eq('governorate', governorateFilter);
+        }
+        if (cityFilter && cityFilter !== 'all') {
+          custQb = custQb.eq('city', cityFilter);
+        }
+        const { data: custMatches, error: custErr } = await custQb;
+        if (!custErr && custMatches && custMatches.length) {
+          const ids = Array.from(new Set(custMatches.map((c: any) => c.id).filter(Boolean)));
+          if (ids.length) {
+            // اقتباس القيم النصية بشكل آمن
+            const quoted = ids
+              .slice(0, 200)
+              .map((v: string) => `'${String(v).replace(/'/g, "''")}'`)
+              .join(',');
+            orParts.push(`customer_id.in.(${quoted})`);
+          }
+        }
+      } catch (e) {
+        console.warn('customers pre-search failed, fallback to root fields only');
       }
+      qb = qb.or(orParts.join(','));
     }
     if (statusFilter && statusFilter !== 'all')
       qb = qb.eq('status', statusFilter as InvoiceStatus);
     if (dateFrom) qb = qb.gte('date', dateFrom);
     if (dateTo) qb = qb.lte('date', dateTo);
-    const orderField = sortBy || 'date';
+    if (governorateFilter && governorateFilter !== 'all') qb = qb.eq('customer.governorate', governorateFilter);
+    if (cityFilter && cityFilter !== 'all') qb = qb.eq('customer.city', cityFilter);
+    const sortMap: Record<string, string> = {
+      id: 'id',
+      date: 'date',
+      totalAmount: 'total_amount',
+      status: 'status',
+      paymentMethod: 'payment_method',
+      pointsEarned: 'points_earned',
+      customerId: 'customer_id'
+    };
+    const orderField = sortBy ? (sortMap[sortBy] || 'date') : 'date';
     const ascending = sortDir === 'asc';
     const { data, error, count } = await qb
       .order(orderField, { ascending })
@@ -1191,6 +1219,109 @@ export const invoicesService = {
     return {
       items: (data || []).map(dbInvoiceToAppInvoice),
       total: count || 0
+    };
+  },
+
+  /** جلب إحصائيات مجمعة للفواتير بناءً على نفس الفلاتر */
+  async getAggregates(
+    searchTerm?: string,
+    statusFilter?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    governorateFilter?: string,
+    cityFilter?: string
+  ): Promise<{
+    totalCount: number;
+    totalAmount: number;
+    statusBreakdown: Record<string, { count: number; sum: number }>;
+    categoryBreakdown: Record<string, { count: number; percentage: number }>;
+  }> {
+    // بناء نفس الاستعلام المستخدم في getPaginated لكن بدون ترقيم
+    const selectCols = `
+      id,
+      total_amount,
+      status,
+      categories_count,
+      customer:customers!inner(name, governorate, city, contact_person, phone)
+    `;
+    let qb = supabase
+      .from('invoices')
+      .select(selectCols, { count: 'exact' });
+    
+    // تطبيق نفس الفلاتر
+    if (searchTerm) {
+      const q = `%${searchTerm}%`;
+      const orParts: string[] = [
+        `id.ilike.${q}`,
+        `customer_id.ilike.${q}`
+      ];
+      // ابحث عن العملاء المطابقين
+      try {
+        let custQb = supabase
+          .from('customers')
+          .select('id')
+          .or(`name.ilike.${q},contact_person.ilike.${q},phone.ilike.${q}`)
+          .limit(500);
+        if (governorateFilter && governorateFilter !== 'all') {
+          custQb = custQb.eq('governorate', governorateFilter);
+        }
+        if (cityFilter && cityFilter !== 'all') {
+          custQb = custQb.eq('city', cityFilter);
+        }
+        const { data: custMatches, error: custErr } = await custQb;
+        if (!custErr && custMatches && custMatches.length) {
+          const ids = Array.from(new Set(custMatches.map((c: any) => c.id).filter(Boolean)));
+          if (ids.length) {
+            const quoted = ids
+              .slice(0, 200)
+              .map((v: string) => `'${String(v).replace(/'/g, "''")}'`)
+              .join(',');
+            orParts.push(`customer_id.in.(${quoted})`);
+          }
+        }
+      } catch (e) {
+        console.warn('customers pre-search failed in aggregates, fallback to root fields only');
+      }
+      qb = qb.or(orParts.join(','));
+    }
+    if (statusFilter && statusFilter !== 'all')
+      qb = qb.eq('status', statusFilter as InvoiceStatus);
+    if (dateFrom) qb = qb.gte('date', dateFrom);
+    if (dateTo) qb = qb.lte('date', dateTo);
+    if (governorateFilter && governorateFilter !== 'all') qb = qb.eq('customer.governorate', governorateFilter);
+    if (cityFilter && cityFilter !== 'all') qb = qb.eq('customer.city', cityFilter);
+
+    const { data, error, count } = await qb;
+    if (error) {
+      console.error('Error fetching invoice aggregates:', error);
+      throw error;
+    }
+
+    const invoices = (data || []).map(dbInvoiceToAppInvoice);
+    const totalCount = count || 0;
+    const totalAmount = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+
+    // حساب إحصائيات الحالة
+    const statusBreakdown: Record<string, { count: number; sum: number }> = {};
+    Object.values(InvoiceStatus).forEach(status => {
+      statusBreakdown[status] = { count: 0, sum: 0 };
+    });
+    invoices.forEach(inv => {
+      if (statusBreakdown[inv.status]) {
+        statusBreakdown[inv.status].count++;
+        statusBreakdown[inv.status].sum += inv.totalAmount || 0;
+      }
+    });
+
+    // حساب إحصائيات الفئات (مؤقتاً فارغة - سيتم تطويرها لاحقاً)
+    const categoryBreakdown: Record<string, { count: number; percentage: number }> = {};
+    // TODO: تطوير منطق الفئات عند توفر بيانات invoice_items مع product categories
+
+    return {
+      totalCount,
+      totalAmount,
+      statusBreakdown,
+      categoryBreakdown
     };
   }
 };
@@ -1212,6 +1343,46 @@ export const redemptionsService = {
     }
     
     return data.map(dbRedemptionToAppRedemption);
+  },
+  
+  // دعم التصفح المحكوم بالخادم لعمليات الاستبدال
+  async getPaginated(
+    pageIndex: number,
+    pageSize: number,
+    searchTerm?: string,
+    statusFilter?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
+  ): Promise<{ items: Redemption[]; total: number }> {
+    const from = pageIndex * pageSize;
+    const to = from + pageSize - 1;
+    let qb = supabase
+      .from('redemptions')
+      .select('id, customer_id, date, total_points_redeemed, status', { count: 'exact' });
+
+    if (searchTerm) {
+      const q = `%${searchTerm}%`;
+      qb = qb.or(`id.ilike.${q},customer_id.ilike.${q}`);
+    }
+    if (statusFilter && statusFilter !== 'all') qb = qb.eq('status', statusFilter as RedemptionStatus);
+    if (dateFrom) qb = qb.gte('date', dateFrom);
+    if (dateTo) qb = qb.lte('date', dateTo);
+
+    const orderField = sortBy || 'date';
+    const ascending = sortDir === 'asc';
+    const { data, error, count } = await qb
+      .order(orderField, { ascending })
+      .range(from, to);
+    if (error) {
+      console.error('Error fetching paginated redemptions:', error);
+      throw error;
+    }
+    return {
+      items: (data || []).map(dbRedemptionToAppRedemption),
+      total: count || 0
+    };
   },
   
   async getByCustomerId(customerId: string): Promise<Redemption[]> {

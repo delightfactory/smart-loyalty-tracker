@@ -240,6 +240,8 @@ export function useInvoiceMutations() {
       
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'aggregates'] });
       
       // تحديث بيانات العميل بعد إضافة فاتورة جديدة
       await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
@@ -266,6 +268,8 @@ export function useInvoiceMutations() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', data.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'aggregates'] });
       
       // تحديث بيانات العميل بعد تحديث الفاتورة
       await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
@@ -294,6 +298,8 @@ export function useInvoiceMutations() {
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices', 'customer', data.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'aggregates'] });
       
       // تحديث بيانات العميل بعد حذف الفاتورة
       await updateCustomerDataBasedOnInvoices(data.customerId, queryClient);
@@ -333,10 +339,34 @@ export function useInvoices() {
   const getByCustomerId = useCustomerInvoices;
   const { addInvoice, updateInvoice, deleteInvoice } = useInvoiceMutations();
 
-  /** دعم pagination من الخادم: جلب دفعة من الفواتير مع العدّ الكلي */
-  const getPaginated = (params: { pageIndex: number; pageSize: number; searchTerm?: string; statusFilter?: string; dateFrom?: string; dateTo?: string }) =>
+  /** دعم pagination من الخادم مع الفرز والفلاتر الجغرافية */
+  const getPaginated = (params: {
+    pageIndex: number;
+    pageSize: number;
+    searchTerm?: string;
+    statusFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    governorateFilter?: string;
+    cityFilter?: string;
+  }) =>
     useQuery<{ items: Invoice[]; total: number }, Error>({
-      queryKey: ['invoices', 'paginated', params.pageIndex, params.pageSize, params.searchTerm, params.statusFilter, params.dateFrom, params.dateTo],
+      queryKey: [
+        'invoices',
+        'paginated',
+        params.pageIndex,
+        params.pageSize,
+        params.searchTerm,
+        params.statusFilter,
+        params.dateFrom,
+        params.dateTo,
+        params.sortBy,
+        params.sortDir,
+        params.governorateFilter,
+        params.cityFilter,
+      ],
       queryFn: () =>
         invoicesService.getPaginated(
           params.pageIndex,
@@ -344,8 +374,44 @@ export function useInvoices() {
           params.searchTerm,
           params.statusFilter,
           params.dateFrom,
-          params.dateTo
+          params.dateTo,
+          params.sortBy,
+          params.sortDir,
+          params.governorateFilter,
+          params.cityFilter
         ),
+    });
+
+  /** جلب إحصائيات مجمعة للفواتير بناءً على نفس الفلاتر */
+  const getAggregates = (params: {
+    searchTerm?: string;
+    statusFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    governorateFilter?: string;
+    cityFilter?: string;
+  }) =>
+    useQuery({
+      queryKey: [
+        'invoices',
+        'aggregates',
+        params.searchTerm,
+        params.statusFilter,
+        params.dateFrom,
+        params.dateTo,
+        params.governorateFilter,
+        params.cityFilter,
+      ],
+      queryFn: () =>
+        invoicesService.getAggregates(
+          params.searchTerm,
+          params.statusFilter,
+          params.dateFrom,
+          params.dateTo,
+          params.governorateFilter,
+          params.cityFilter
+        ),
+      staleTime: 1000 * 60 * 2, // 2 minutes cache
     });
 
   return {
@@ -356,5 +422,6 @@ export function useInvoices() {
     updateInvoice,
     deleteInvoice,
     getPaginated,
+    getAggregates,
   };
 }
